@@ -2,7 +2,6 @@ import type { TgpuQuerySet } from '../../core/querySet/querySet.ts';
 import type { AnyComputeBuiltin, OmitBuiltins } from '../../builtin.ts';
 import type { AnyData, Disarray } from '../../data/dataTypes.ts';
 import type { AnyWgslData, WgslArray } from '../../data/wgslTypes.ts';
-import type { JitTranspiler } from '../../jitTranspiler.ts';
 import type { NameRegistry } from '../../nameRegistry.ts';
 import type { Infer } from '../../shared/repr.ts';
 import type {
@@ -11,7 +10,7 @@ import type {
   Prettify,
 } from '../../shared/utilityTypes.ts';
 import type {
-  LayoutEntryToInput,
+  ExtractBindGroupInputFromLayout,
   TgpuBindGroup,
   TgpuBindGroupLayout,
   TgpuLayoutEntry,
@@ -111,7 +110,7 @@ export interface WithFragment<
   createPipeline(): TgpuRenderPipeline<Output>;
 }
 
-export interface WithBinding {
+export interface Configurable {
   with<T>(slot: TgpuSlot<T>, value: Eventual<T>): WithBinding;
   with<T extends AnyWgslData>(
     accessor: TgpuAccessor<T>,
@@ -122,6 +121,10 @@ export interface WithBinding {
       | Infer<T>,
   ): WithBinding;
 
+  pipe(transform: (cfg: Configurable) => Configurable): Configurable;
+}
+
+export interface WithBinding extends Configurable {
   withCompute<ComputeIn extends IORecord<AnyComputeBuiltin>>(
     entryFn: TgpuComputeFn<ComputeIn>,
   ): WithCompute;
@@ -520,9 +523,7 @@ export interface TgpuRoot extends Unwrapper {
     >,
   >(
     layout: TgpuBindGroupLayout<Entries>,
-    entries: {
-      [K in keyof OmitProps<Entries, null>]: LayoutEntryToInput<Entries[K]>;
-    },
+    entries: ExtractBindGroupInputFromLayout<Entries>,
   ): TgpuBindGroup<Entries>;
 
   /**
@@ -542,7 +543,6 @@ export interface TgpuRoot extends Unwrapper {
 }
 
 export interface ExperimentalTgpuRoot extends TgpuRoot, WithBinding {
-  readonly jitTranspiler?: JitTranspiler | undefined;
   readonly nameRegistry: NameRegistry;
   /**
    * The current command encoder. This property will

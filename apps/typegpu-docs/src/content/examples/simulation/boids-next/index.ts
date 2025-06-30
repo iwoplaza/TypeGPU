@@ -5,17 +5,15 @@ import * as std from 'typegpu/std';
 const triangleAmount = 1000;
 const triangleSize = 0.03;
 
-const rotate = tgpu['~unstable'].fn([d.vec2f, d.f32], d.vec2f)((v, angle) => {
+const rotate = tgpu.fn([d.vec2f, d.f32], d.vec2f)((v, angle) => {
   const cos = std.cos(angle);
   const sin = std.sin(angle);
   return d.vec2f(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
 });
 
-const getRotationFromVelocity = tgpu['~unstable'].fn([d.vec2f], d.f32)(
-  (velocity) => {
-    return -std.atan2(velocity.x, velocity.y);
-  },
-);
+const getRotationFromVelocity = tgpu.fn([d.vec2f], d.f32)((velocity) => {
+  return -std.atan2(velocity.x, velocity.y);
+});
 
 const TriangleData = d.struct({
   position: d.vec2f,
@@ -62,16 +60,14 @@ const mainFrag = tgpu['~unstable'].fragmentFn({
   return input.color;
 });
 
-const Params = d
-  .struct({
-    separationDistance: d.f32,
-    separationStrength: d.f32,
-    alignmentDistance: d.f32,
-    alignmentStrength: d.f32,
-    cohesionDistance: d.f32,
-    cohesionStrength: d.f32,
-  })
-  .$name('Params');
+const Params = d.struct({
+  separationDistance: d.f32,
+  separationStrength: d.f32,
+  alignmentDistance: d.f32,
+  alignmentStrength: d.f32,
+  cohesionDistance: d.f32,
+  cohesionStrength: d.f32,
+});
 
 type Params = d.Infer<typeof Params>;
 
@@ -186,15 +182,13 @@ const renderPipeline = root['~unstable']
   .createPipeline()
   .with(vertexLayout, triangleVertexBuffer);
 
-const computeBindGroupLayout = tgpu
-  .bindGroupLayout({
-    currentTrianglePos: { storage: TriangleDataArray },
-    nextTrianglePos: {
-      storage: TriangleDataArray,
-      access: 'mutable',
-    },
-  })
-  .$name('compute');
+const computeBindGroupLayout = tgpu.bindGroupLayout({
+  currentTrianglePos: { storage: TriangleDataArray },
+  nextTrianglePos: {
+    storage: TriangleDataArray,
+    access: 'mutable',
+  },
+});
 
 const { currentTrianglePos, nextTrianglePos } = computeBindGroupLayout.bound;
 

@@ -1,5 +1,6 @@
 import tgpu from 'typegpu';
 import * as d from 'typegpu/data';
+import { cos, sin } from 'typegpu/std';
 
 // constants
 
@@ -58,7 +59,6 @@ const particleGeometryBuffer = root
         color: COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)],
       })),
   )
-  .$name('geometry')
   .$usage('vertex');
 
 const particleDataBuffer = root
@@ -73,27 +73,26 @@ const particleDataStorage = particleDataBuffer.as('mutable');
 
 // layouts
 
-const geometryLayout = tgpu
-  .vertexLayout((n: number) => d.arrayOf(ParticleGeometry, n), 'instance')
-  .$name('geometry');
+const geometryLayout = tgpu.vertexLayout(
+  (n: number) => d.arrayOf(ParticleGeometry, n),
+  'instance',
+);
 
-const dataLayout = tgpu
-  .vertexLayout((n: number) => d.arrayOf(ParticleData, n), 'instance')
-  .$name('data');
+const dataLayout = tgpu.vertexLayout(
+  (n: number) => d.arrayOf(ParticleData, n),
+  'instance',
+);
 
 // functions
 
-const rotate = tgpu['~unstable'].fn(
-  [d.vec2f, d.f32],
-  d.vec2f,
-) /* wgsl */`(v: vec2f, angle: f32) -> vec2f {
-  let pos = vec2(
+const rotate = tgpu.fn([d.vec2f, d.f32], d.vec2f)((v, angle) => {
+  const pos = d.vec2f(
     (v.x * cos(angle)) - (v.y * sin(angle)),
-    (v.x * sin(angle)) + (v.y * cos(angle))
+    (v.x * sin(angle)) + (v.y * cos(angle)),
   );
 
   return pos;
-}`;
+});
 
 const mainVert = tgpu['~unstable'].vertexFn({
   in: {
@@ -164,14 +163,12 @@ const renderPipeline = root['~unstable']
     topology: 'triangle-strip',
   })
   .createPipeline()
-  .$name('draw confetti')
   .with(geometryLayout, particleGeometryBuffer)
   .with(dataLayout, particleDataBuffer);
 
 const computePipeline = root['~unstable']
   .withCompute(mainCompute)
-  .createPipeline()
-  .$name('move particles');
+  .createPipeline();
 
 // compute and draw
 

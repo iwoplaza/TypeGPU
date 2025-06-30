@@ -11,7 +11,6 @@ import {
   MissingBindGroupsError,
   MissingVertexBuffersError,
 } from '../../errors.ts';
-import type { JitTranspiler } from '../../jitTranspiler.ts';
 import { WeakMemo } from '../../memo.ts';
 import {
   type NameRegistry,
@@ -87,6 +86,7 @@ import {
   type TgpuVertexLayout,
 } from '../vertexLayout/vertexLayout.ts';
 import type {
+  Configurable,
   CreateTextureOptions,
   CreateTextureResult,
   ExperimentalTgpuRoot,
@@ -139,6 +139,10 @@ class WithBindingImpl implements WithBinding {
       vertexAttribs: attribs as AnyVertexAttribs,
       multisampleState: undefined,
     });
+  }
+
+  pipe(transform: (cfg: Configurable) => Configurable): Configurable {
+    return transform(this);
   }
 }
 
@@ -232,7 +236,6 @@ class TgpuRootImpl extends WithBindingImpl
   constructor(
     public readonly device: GPUDevice,
     public readonly nameRegistry: NameRegistry,
-    public readonly jitTranspiler: JitTranspiler | undefined,
     private readonly _ownDevice: boolean,
   ) {
     super(() => this, []);
@@ -505,8 +508,8 @@ class TgpuRootImpl extends WithBindingImpl
 
       pass.setPipeline(memo.pipeline);
 
-      const missingBindGroups = new Set(memo.bindGroupLayouts);
-      memo.bindGroupLayouts.forEach((layout, idx) => {
+      const missingBindGroups = new Set(memo.usedBindGroupLayouts);
+      memo.usedBindGroupLayouts.forEach((layout, idx) => {
         if (memo.catchall && idx === memo.catchall[0]) {
           // Catch-all
           pass.setBindGroup(idx, this.unwrap(memo.catchall[1]));
@@ -645,7 +648,6 @@ export type InitOptions = {
     | undefined;
   /** @default 'random' */
   unstable_names?: 'random' | 'strict' | undefined;
-  unstable_jitTranspiler?: JitTranspiler | undefined;
 };
 
 /**
@@ -655,7 +657,6 @@ export type InitFromDeviceOptions = {
   device: GPUDevice;
   /** @default 'random' */
   unstable_names?: 'random' | 'strict' | undefined;
-  unstable_jitTranspiler?: JitTranspiler | undefined;
 };
 
 /**
@@ -681,7 +682,6 @@ export async function init(options?: InitOptions): Promise<TgpuRoot> {
     adapter: adapterOpt,
     device: deviceOpt,
     unstable_names: names = 'random',
-    unstable_jitTranspiler: jitTranspiler,
   } = options ?? {};
 
   if (!navigator.gpu) {
@@ -719,7 +719,6 @@ export async function init(options?: InitOptions): Promise<TgpuRoot> {
       requiredFeatures: availableFeatures,
     }),
     names === 'random' ? new RandomNameRegistry() : new StrictNameRegistry(),
-    jitTranspiler,
     true,
   );
 }
@@ -737,13 +736,11 @@ export function initFromDevice(options: InitFromDeviceOptions): TgpuRoot {
   const {
     device,
     unstable_names: names = 'random',
-    unstable_jitTranspiler: jitTranspiler,
   } = options ?? {};
 
   return new TgpuRootImpl(
     device,
     names === 'random' ? new RandomNameRegistry() : new StrictNameRegistry(),
-    jitTranspiler,
     false,
   );
 }
