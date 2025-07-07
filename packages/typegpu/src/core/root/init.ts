@@ -5,7 +5,13 @@ import {
 } from '../../core/querySet/querySet.ts';
 import type { AnyComputeBuiltin, OmitBuiltins } from '../../builtin.ts';
 import type { AnyData, Disarray } from '../../data/dataTypes.ts';
-import type { AnyWgslData, BaseData, WgslArray } from '../../data/wgslTypes.ts';
+import type {
+  AnyWgslData,
+  BaseData,
+  U16,
+  U32,
+  WgslArray,
+} from '../../data/wgslTypes.ts';
 import {
   invariant,
   MissingBindGroupsError,
@@ -41,10 +47,7 @@ import type { TgpuBufferUsage } from '../buffer/bufferUsage.ts';
 import type { IOLayout } from '../function/fnTypes.ts';
 import type { TgpuComputeFn } from '../function/tgpuComputeFn.ts';
 import type { TgpuFn } from '../function/tgpuFn.ts';
-import type {
-  FragmentOutConstrained,
-  TgpuFragmentFn,
-} from '../function/tgpuFragmentFn.ts';
+import type { TgpuFragmentFn } from '../function/tgpuFragmentFn.ts';
 import type { TgpuVertexFn } from '../function/tgpuVertexFn.ts';
 import {
   INTERNAL_createComputePipeline,
@@ -104,6 +107,28 @@ import {
   type TgpuUniform,
 } from '../buffer/bufferShorthand.ts';
 
+class ConfigurableImpl implements Configurable {
+  constructor(readonly bindings: [TgpuSlot<unknown>, unknown][]) {}
+
+  with<T extends AnyWgslData>(
+    slot: TgpuSlot<T> | TgpuAccessor<T>,
+    value: T | TgpuFn<() => T> | TgpuBufferUsage<T> | Infer<T>,
+  ): Configurable {
+    return new ConfigurableImpl([
+      ...this.bindings,
+      [isAccessor(slot) ? slot.slot : slot, value],
+    ]);
+  }
+
+  pipe(transform: (cfg: Configurable) => Configurable): Configurable {
+    const newCfg = transform(this);
+    return new ConfigurableImpl([
+      ...this.bindings,
+      ...newCfg.bindings,
+    ]);
+  }
+}
+
 class WithBindingImpl implements WithBinding {
   constructor(
     private readonly _getRoot: () => ExperimentalTgpuRoot,
@@ -141,8 +166,12 @@ class WithBindingImpl implements WithBinding {
     });
   }
 
-  pipe(transform: (cfg: Configurable) => Configurable): Configurable {
-    return transform(this);
+  pipe(transform: (cfg: Configurable) => Configurable): WithBinding {
+    const newCfg = transform(new ConfigurableImpl([]));
+    return new WithBindingImpl(this._getRoot, [
+      ...this._slotBindings,
+      ...newCfg.bindings,
+    ]);
   }
 }
 
@@ -189,7 +218,14 @@ class WithVertexImpl implements WithVertex {
 class WithFragmentImpl implements WithFragment {
   constructor(private readonly _options: RenderPipelineCoreOptions) {}
 
-  withPrimitive(primitiveState: GPUPrimitiveState | undefined): WithFragment {
+  withPrimitive(
+    primitiveState:
+      | GPUPrimitiveState
+      | Omit<GPUPrimitiveState, 'stripIndexFormat'> & {
+        stripIndexFormat?: U32 | U16;
+      }
+      | undefined,
+  ): WithFragment {
     return new WithFragmentImpl({ ...this._options, primitiveState });
   }
 
@@ -201,7 +237,7 @@ class WithFragmentImpl implements WithFragment {
 
   withMultisample(
     multisampleState: GPUMultisampleState | undefined,
-  ): WithFragment<FragmentOutConstrained> {
+  ): WithFragment {
     return new WithFragmentImpl({ ...this._options, multisampleState });
   }
 

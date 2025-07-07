@@ -1,7 +1,8 @@
-import type { TgpuQuerySet } from '../../core/querySet/querySet.ts';
 import type { AnyComputeBuiltin, OmitBuiltins } from '../../builtin.ts';
-import type { AnyData, Disarray } from '../../data/dataTypes.ts';
-import type { AnyWgslData, WgslArray } from '../../data/wgslTypes.ts';
+import type { TgpuQuerySet } from '../../core/querySet/querySet.ts';
+import type { UndecorateRecord } from '../../data/attributes.ts';
+import type { AnyData, Disarray, HasNestedType } from '../../data/dataTypes.ts';
+import type { AnyWgslData, U16, U32, WgslArray } from '../../data/wgslTypes.ts';
 import type { NameRegistry } from '../../nameRegistry.ts';
 import type { Infer } from '../../shared/repr.ts';
 import type {
@@ -56,10 +57,11 @@ export interface WithCompute {
 }
 
 export type ValidateFragmentIn<
-  VertexOut extends IORecord,
+  VertexOut extends VertexOutConstrained,
   FragmentIn extends FragmentInConstrained,
   FragmentOut extends FragmentOutConstrained,
-> = FragmentIn extends Partial<VertexOut> ? VertexOut extends FragmentIn ? [
+> = UndecorateRecord<FragmentIn> extends Partial<UndecorateRecord<VertexOut>>
+  ? UndecorateRecord<VertexOut> extends UndecorateRecord<FragmentIn> ? [
       entryFn: TgpuFragmentFn<FragmentIn, FragmentOut>,
       targets: FragmentOutToTargets<FragmentOut>,
     ]
@@ -83,7 +85,9 @@ export type ValidateFragmentIn<
     },
   ];
 
-export interface WithVertex<VertexOut extends IORecord = IORecord> {
+export interface WithVertex<
+  VertexOut extends VertexOutConstrained = VertexOutConstrained,
+> {
   withFragment<
     FragmentIn extends FragmentInConstrained,
     FragmentOut extends FragmentOutConstrained,
@@ -96,7 +100,12 @@ export interface WithFragment<
   Output extends FragmentOutConstrained = FragmentOutConstrained,
 > {
   withPrimitive(
-    primitiveState: GPUPrimitiveState | undefined,
+    primitiveState:
+      | GPUPrimitiveState
+      | Omit<GPUPrimitiveState, 'stripIndexFormat'> & {
+        stripIndexFormat?: U32 | U16;
+      }
+      | undefined,
   ): WithFragment<Output>;
 
   withDepthStencil(
@@ -111,7 +120,9 @@ export interface WithFragment<
 }
 
 export interface Configurable {
-  with<T>(slot: TgpuSlot<T>, value: Eventual<T>): WithBinding;
+  readonly bindings: [slot: TgpuSlot<unknown>, value: unknown][];
+
+  with<T>(slot: TgpuSlot<T>, value: Eventual<T>): Configurable;
   with<T extends AnyWgslData>(
     accessor: TgpuAccessor<T>,
     value:
@@ -119,12 +130,12 @@ export interface Configurable {
       | TgpuBufferUsage<T>
       | TgpuBufferShorthand<T>
       | Infer<T>,
-  ): WithBinding;
+  ): Configurable;
 
   pipe(transform: (cfg: Configurable) => Configurable): Configurable;
 }
 
-export interface WithBinding extends Configurable {
+export interface WithBinding {
   withCompute<ComputeIn extends IORecord<AnyComputeBuiltin>>(
     entryFn: TgpuComputeFn<ComputeIn>,
   ): WithCompute;
@@ -136,6 +147,18 @@ export interface WithBinding extends Configurable {
     entryFn: TgpuVertexFn<VertexIn, VertexOut>,
     attribs: LayoutToAllowedAttribs<OmitBuiltins<VertexIn>>,
   ): WithVertex<VertexOut>;
+
+  with<T>(slot: TgpuSlot<T>, value: Eventual<T>): WithBinding;
+  with<T extends AnyWgslData>(
+    accessor: TgpuAccessor<T>,
+    value:
+      | TgpuFn<() => T>
+      | TgpuBufferUsage<T>
+      | TgpuBufferShorthand<T>
+      | Infer<T>,
+  ): WithBinding;
+
+  pipe(transform: (cfg: Configurable) => Configurable): WithBinding;
 }
 
 export type CreateTextureOptions<
@@ -364,6 +387,17 @@ export interface RenderPass {
   ): undefined;
 }
 
+type ValidateSchema<TData extends AnyData> = HasNestedType<
+  [TData],
+  'bool'
+> extends true ? 'Error: Bool is not host-shareable, use U32 or I32 instead'
+  : HasNestedType<[TData], 'u16'> extends true ? TData extends {
+      type: 'array';
+      elementType: { type: 'u16' };
+    } ? TData
+    : 'Error: U16 is only usable inside arrays for index buffers'
+  : TData;
+
 export interface TgpuRoot extends Unwrapper {
   /**
    * The GPU device associated with this root.
@@ -380,7 +414,7 @@ export interface TgpuRoot extends Unwrapper {
    * @param initial The initial value of the buffer. (optional)
    */
   createBuffer<TData extends AnyData>(
-    typeSchema: TData,
+    typeSchema: ValidateSchema<TData>,
     initial?: Infer<TData> | undefined,
   ): TgpuBuffer<TData>;
 
@@ -394,7 +428,7 @@ export interface TgpuRoot extends Unwrapper {
    * @param gpuBuffer A vanilla WebGPU buffer.
    */
   createBuffer<TData extends AnyData>(
-    typeSchema: TData,
+    typeSchema: ValidateSchema<TData>,
     gpuBuffer: GPUBuffer,
   ): TgpuBuffer<TData>;
 
