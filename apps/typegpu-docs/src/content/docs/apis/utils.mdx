@@ -109,6 +109,64 @@ Runtime ternaries cannot contain side effects such as assignments, increments, o
 Use an `if` statement for those cases.
 :::
 
+### *std.isKnownAtComptime*
+
+`std.isKnownAtComptime(value)` returns `true` if the value passed into it is computable at
+compile time, and `false` otherwise. During normal JavaScript execution every value is
+available right away, so it always returns `true`.
+
+Since the answer itself is always known at comptime, branching on it is resolved during
+generation, and only the taken branch ends up in the shader. That makes it a good fit for
+opting into optimizations that are only valid when a value is statically known, like
+[unrolling a loop](#tgpuunroll) whose iteration count depends on the size of an array:
+
+```ts twoslash
+import { tgpu, d, std } from 'typegpu';
+// ---cut---
+const layout = tgpu.bindGroupLayout({
+  // Swapping this for `d.arrayOf(d.vec2f)` (a runtime-sized array)
+  // makes the loop below stay a loop.
+  boids: { storage: d.arrayOf(d.vec2f, 3) },
+});
+
+const centroid = tgpu.fn([], d.vec2f)(() => {
+  let sum = d.vec2f();
+
+  for (
+    const boid of std.isKnownAtComptime(layout.$.boids.length)
+      ? tgpu.unroll(layout.$.boids)
+      : layout.$.boids
+  ) {
+    sum = std.add(sum, boid);
+  }
+
+  return sum.div(d.f32(layout.$.boids.length));
+});
+```
+
+Generates:
+
+```wgsl
+@group(0) @binding(0) var<storage, read> boids: array<vec2f, 3>;
+
+fn centroid() -> vec2f {
+  var sum = vec2f();
+  // unrolled iteration #0
+  sum = (sum + boids[0u]);
+  // unrolled iteration #1
+  sum = (sum + boids[1u]);
+  // unrolled iteration #2
+  sum = (sum + boids[2u]);
+  // ---
+  return (sum / 3f);
+}
+```
+
+:::note
+Only the *value* of the argument is inspected, the expression itself is not emitted into the
+generated shader, so avoid passing expressions with side effects.
+:::
+
 ## Resolution environment
 
 TypeGPU exposes standard-library probes for code that needs to adapt to its execution environment:
@@ -514,6 +572,11 @@ const f = () => {
   }
 };
 ```
+:::
+
+:::tip
+To decide whether to unroll based on whether the iteration count is statically known,
+use [`std.isKnownAtComptime`](#stdisknownatcomptime).
 :::
 
 ### Types of iterables (more technical section)
