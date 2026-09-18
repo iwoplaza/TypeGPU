@@ -1,0 +1,7 @@
+{
+  "title": "Text Radiance Cascades",
+  "description": "Turns @pmndrs/glyph text into neon light sources and shadow casters for 2D global illumination computed with @typegpu/radiance-cascades.",
+  "category": "rendering",
+  "tags": ["ecosystem", "text", "lighting", "sdf", "interaction"],
+  "coolFactor": 9
+}

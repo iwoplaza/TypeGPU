@@ -1,0 +1,7 @@
+{
+  "title": "Glyph Text",
+  "description": "Draws GPU text with @pmndrs/glyph inside a TypeGPU render pass and tints it with a 'use gpu' color hook.",
+  "category": "simple",
+  "tags": ["ecosystem", "text", "basics"],
+  "coolFactor": 5
+}

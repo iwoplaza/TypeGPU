@@ -1,0 +1,7 @@
+{
+  "title": "Slug Text Tunnel",
+  "description": "Flies through a tunnel of words rendered with the analytic Slug algorithm via @pmndrs/glyph, with the projection and glow written as TypeGPU shader hooks.",
+  "category": "rendering",
+  "tags": ["ecosystem", "text", "post-processing", "3d"],
+  "coolFactor": 9
+}
