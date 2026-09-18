@@ -189,7 +189,19 @@ function onPointerMove(event: PointerEvent) {
 }
 canvas.addEventListener('pointermove', onPointerMove);
 
+// Hold the pointer down to punch it.
+let boosting = false;
+function onPointerDown() {
+  boosting = true;
+}
+function onPointerUp() {
+  boosting = false;
+}
+canvas.addEventListener('pointerdown', onPointerDown);
+window.addEventListener('pointerup', onPointerUp);
+
 let speed = 4;
+let currentSpeed = 4;
 let roll = 0;
 let lastTime = 0;
 
@@ -201,12 +213,14 @@ function frame(timestamp: number) {
   const dt = lastTime === 0 ? 0 : Math.min(0.05, (timestamp - lastTime) / 1000);
   lastTime = timestamp;
 
-  cameraX += speed * PX_PER_UNIT * dt;
+  const targetSpeed = boosting ? speed * 3 + 6 : speed;
+  currentSpeed += (targetSpeed - currentSpeed) * Math.min(1, dt * 3);
+  cameraX += currentSpeed * PX_PER_UNIT * dt;
   roll += dt * 0.08;
   pointer.x += (pointerTarget.x - pointer.x) * 0.05;
   pointer.y += (pointerTarget.y - pointer.y) * 0.05;
   tunnelParams.patch({ cameraX, roll, cameraOffset: pointer });
-  postParams.patch({ time: timestamp / 1000, speed });
+  postParams.patch({ time: timestamp / 1000, speed: currentSpeed });
   recycleWords();
 
   if (
@@ -283,6 +297,8 @@ export const controls = defineControls({
 export function onCleanup() {
   cancelAnimationFrame(frameId);
   canvas.removeEventListener('pointermove', onPointerMove);
+  canvas.removeEventListener('pointerdown', onPointerDown);
+  window.removeEventListener('pointerup', onPointerUp);
   for (const word of words) {
     word.text.dispose();
   }

@@ -22,6 +22,7 @@ const Params = d.struct({
   time: d.f32,
   intensity: d.f32,
   animateHue: d.u32,
+  neonText: d.u32,
   displayMode: d.u32,
   resolution: d.vec2f,
   lampPos: d.vec2f, // in pixels
@@ -31,8 +32,9 @@ const Params = d.struct({
 
 const params = root.createUniform(Params, {
   time: 0,
-  intensity: 2.5,
+  intensity: 3.5,
   animateHue: 1,
+  neonText: 1,
   displayMode: 0,
   resolution: d.vec2f(1),
   lampPos: d.vec2f(),
@@ -60,10 +62,12 @@ const handle = glyph.handle(
       'use gpu';
       // White text becomes neon that slowly cycles through hues, dark text is
       // left as it is. The alpha channel marks the pixel as solid for the SDF.
-      const emissive = std.step(0.5, color.r);
+      // With neon switched off, the headline turns into a shadow caster too.
+      const emissive = std.step(0.5, color.r) * d.f32(params.$.neonText);
       const phase = fragPos.x * 0.003 + params.$.time * d.f32(params.$.animateHue) * 0.4;
-      const neon = std.mix(hueColor(phase), d.vec3f(1), 0.15) * 0.3;
-      return d.vec4f(std.mix(color.rgb, neon, emissive), color.a);
+      const neon = std.mix(hueColor(phase), d.vec3f(1), 0.15) * 0.45;
+      const base = std.min(color.rgb, d.vec3f(0.03, 0.03, 0.05));
+      return d.vec4f(std.mix(base, neon, emissive), color.a);
     },
   }),
 );
@@ -81,7 +85,7 @@ const headline = handle.createText({
 const body = handle.createText({
   font,
   text: 'Letters cast shadows. Move the lamp around and watch the light bounce between the glyphs.',
-  style: { fontSize: 36, lineHeight: 1.25, color: '#06060c' },
+  style: { fontSize: 36, lineHeight: 1.25, color: '#16161f' },
   layout: { align: 'center' },
 });
 
@@ -96,7 +100,7 @@ function layoutTexts() {
     constraints: { width: { mode: 'exact', size: width } },
   });
   body.update({
-    style: { fontSize: headlineSize * 0.24, lineHeight: 1.25, color: '#06060c' },
+    style: { fontSize: headlineSize * 0.24, lineHeight: 1.25, color: '#16161f' },
     constraints: { width: { mode: 'exact', size: width * 0.7 } },
   });
   const headlineHeight = headline.measure().height;
@@ -261,6 +265,13 @@ let sized = createSizedResources(Math.max(1, canvas.width), Math.max(1, canvas.h
 
 // #region Frame loop
 
+let intensity = 3.5;
+// Larger canvases get more cascade levels and gather more light, so the
+// emission is toned down with size to keep the look consistent.
+function emissionScale() {
+  return Math.min(1.1, Math.max(0.55, 700 / Math.min(canvas.width, canvas.height)));
+}
+
 const pointer = { x: 0, y: 0, active: false };
 function onPointerMove(event: PointerEvent) {
   const rect = canvas.getBoundingClientRect();
@@ -292,10 +303,11 @@ function frame(timestamp: number) {
     ? d.vec2f(pointer.x, pointer.y)
     : d.vec2f(
         canvas.width * (0.5 + 0.38 * Math.sin(time * 0.5)),
-        canvas.height * (0.5 + 0.25 * Math.sin(time * 0.9 + 1)),
+        canvas.height * (0.5 + 0.18 * Math.sin(time * 0.9 + 1)),
       );
   params.patch({
     time,
+    intensity: intensity * emissionScale(),
     lampPos,
     lampRadius: canvas.width * 0.018,
     resolution: d.vec2f(canvas.width, canvas.height),
@@ -339,18 +351,24 @@ export const controls = defineControls({
     },
   },
   Intensity: {
-    initial: 2.5,
+    initial: 3.5,
     min: 0.5,
     max: 8,
     step: 0.1,
     onSliderChange(value: number) {
-      params.patch({ intensity: value });
+      intensity = value;
     },
   },
   'Lamp Color': {
     initial: d.vec3f(1, 0.85, 0.6),
     onColorChange(value: d.v3f) {
       params.patch({ lampColor: value });
+    },
+  },
+  'Neon Text': {
+    initial: true,
+    onToggleChange(value: boolean) {
+      params.patch({ neonText: value ? 1 : 0 });
     },
   },
   'Animate Hue': {
