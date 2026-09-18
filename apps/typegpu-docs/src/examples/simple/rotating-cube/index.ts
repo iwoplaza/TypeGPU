@@ -102,10 +102,13 @@ const pipeline = root.createRenderPipeline({
     'use gpu';
     const n = std.normalize(worldNormal);
     const diffuse = std.max(std.dot(n, lightDirection), 0);
+    // A cheap highlight: how well the normal points between the light and the camera.
+    const halfVector = std.normalize(lightDirection + d.vec3f(0, 0.4, 1));
+    const specular = std.pow(std.max(std.dot(n, halfVector), 0), 32) * 0.4;
     // A checkerboard from the UVs, so the faces are easy to tell apart.
     const cell = std.floor(uv * 4);
-    const checker = std.select(0.75, 1, (cell.x + cell.y) % 2 === 0);
-    const color = colorUniform.$ * checker * (0.25 + 0.75 * diffuse);
+    const checker = std.select(0.7, 1, (cell.x + cell.y) % 2 === 0);
+    const color = colorUniform.$ * checker * (0.15 + 0.85 * diffuse) + specular;
     return d.vec4f(color, 1);
   },
   primitive: { cullMode: 'back' },
