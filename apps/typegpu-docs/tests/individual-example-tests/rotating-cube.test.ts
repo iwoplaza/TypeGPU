@@ -58,9 +58,11 @@ describe('rotating cube example', () => {
       @fragment fn fragment(_arg_0: FragmentIn) -> @location(0) vec4f {
         let n = normalize(_arg_0.worldNormal);
         let diffuse = max(dot(n, vec3f(0.36369648575782776, 0.7273929715156555, 0.5819143652915955)), 0f);
+        let halfVector = vec3f(0.18402941524982452, 0.5704577565193176, 0.8004443049430847);
+        let specular = (pow(max(dot(n, halfVector), 0f), 32f) * 0.4f);
         let cell = floor((_arg_0.uv * 4f));
-        let checker = select(0.75f, 1f, (((cell.x + cell.y) % 2f) == 0f));
-        let color = ((colorUniform * checker) * (0.25f + (0.75f * diffuse)));
+        let checker = select(0.7f, 1f, (((cell.x + cell.y) % 2f) == 0f));
+        let color = (((colorUniform * checker) * (0.15f + (0.85f * diffuse))) + specular);
         return vec4f(color, 1f);
       }"
     `);
