@@ -111,12 +111,21 @@ export function createPostProcessing(
   const compositeFragment = tgpu.fragmentFn({ in: { uv: d.vec2f }, out: d.vec4f })(({ uv }) => {
     'use gpu';
     const params = postParamsAccess.$;
-    const text = std.textureSample(compositeLayout.$.hdr, compositeLayout.$.linear, uv);
+    const centered = (uv - 0.5) * d.vec2f(params.aspect, 1);
+    const dist = std.length(centered);
+
+    // Slight chromatic aberration: the channels are sampled a bit apart,
+    // more so towards the edges and at high speed.
+    const shift = (uv - 0.5) * dist * (0.004 + params.speed * 0.0008);
+    const text = d.vec4f(
+      std.textureSample(compositeLayout.$.hdr, compositeLayout.$.linear, uv + shift).r,
+      std.textureSample(compositeLayout.$.hdr, compositeLayout.$.linear, uv).g,
+      std.textureSample(compositeLayout.$.hdr, compositeLayout.$.linear, uv - shift).b,
+      std.textureSample(compositeLayout.$.hdr, compositeLayout.$.linear, uv).a,
+    );
     const bloom = std.textureSample(compositeLayout.$.bloom, compositeLayout.$.linear, uv).rgb;
 
     // Background: a deep gradient plus streaks that get brighter with speed.
-    const centered = (uv - 0.5) * d.vec2f(params.aspect, 1);
-    const dist = std.length(centered);
     const streaks = warpStreaks(uv, params.time, params.aspect) * std.saturate(params.speed * 0.12);
     let color = std.mix(
       d.vec3f(0.06, 0.03, 0.12),
