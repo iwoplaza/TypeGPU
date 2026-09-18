@@ -97,6 +97,7 @@ interface Word {
 }
 
 let font = fonts['Bebas Neue'];
+let message = DEFAULT_MESSAGE;
 let words: Word[] = [];
 let cameraX = 0;
 // Where the next recycled word goes, per lane.
@@ -108,7 +109,7 @@ function placeWord(word: Word, x: number) {
   laneEnd[word.lane] = x + word.width + WORD_GAP;
 }
 
-function buildWords(message: string) {
+function buildWords() {
   for (const word of words) {
     word.text.dispose();
   }
@@ -142,7 +143,7 @@ function buildWords(message: string) {
 }
 
 // Words that went past the camera get moved to the end of their lane.
-function recycleWords(cameraX: number) {
+function recycleWords() {
   let changed = false;
   for (const word of words) {
     if (word.x + word.width < cameraX - PX_PER_UNIT) {
@@ -159,7 +160,12 @@ function recycleWords(cameraX: number) {
 
 // #region Rendering
 
-let post = createPostProcessing(root, canvas.width, canvas.height, postParams);
+let post = createPostProcessing(
+  root,
+  Math.max(1, canvas.width),
+  Math.max(1, canvas.height),
+  postParams,
+);
 
 function resize() {
   const { width, height } = canvas;
@@ -172,7 +178,7 @@ function resize() {
   postParams.patch({ aspect: width / height });
 }
 resize();
-buildWords(DEFAULT_MESSAGE);
+buildWords();
 
 const pointerTarget = d.vec2f();
 const pointer = d.vec2f();
@@ -188,6 +194,10 @@ let roll = 0;
 let lastTime = 0;
 
 function frame(timestamp: number) {
+  frameId = requestAnimationFrame(frame);
+  if (canvas.width === 0 || canvas.height === 0) {
+    return;
+  }
   const dt = lastTime === 0 ? 0 : Math.min(0.05, (timestamp - lastTime) / 1000);
   lastTime = timestamp;
 
@@ -197,7 +207,7 @@ function frame(timestamp: number) {
   pointer.y += (pointerTarget.y - pointer.y) * 0.05;
   tunnelParams.patch({ cameraX, roll, cameraOffset: pointer });
   postParams.patch({ time: timestamp / 1000, speed });
-  recycleWords(cameraX);
+  recycleWords();
 
   if (
     canvas.width !== post.hdrTexture.props.size[0] ||
@@ -217,8 +227,6 @@ function frame(timestamp: number) {
 
   // 2. Bloom + background + tone mapping, straight to the canvas.
   post.render(context);
-
-  frameId = requestAnimationFrame(frame);
 }
 let frameId = requestAnimationFrame(frame);
 
@@ -230,7 +238,8 @@ export const controls = defineControls({
   Message: {
     initial: DEFAULT_MESSAGE,
     onTextChange(value: string) {
-      buildWords(value);
+      message = value;
+      buildWords();
     },
   },
   Font: {
@@ -238,10 +247,8 @@ export const controls = defineControls({
     options: Object.keys(fonts) as (keyof typeof fonts)[],
     onSelectChange(value) {
       font = fonts[value];
-      for (const word of words) {
-        word.text.update({ font });
-      }
-      glyph.shape();
+      // Word widths depend on the font, so the tunnel is refilled.
+      buildWords();
     },
   },
   Speed: {

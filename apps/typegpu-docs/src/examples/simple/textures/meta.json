@@ -1,0 +1,7 @@
+{
+  "title": "Textures",
+  "description": "Uploads an image into a GPU texture, generates mipmaps, and shows how sampler filtering and address modes change the result.",
+  "category": "simple",
+  "tags": ["basics", "textures"],
+  "coolFactor": 3
+}

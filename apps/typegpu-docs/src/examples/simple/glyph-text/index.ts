@@ -55,6 +55,9 @@ const subtitle = handle.createText({
 
 function layoutTexts() {
   const { width, height } = canvas;
+  if (width === 0 || height === 0) {
+    return;
+  }
   // Constraining the width lets `align: 'center'` do the centering for us.
   const constraints = { width: { mode: 'exact', size: width } } as const;
   const titleSize = Math.min(120, width / 8);
@@ -76,6 +79,10 @@ layoutTexts();
 // 5. Draw. Glyph records into a caller-owned render pass, so other TypeGPU
 //    pipelines can draw into the same pass before or after the text.
 function frame(timestamp: number) {
+  frameId = requestAnimationFrame(frame);
+  if (canvas.width === 0 || canvas.height === 0) {
+    return;
+  }
   timeUniform.write(timestamp / 1000);
 
   const encoder = root['~unstable'].createCommandEncoder();
@@ -85,8 +92,6 @@ function frame(timestamp: number) {
   handle.draw(pass, { width: canvas.width, height: canvas.height });
   pass.end();
   encoder.submit();
-
-  frameId = requestAnimationFrame(frame);
 }
 let frameId = requestAnimationFrame(frame);
 

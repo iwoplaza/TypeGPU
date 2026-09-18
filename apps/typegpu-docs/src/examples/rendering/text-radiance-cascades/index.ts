@@ -31,7 +31,7 @@ const Params = d.struct({
 
 const params = root.createUniform(Params, {
   time: 0,
-  intensity: 3,
+  intensity: 2.5,
   animateHue: 1,
   displayMode: 0,
   resolution: d.vec2f(1),
@@ -62,7 +62,7 @@ const handle = glyph.handle(
       // left as it is. The alpha channel marks the pixel as solid for the SDF.
       const emissive = std.step(0.5, color.r);
       const phase = fragPos.x * 0.003 + params.$.time * d.f32(params.$.animateHue) * 0.4;
-      const neon = std.mix(hueColor(phase), d.vec3f(1), 0.15) * 0.6;
+      const neon = std.mix(hueColor(phase), d.vec3f(1), 0.15) * 0.3;
       return d.vec4f(std.mix(color.rgb, neon, emissive), color.a);
     },
   }),
@@ -87,6 +87,9 @@ const body = handle.createText({
 
 function layoutTexts() {
   const { width, height } = canvas;
+  if (width === 0 || height === 0) {
+    return;
+  }
   const headlineSize = Math.min(220, width / 6);
   headline.update({
     style: { fontSize: headlineSize, letterSpacing: headlineSize * 0.03, color: '#ffffff' },
@@ -252,7 +255,7 @@ function createSizedResources(width: number, height: number) {
   };
 }
 
-let sized = createSizedResources(canvas.width, canvas.height);
+let sized = createSizedResources(Math.max(1, canvas.width), Math.max(1, canvas.height));
 
 // #endregion
 
@@ -273,6 +276,10 @@ canvas.addEventListener('pointerleave', () => {
 layoutTexts();
 
 function frame(timestamp: number) {
+  frameId = requestAnimationFrame(frame);
+  if (canvas.width === 0 || canvas.height === 0) {
+    return;
+  }
   const time = timestamp / 1000;
   if (canvas.width !== sized.width || canvas.height !== sized.height) {
     sized.destroy();
@@ -308,8 +315,6 @@ function frame(timestamp: number) {
   sized.flood.run();
   sized.radiance.run();
   displayPipeline.with(sized.displayGroup).withColorAttachment({ view: context }).draw(3);
-
-  frameId = requestAnimationFrame(frame);
 }
 let frameId = requestAnimationFrame(frame);
 
@@ -334,7 +339,7 @@ export const controls = defineControls({
     },
   },
   Intensity: {
-    initial: 3,
+    initial: 2.5,
     min: 0.5,
     max: 8,
     step: 0.1,

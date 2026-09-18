@@ -1,0 +1,7 @@
+{
+  "title": "Rotating Cube",
+  "description": "Draws a lit, spinning cube with a typed vertex layout, an index buffer, a depth buffer, and camera matrices from wgpu-matrix.",
+  "category": "simple",
+  "tags": ["basics", "3d", "primitives"],
+  "coolFactor": 4
+}
