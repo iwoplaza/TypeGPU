@@ -129,12 +129,6 @@ const OP_MAP = {
   get '??='(): never {
     throw new Error('The `??=` operator is unsupported in TypeGPU functions.');
   },
-  get '&&='(): never {
-    throw new Error('The `&&=` operator is unsupported in TypeGPU functions.');
-  },
-  get '||='(): never {
-    throw new Error('The `||=` operator is unsupported in TypeGPU functions.');
-  },
 } as Record<string, string>;
 
 type Operator =
@@ -1934,6 +1928,15 @@ ${this.ctx.pre}else ${alternate}`,
     let desugared: tinyest.AssignmentExpression = statement;
     if (op === '**=') {
       desugared = [NODE.assignmentExpr, lhs, '=', [NODE.binaryExpr, lhs, '**', rhs]];
+    } else if (op === '&&=' || op === '||=') {
+      // WGSL's `&&` and `||` short-circuit, just like the JS operators, so
+      // the right-hand side is only evaluated when JS would evaluate it.
+      desugared = [
+        NODE.assignmentExpr,
+        lhs,
+        '=',
+        [NODE.logicalExpr, lhs, op === '&&=' ? '&&' : '||', rhs],
+      ];
     }
 
     if (desugared !== statement && this._expression(lhs).possibleSideEffects) {

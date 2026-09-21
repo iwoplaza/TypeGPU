@@ -150,3 +150,80 @@ describe('exponentiation assignment', () => {
     `);
   });
 });
+
+describe('logical assignment', () => {
+  it('is emitted as an assignment of a logical expression', () => {
+    const main = tgpu.fn(
+      [d.bool, d.f32],
+      d.bool,
+    )((b, x) => {
+      let a = b;
+      a &&= x > 0;
+      a ||= x < -1;
+      return a;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(b: bool, x: f32) -> bool {
+        var a = b;
+        a = (a && (x > 0f));
+        a = (a || (x < -1f));
+        return a;
+      }"
+    `);
+  });
+
+  it('keeps comptime-known right-hand sides inline', () => {
+    const flag = true;
+    const main = tgpu.fn(
+      [],
+      d.bool,
+    )(() => {
+      let a = false;
+      a ||= flag;
+      return a;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() -> bool {
+        var a = false;
+        a = (a || true);
+        return a;
+      }"
+    `);
+  });
+
+  it('requires boolean operands', () => {
+    const main = tgpu.fn(
+      [d.f32],
+      d.f32,
+    )((x) => {
+      let a = x;
+      a &&= 2;
+      return a;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: Logical expression '&&' requires boolean operands. Got 'f32' and 'abstractInt'.]
+    `);
+  });
+
+  it('keeps rejecting nullish assignment', () => {
+    const main = tgpu.fn(
+      [d.f32],
+      d.f32,
+    )((x) => {
+      let a = x;
+      a ??= 2;
+      return a;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: The \`??=\` operator is unsupported in TypeGPU functions.]
+    `);
+  });
+});

@@ -41,7 +41,7 @@ bottom need a new tinyest node and touch all three.
 | 2 | Prefix update `++i` / `--i` (statement) | `i++;` / `i--;` | `++i;` / `--i;` | tinyest-for-wgsl, typegpu, @typegpu/gl | done |
 | 3 | Bitwise complement `~x` | `~x` (validated to integers, folded at comptime) | same | typegpu | done |
 | 4 | Exponentiation assignment `a **= b` | `a = pow(a, b);` | same | typegpu | done |
-| 5 | Logical assignment `a &&= b` / `a \|\|= b` | `a = (a && b);` / `a = (a \|\| b);` | same | typegpu | planned |
+| 5 | Logical assignment `a &&= b` / `a \|\|= b` | `a = (a && b);` / `a = (a \|\| b);` | same | typegpu | done |
 | 6 | Multiple declarators `let a = 1, b = 2;` | two declarations | same | tinyest-for-wgsl | planned |
 | 7 | Destructuring declarations `const { x, y } = v;` / `const [a, b] = arr;` | `let x = v.x; let y = v.y;` / `let a = arr[0]; ...` | same | tinyest-for-wgsl | planned |
 | 8 | `do { } while (cond);` | `loop { ... continuing { break if !(cond); } }` | `do { } while (cond);` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | planned |

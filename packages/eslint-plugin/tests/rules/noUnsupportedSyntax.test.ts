@@ -13,6 +13,7 @@ describe('noUnsupportedSyntax', () => {
       "const fn = (a) => { 'use gpu'; return +a; }",
       "const fn = () => { 'use gpu'; let x = 0; ++x; x++; --x; }",
       "const fn = () => { 'use gpu'; let a = 2; a **= 3; }",
+      "const fn = (b) => { 'use gpu'; let a = true; a &&= b; a ||= b; }",
     ],
     invalid: [
       {
@@ -25,19 +26,11 @@ describe('noUnsupportedSyntax', () => {
         ],
       },
       {
-        code: "const fn = () => { 'use gpu'; let a = 0; a ??= 1; a &&= 1; a ||= 1; }",
+        code: "const fn = () => { 'use gpu'; let a = 0; a ??= 1; }",
         errors: [
           {
             messageId: 'unexpected',
             data: { snippet: 'a ??= 1', syntax: "assignment expression '??='" },
-          },
-          {
-            messageId: 'unexpected',
-            data: { snippet: 'a &&= 1', syntax: "assignment expression '&&='" },
-          },
-          {
-            messageId: 'unexpected',
-            data: { snippet: 'a ||= 1', syntax: "assignment expression '||='" },
           },
         ],
       },
