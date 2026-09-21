@@ -939,6 +939,13 @@ export class GlslGenerator extends WgslGenerator {
     return node;
   }
 
+  /**
+   * GLSL has both prefix and postfix increment/decrement, so we keep the spelling used in JS.
+   */
+  protected override _emitUpdate(argStr: string, op: '++' | '--', prefix: boolean): string {
+    return prefix ? `${op}${argStr}` : `${argStr}${op}`;
+  }
+
   override _return(statement: Return): string {
     const exprNode = statement[1];
 

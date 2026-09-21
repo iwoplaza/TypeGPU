@@ -191,15 +191,6 @@ export const noUnsupportedSyntax = createRule({
         }
       },
 
-      UpdateExpression(node) {
-        if (!directives.getEnclosingTypegpuFunction()) {
-          return;
-        }
-        if (node.prefix) {
-          report(node, 'prefix update expression');
-        }
-      },
-
       VariableDeclaration(node) {
         if (!directives.getEnclosingTypegpuFunction()) {
           return;

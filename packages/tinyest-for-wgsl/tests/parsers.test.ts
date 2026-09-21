@@ -554,3 +554,24 @@ describe('empty statements', () => {
     }),
   );
 });
+
+describe('update expressions', () => {
+  it(
+    'transpiles prefix and postfix updates',
+    dualTest((p, transpileFn) => {
+      const { body } = transpileFn(
+        p(`() => {
+          let i = 0;
+          i++;
+          ++i;
+          --i;
+          for (let j = 0; j < 3; ++j) {}
+        }`),
+      );
+
+      expect(JSON.stringify(body)).toMatchInlineSnapshot(
+        `"[0,[[12,"i",[5,"0"]],[102,"++","i"],[101,"++","i"],[101,"--","i"],[14,[12,"j",[5,"0"]],[1,"j","<",[5,"3"]],[101,"++","j"],[0,[]]]]]"`,
+      );
+    }),
+  );
+});

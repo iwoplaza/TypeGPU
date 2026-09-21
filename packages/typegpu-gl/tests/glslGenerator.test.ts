@@ -807,3 +807,27 @@ describe('GlslGenerator - entry point generation with JS functions', () => {
       `);
   });
 });
+
+describe('update statements', () => {
+  it('keeps the prefix and postfix spelling', () => {
+    const main = tgpu.fn([])(() => {
+      let a = 0;
+      ++a;
+      a--;
+      for (let i = 0; i < 3; ++i) {
+        a += i;
+      }
+    });
+
+    expect(tgpu.resolve([main], glOptions())).toMatchInlineSnapshot(`
+      "void main() {
+        int a = 0;
+        ++a;
+        a--;
+        for (int i = 0; (i < 3); ++i) {
+          a += i;
+        }
+      }"
+    `);
+  });
+});

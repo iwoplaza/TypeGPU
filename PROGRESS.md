@@ -38,7 +38,7 @@ bottom need a new tinyest node and touch all three.
 | # | JavaScript | WGSL mapping | GLSL mapping | Package(s) | Status |
 |---|---|---|---|---|---|
 | 1 | Empty statement `;` | nothing emitted | nothing emitted | tinyest-for-wgsl | done |
-| 2 | Prefix update `++i` / `--i` (statement) | `i++;` / `i--;` | `++i;` / `--i;` | tinyest-for-wgsl, typegpu, @typegpu/gl | planned |
+| 2 | Prefix update `++i` / `--i` (statement) | `i++;` / `i--;` | `++i;` / `--i;` | tinyest-for-wgsl, typegpu, @typegpu/gl | done |
 | 3 | Bitwise complement `~x` | `~x` (validated to integers, folded at comptime) | same | typegpu | planned |
 | 4 | Exponentiation assignment `a **= b` | `a = pow(a, b);` | same | typegpu | planned |
 | 5 | Logical assignment `a &&= b` / `a \|\|= b` | `a = (a && b);` / `a = (a \|\| b);` | same | typegpu | planned |

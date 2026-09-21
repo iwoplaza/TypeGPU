@@ -111,11 +111,9 @@ export const baseTranspilers = {
     const operator = node.operator;
     const argument = transpile(ctx, node.argument) as tinyest.Expression;
 
-    if (node.prefix) {
-      throw new Error('Prefix update expressions are not supported in WGSL.');
-    }
-
-    return [NODE.postUpdate, operator, argument];
+    return node.prefix
+      ? [NODE.preUpdate, operator, argument]
+      : [NODE.postUpdate, operator, argument];
   },
 
   ConditionalExpression(ctx, node, transpile) {

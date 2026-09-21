@@ -11,6 +11,7 @@ describe('noUnsupportedSyntax', () => {
       "const cls = new (class { #priv = 1; fn = () => { 'use gpu'; const a = this.#priv; } } )()",
       "const fn = () => { 'use gpu'; const obj = { [key]: 1 }; }",
       "const fn = (a) => { 'use gpu'; return +a; }",
+      "const fn = () => { 'use gpu'; let x = 0; ++x; x++; --x; }",
     ],
     invalid: [
       {
@@ -265,15 +266,6 @@ describe('noUnsupportedSyntax', () => {
           {
             messageId: 'unexpected',
             data: { snippet: 'try { } catch(e) { }', syntax: 'try-catch statement' },
-          },
-        ],
-      },
-      {
-        code: "const fn = () => { 'use gpu'; ++x; }",
-        errors: [
-          {
-            messageId: 'unexpected',
-            data: { snippet: '++x', syntax: 'prefix update expression' },
           },
         ],
       },

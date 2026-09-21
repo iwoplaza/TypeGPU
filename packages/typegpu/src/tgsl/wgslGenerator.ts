@@ -701,7 +701,7 @@ export class WgslGenerator implements ShaderGenerator {
       return this._binaryExpression(expression);
     }
 
-    if (expression[0] === NODE.postUpdate) {
+    if (expression[0] === NODE.postUpdate || expression[0] === NODE.preUpdate) {
       throw new Error(
         `'${stringifyNode(expression)}' is invalid because update is only allowed as a statement.`,
       );
@@ -1124,10 +1124,6 @@ export class WgslGenerator implements ShaderGenerator {
 
     if (expression[0] === NODE.stringLiteral) {
       return snip(expression[1], UnknownData, /* origin */ 'constant', false);
-    }
-
-    if (expression[0] === NODE.preUpdate) {
-      throw new Error('Cannot use pre-updates in TypeGPU functions.');
     }
 
     if (expression[0] === NODE.nullLiteral) {
@@ -1874,16 +1870,8 @@ ${this.ctx.pre}else ${alternate}`,
       }
     }
 
-    if (statement[0] === NODE.postUpdate) {
-      // Post-update statement
-      const [_, op, arg] = statement;
-      const argExpr = this._expression(arg);
-      const argStr = this.ctx.resolveSnippet(argExpr).value;
-
-      validateSnippetMutation(argExpr, statement);
-      this.tryMarkModified(arg);
-
-      return { code: `${this.ctx.pre}${argStr}${op};`, definesInNearestScope: false };
+    if (statement[0] === NODE.postUpdate || statement[0] === NODE.preUpdate) {
+      return this._updateStatement(statement);
     }
 
     if (statement[0] === NODE.continue) {
@@ -1920,6 +1908,32 @@ ${this.ctx.pre}else ${alternate}`,
     const resolved =
       expr.value !== undefined && expr.value !== null ? this.ctx.resolveSnippet(expr).value : '';
     return { code: resolved ? `${this.ctx.pre}${resolved};` : '', definesInNearestScope: false };
+  }
+
+  /**
+   * Handles `i++`, `i--`, `++i` and `--i` statements. WGSL only has the postfix
+   * increment/decrement statements, so both spellings are emitted as postfix.
+   * As statements, they're equivalent. Languages that have both (e.g. GLSL) override this.
+   */
+  protected _updateStatement(statement: tinyest.PostUpdate | tinyest.PreUpdate): ResolvedStatement {
+    const [_, op, arg] = statement;
+    const argExpr = this._expression(arg);
+    const argStr = this.ctx.resolveSnippet(argExpr).value;
+
+    validateSnippetMutation(argExpr, statement);
+    this.tryMarkModified(arg);
+
+    return {
+      code: `${this.ctx.pre}${this._emitUpdate(argStr, op, statement[0] === NODE.preUpdate)};`,
+      definesInNearestScope: false,
+    };
+  }
+
+  /**
+   * Emits an increment/decrement. WGSL only has the postfix form.
+   */
+  protected _emitUpdate(argStr: string, op: '++' | '--', _prefix: boolean): string {
+    return `${argStr}${op}`;
   }
 
   /**

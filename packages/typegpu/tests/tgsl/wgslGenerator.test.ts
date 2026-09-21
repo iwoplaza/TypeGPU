@@ -2376,3 +2376,53 @@ describe('empty statements', () => {
     `);
   });
 });
+
+describe('prefix update statements', () => {
+  it('emits prefix updates as postfix updates', () => {
+    const main = tgpu.fn([])(() => {
+      let a = 0;
+      ++a;
+      --a;
+      for (let i = 0; i < 3; ++i) {
+        a += i;
+      }
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() {
+        var a = 0;
+        a++;
+        a--;
+        for (var i = 0; (i < 3i); i++) {
+          a += i;
+        }
+      }"
+    `);
+  });
+
+  it('rejects prefix updates used as expressions', () => {
+    const main = tgpu.fn([])(() => {
+      let a = 0;
+      const b = ++a;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: '++a' is invalid because update is only allowed as a statement.]
+    `);
+  });
+
+  it('rejects postfix updates used as expressions', () => {
+    const main = tgpu.fn([])(() => {
+      let a = 0;
+      const b = a++;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: 'a++' is invalid because update is only allowed as a statement.]
+    `);
+  });
+});
