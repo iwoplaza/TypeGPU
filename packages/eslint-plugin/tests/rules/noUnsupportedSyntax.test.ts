@@ -10,6 +10,7 @@ describe('noUnsupportedSyntax', () => {
       "const fn = () => { 'use gpu'; let x = 1; }",
       "const cls = new (class { #priv = 1; fn = () => { 'use gpu'; const a = this.#priv; } } )()",
       "const fn = () => { 'use gpu'; const obj = { [key]: 1 }; }",
+      "const fn = (a) => { 'use gpu'; return +a; }",
     ],
     invalid: [
       {
@@ -316,12 +317,8 @@ describe('noUnsupportedSyntax', () => {
         ],
       },
       {
-        code: "const fn = () => { 'use gpu'; +a; typeof b; void c; delete d; }",
+        code: "const fn = () => { 'use gpu'; typeof b; void c; delete d; }",
         errors: [
-          {
-            messageId: 'unexpected',
-            data: { snippet: '+a', syntax: "unary operator '+'" },
-          },
           {
             messageId: 'unexpected',
             data: { snippet: 'typeof b', syntax: "unary operator 'typeof'" },

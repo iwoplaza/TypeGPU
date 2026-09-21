@@ -171,6 +171,30 @@ function operatorToType<
 
 const unaryOpCodeToCodegen = {
   '-': neg[$gpuCallable].call.bind(neg),
+  '+': (ctx: ResolutionCtx, [argExpr]: Snippet[]) => {
+    if (argExpr === undefined) {
+      throw new Error('The unary operator `+` expects 1 argument, but 0 were provided.');
+    }
+
+    // WGSL has no unary plus. In JS, it's an identity for numbers (and a
+    // conversion to number for everything else, which has no WGSL counterpart).
+    if (!wgsl.isNumericSchema(argExpr.dataType)) {
+      throw new WgslTypeError(
+        `Unary operator + requires a numeric operand. Got ${String(argExpr.dataType)}.`,
+      );
+    }
+
+    if (isKnownAtComptime(argExpr)) {
+      return snip(+(argExpr.value as number), argExpr.dataType, 'constant', false);
+    }
+
+    return snip(
+      ctx.resolveSnippet(argExpr).value,
+      argExpr.dataType,
+      'runtime',
+      argExpr.possibleSideEffects,
+    );
+  },
   void: () => snip(undefined, wgsl.Void, 'constant', false),
   '!': (ctx: ResolutionCtx, [argExpr]: Snippet[]) => {
     if (argExpr === undefined) {
