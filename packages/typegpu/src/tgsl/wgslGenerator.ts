@@ -196,6 +196,12 @@ const unaryOpCodeToCodegen = {
     );
   },
   void: () => snip(undefined, wgsl.Void, 'constant', false),
+  get typeof(): never {
+    throw new Error('The `typeof` operator is unsupported in TypeGPU functions.');
+  },
+  get delete(): never {
+    throw new Error('The `delete` operator is unsupported in TypeGPU functions.');
+  },
   '!': (ctx: ResolutionCtx, [argExpr]: Snippet[]) => {
     if (argExpr === undefined) {
       throw new Error('The unary operator `!` expects 1 argument, but 0 were provided.');

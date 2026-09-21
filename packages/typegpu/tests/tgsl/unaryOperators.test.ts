@@ -49,3 +49,31 @@ describe('unary plus', () => {
     `);
   });
 });
+
+describe('unsupported unary operators', () => {
+  it('throws on typeof', () => {
+    const main = tgpu.fn([d.f32])((x) => {
+      const t = typeof x;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: The \`typeof\` operator is unsupported in TypeGPU functions.]
+    `);
+  });
+
+  it('throws on delete', () => {
+    const Boid = d.struct({ pos: d.vec3f });
+    const main = tgpu.fn([])(() => {
+      const boid = Boid();
+      delete (boid as { pos?: d.v3f }).pos;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: The \`delete\` operator is unsupported in TypeGPU functions.]
+    `);
+  });
+});
