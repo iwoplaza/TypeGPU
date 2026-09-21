@@ -2613,3 +2613,382 @@ describe('do...while', () => {
     `);
   });
 });
+
+describe('switch', () => {
+  it('merges empty cases and drops trailing breaks', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((x) => {
+      let result = 0;
+      switch (x) {
+        case 1:
+        case 2:
+          result = 12;
+          break;
+        case 3: {
+          result = 3;
+          break;
+        }
+        default:
+          result = -1;
+      }
+      return result;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(x: i32) -> i32 {
+        var result = 0;
+        switch x {
+          case 1i, 2i: {
+            result = 12i;
+          }
+          case 3i: {
+            result = 3i;
+          }
+          default: {
+            result = -1i;
+          }
+        }
+        return result;
+      }"
+    `);
+  });
+
+  it('appends a default clause when missing and accepts returns', () => {
+    const main = tgpu.fn(
+      [d.u32],
+      d.f32,
+    )((x) => {
+      switch (x) {
+        case 0:
+          return 0.5;
+        case 1:
+          return 1.5;
+      }
+      return 0;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(x: u32) -> f32 {
+        switch x {
+          case 0u: {
+            return 0.5f;
+          }
+          case 1u: {
+            return 1.5f;
+          }
+          default: {}
+        }
+        return 0f;
+      }"
+    `);
+  });
+
+  it('merges default with other selectors', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case 1:
+        default:
+          return 1;
+        case 2:
+          return 2;
+      }
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(x: i32) -> i32 {
+        switch x {
+          case 1i, default: {
+            return 1i;
+          }
+          case 2i: {
+            return 2i;
+          }
+        }
+      }"
+    `);
+  });
+
+  it('accepts comptime-known and tgpu.const selectors', () => {
+    const TWO = 2;
+    const THREE = tgpu.const(d.i32, 3);
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case TWO:
+          return 2;
+        case THREE.$:
+          return 3;
+        default:
+          return 0;
+      }
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "const THREE: i32 = 3i;
+
+      fn main(x: i32) -> i32 {
+        switch x {
+          case 2i: {
+            return 2i;
+          }
+          case THREE: {
+            return 3i;
+          }
+          default: {
+            return 0i;
+          }
+        }
+      }"
+    `);
+  });
+
+  it('treats if/else with terminating branches as terminated', () => {
+    const main = tgpu.fn(
+      [d.i32, d.bool],
+      d.i32,
+    )((x, flag) => {
+      switch (x) {
+        case 1:
+          if (flag) {
+            return 1;
+          } else {
+            return 2;
+          }
+        default:
+          return 0;
+      }
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(x: i32, flag: bool) -> i32 {
+        switch x {
+          case 1i: {
+            if (flag) {
+              return 1i;
+            }
+            else {
+              return 2i;
+            }
+          }
+          default: {
+            return 0i;
+          }
+        }
+      }"
+    `);
+  });
+
+  it('lets break target the switch and continue target the enclosing loop', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      let acc = 0;
+      for (let i = 0; i < n; i++) {
+        switch (i) {
+          case 0:
+            continue;
+          case 1:
+            if (n > 5) {
+              break;
+            }
+            acc += 10;
+            break;
+          default:
+            acc += i;
+        }
+        acc += 1;
+      }
+      return acc;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(n: i32) -> i32 {
+        var acc = 0;
+        for (var i = 0; (i < n); i++) {
+          switch i {
+            case 0i: {
+              continue;
+            }
+            case 1i: {
+              if ((n > 5i)) {
+                break;
+              }
+              acc += 10i;
+            }
+            default: {
+              acc += i;
+            }
+          }
+          acc += 1i;
+        }
+        return acc;
+      }"
+    `);
+  });
+
+  it('allows break inside a switch inside an unrolled loop', () => {
+    const main = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
+      let acc = 0;
+      for (const i of tgpu.unroll([1, 2, 3])) {
+        switch (i) {
+          case 2:
+            break;
+          default:
+            acc += i;
+        }
+      }
+      return acc;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() -> i32 {
+        var acc = 0;
+        // unrolled iteration #0
+        switch 1i {
+          case 2i: {}
+          default: {
+            acc += 1i;
+          }
+        }
+        // unrolled iteration #1
+        switch 2i {
+          case 2i: {}
+          default: {
+            acc += 2i;
+          }
+        }
+        // unrolled iteration #2
+        switch 3i {
+          case 2i: {}
+          default: {
+            acc += 3i;
+          }
+        }
+        // ---
+        return acc;
+      }"
+    `);
+  });
+
+  it('still rejects continue inside a switch inside an unrolled loop', () => {
+    const main = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
+      let acc = 0;
+      for (const i of tgpu.unroll([1, 2, 3])) {
+        switch (i) {
+          case 2:
+            continue;
+          default:
+            acc += i;
+        }
+      }
+      return acc;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: Cannot unroll loop containing \`continue\`]
+    `);
+  });
+
+  it('rejects fallthrough', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((x) => {
+      let result = 0;
+      switch (x) {
+        case 1:
+          result = 1;
+        case 2:
+          result = 2;
+          break;
+      }
+      return result;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: Switch case '1' falls through to the next case, which is not supported in WGSL. End the case with 'break', 'return' or 'continue'.]
+    `);
+  });
+
+  it('rejects runtime case selectors', () => {
+    const main = tgpu.fn(
+      [d.i32, d.i32],
+      d.i32,
+    )((x, y) => {
+      switch (x) {
+        case y:
+          return 1;
+        default:
+          return 0;
+      }
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: 'case y:' is invalid, case selectors must be known at comptime.]
+    `);
+  });
+
+  it('rejects non-integer selectors', () => {
+    const main = tgpu.fn(
+      [d.f32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case 1:
+          return 1;
+        default:
+          return 0;
+      }
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: 'switch (x)' is invalid, the switch selector must be an i32 or a u32. Got f32.]
+    `);
+  });
+
+  it('rejects duplicate case selectors', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((x) => {
+      /* oxlint-disable no-duplicate-case */
+      switch (x) {
+        case 1:
+          return 1;
+        case 1:
+          return 2;
+        default:
+          return 0;
+      }
+      /* oxlint-enable no-duplicate-case */
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: Duplicate switch case selector '1'.]
+    `);
+  });
+});

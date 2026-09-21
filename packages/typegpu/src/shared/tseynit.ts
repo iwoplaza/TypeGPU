@@ -69,6 +69,16 @@ function stringifyStatement(node: tinyest.Statement, ident: string): string {
     return `${ident}do ${body} while (${cond});`;
   }
 
+  if (node[0] === NODE.switch) {
+    const discriminant = stringifyExpression(node[1], ident);
+    const cases = node[2].map(([test, body]) => {
+      const label = test === null ? 'default' : `case ${stringifyExpression(test, ident)}`;
+      const statements = body.map((n) => stringifyStatement(n, ident + '    '));
+      return [`${ident}  ${label}:`, ...statements].join('\n');
+    });
+    return `${ident}switch (${discriminant}) {\n${cases.join('\n')}\n${ident}}`;
+  }
+
   if (node[0] === NODE.continue) {
     return `${ident}continue;`;
   }

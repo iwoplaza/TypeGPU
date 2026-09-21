@@ -58,6 +58,16 @@ export interface ResolvedStatement {
 }
 
 /**
+ * One clause of a generated `switch` statement.
+ */
+export interface SwitchClause {
+  /** Already resolved case selectors (excluding `default`). */
+  selectors: string[];
+  isDefault: boolean;
+  body: ResolvedStatement;
+}
+
+/**
  * **NOTE: This is an unstable API and may change in the future.**
  *
  * Used to instantiate generators, once per resolution context

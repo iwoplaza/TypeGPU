@@ -44,6 +44,7 @@ import type {
   VariableDefinitionOptions,
   BinaryOperator,
   ResolvedStatement,
+  SwitchClause,
 } from './shaderGenerator.ts';
 import { resolveData } from '../core/resolve/resolveData.ts';
 import { createPtrFromOrigin, implicitFrom, ptrFn } from '../data/ptr.ts';
@@ -280,6 +281,9 @@ export class WgslGenerator implements ShaderGenerator {
   // used to detect `continue` and `break` nodes in loop body, as well as label
   // unrolled blocks with comments
   #unrollingChain: number[] = [];
+  // true while generating a `switch` case body that is not nested in a loop
+  // of its own, meaning a `break` targets the switch rather than the loop.
+  #breakTargetsSwitch = false;
 
   // prototype properties
   declare languageKey: string;
@@ -1707,7 +1711,9 @@ ${this.ctx.pre}else ${alternate}`,
     if (statement[0] === NODE.for) {
       const [_, init, condition, update, body] = statement;
       const prevUnrollingChain = this.#unrollingChain;
+      const prevBreakTargetsSwitch = this.#breakTargetsSwitch;
       this.#unrollingChain = [];
+      this.#breakTargetsSwitch = false;
 
       try {
         this.ctx.pushBlockScope();
@@ -1729,13 +1735,16 @@ ${this.ctx.pre}else ${alternate}`,
         };
       } finally {
         this.#unrollingChain = prevUnrollingChain;
+        this.#breakTargetsSwitch = prevBreakTargetsSwitch;
         this.ctx.popBlockScope();
       }
     }
 
     if (statement[0] === NODE.while) {
       const prevUnrollingChain = this.#unrollingChain;
+      const prevBreakTargetsSwitch = this.#breakTargetsSwitch;
       this.#unrollingChain = [];
+      this.#breakTargetsSwitch = false;
       try {
         const [_, condition, body] = statement;
         const condSnippet = this._typedExpression(condition, bool);
@@ -1748,16 +1757,30 @@ ${this.ctx.pre}else ${alternate}`,
         };
       } finally {
         this.#unrollingChain = prevUnrollingChain;
+        this.#breakTargetsSwitch = prevBreakTargetsSwitch;
       }
     }
 
     if (statement[0] === NODE.doWhile) {
       const prevUnrollingChain = this.#unrollingChain;
+      const prevBreakTargetsSwitch = this.#breakTargetsSwitch;
       this.#unrollingChain = [];
+      this.#breakTargetsSwitch = false;
       try {
         return this._doWhileStatement(statement);
       } finally {
         this.#unrollingChain = prevUnrollingChain;
+        this.#breakTargetsSwitch = prevBreakTargetsSwitch;
+      }
+    }
+
+    if (statement[0] === NODE.switch) {
+      const prevBreakTargetsSwitch = this.#breakTargetsSwitch;
+      this.#breakTargetsSwitch = true;
+      try {
+        return this._switchStatement(statement);
+      } finally {
+        this.#breakTargetsSwitch = prevBreakTargetsSwitch;
       }
     }
 
@@ -1772,6 +1795,8 @@ ${this.ctx.pre}else ${alternate}`,
 
       let ctxIndent = false;
       const prevUnrollingChain = this.#unrollingChain;
+      const prevBreakTargetsSwitch = this.#breakTargetsSwitch;
+      this.#breakTargetsSwitch = false;
 
       try {
         this.ctx.pushBlockScope();
@@ -1887,6 +1912,7 @@ ${this.ctx.pre}else ${alternate}`,
           this.ctx.dedent();
         }
         this.#unrollingChain = prevUnrollingChain;
+        this.#breakTargetsSwitch = prevBreakTargetsSwitch;
         this.ctx.popBlockScope();
       }
     }
@@ -1907,7 +1933,7 @@ ${this.ctx.pre}else ${alternate}`,
     }
 
     if (statement[0] === NODE.break) {
-      if (this.#unrollingChain.length > 0) {
+      if (this.#unrollingChain.length > 0 && !this.#breakTargetsSwitch) {
         throw new WgslTypeError('Cannot unroll loop containing `break`');
       }
       return {
@@ -1925,6 +1951,111 @@ ${this.ctx.pre}else ${alternate}`,
     const resolved =
       expr.value !== undefined && expr.value !== null ? this.ctx.resolveSnippet(expr).value : '';
     return { code: resolved ? `${this.ctx.pre}${resolved};` : '', definesInNearestScope: false };
+  }
+
+  /**
+   * Maps a JS `switch` onto a WGSL `switch`:
+   * - consecutive empty cases are merged into one clause with multiple selectors,
+   * - the trailing `break` of each case is dropped (WGSL clauses never fall through),
+   * - a case that would fall through in JS is rejected,
+   * - a `default` clause is appended when JS omits it (WGSL requires exactly one).
+   */
+  protected _switchStatement(statement: tinyest.Switch): ResolvedStatement {
+    const [_, discriminantNode, cases] = statement;
+
+    const discriminant = this._expression(discriminantNode);
+    const selectorType = concretize(discriminant.dataType as wgsl.AnyWgslData);
+    if (!wgsl.isInteger(selectorType)) {
+      throw new WgslTypeError(
+        `'switch (${stringifyNode(discriminantNode)})' is invalid, the switch selector must be an i32 or a u32. Got ${String(discriminant.dataType)}.`,
+      );
+    }
+    const selectorStr = this.ctx.resolveSnippet(
+      tryConvertSnippet(this.ctx, discriminant, selectorType, false),
+    ).value;
+
+    const clauses: SwitchClause[] = [];
+    const seenSelectors = new Set<string>();
+    let pending: Omit<SwitchClause, 'body'> = { selectors: [], isDefault: false };
+
+    this.ctx.indent();
+    try {
+      cases.forEach(([testNode, bodyNodes], index) => {
+        if (testNode === null) {
+          pending.isDefault = true;
+        } else {
+          const test = this._expression(testNode);
+          if (!isKnownAtComptime(test) && test.origin !== 'constant-immutable-def') {
+            throw new WgslTypeError(
+              `'case ${stringifyNode(testNode)}:' is invalid, case selectors must be known at comptime.`,
+            );
+          }
+          const selector = this.ctx.resolveSnippet(
+            tryConvertSnippet(this.ctx, test, selectorType, false),
+          ).value;
+          if (seenSelectors.has(selector)) {
+            throw new WgslTypeError(`Duplicate switch case selector '${stringifyNode(testNode)}'.`);
+          }
+          seenSelectors.add(selector);
+          pending.selectors.push(selector);
+        }
+
+        const isLast = index === cases.length - 1;
+        if (bodyNodes.length === 0 && !isLast) {
+          // `case 1: case 2: { ... }` -> merged into the next non-empty case.
+          return;
+        }
+
+        const { statements, terminated } = stripTrailingBreak(bodyNodes);
+        if (!terminated && !isLast) {
+          throw new WgslTypeError(
+            `Switch case '${stringifyNode(cases[index]?.[0] ?? 'default')}' falls through to the next case, which is not supported in WGSL. End the case with 'break', 'return' or 'continue'.`,
+          );
+        }
+
+        const body = this._block([NODE.block, statements], /* allowInlining */ false);
+        clauses.push({ ...pending, body });
+        pending = { selectors: [], isDefault: false };
+      });
+
+      if (!clauses.some((clause) => clause.isDefault)) {
+        clauses.push({
+          selectors: [],
+          isDefault: true,
+          body: { code: '', definesInNearestScope: false },
+        });
+      }
+    } finally {
+      this.ctx.dedent();
+    }
+
+    return { code: this._emitSwitch(selectorStr, clauses), definesInNearestScope: false };
+  }
+
+  /**
+   * Emits a switch statement. The clause bodies were generated one indent level deeper.
+   * ```
+   * switch x {
+   *   case 1, 2: { ... }
+   *   default: { ... }
+   * }
+   * ```
+   */
+  protected _emitSwitch(selectorStr: string, clauses: SwitchClause[]): string {
+    const outerPre = this.ctx.pre;
+    this.ctx.indent();
+    const casePre = this.ctx.pre;
+    this.ctx.dedent();
+
+    const clauseStrs = clauses.map(({ selectors, isDefault, body }) => {
+      const label =
+        selectors.length === 0
+          ? 'default'
+          : `case ${[...selectors, ...(isDefault ? ['default'] : [])].join(', ')}`;
+      return `${casePre}${label}: ${body.code || '{}'}`;
+    });
+
+    return `${outerPre}switch ${selectorStr} {\n${clauseStrs.join('\n')}\n${outerPre}}`;
   }
 
   protected _doWhileStatement(statement: tinyest.DoWhile): ResolvedStatement {
@@ -2140,6 +2271,56 @@ function parseNumericString(str: string): number {
   }
 
   return Number.parseFloat(str);
+}
+
+/**
+ * Whether the statement never lets execution fall off its end.
+ */
+function terminates(statement: tinyest.Statement): boolean {
+  if (typeof statement !== 'object') {
+    return false;
+  }
+  if (
+    statement[0] === NODE.break ||
+    statement[0] === NODE.return ||
+    statement[0] === NODE.continue
+  ) {
+    return true;
+  }
+  if (statement[0] === NODE.block) {
+    const last = statement[1].at(-1);
+    return last !== undefined && terminates(last);
+  }
+  if (statement[0] === NODE.if) {
+    return statement[3] !== undefined && terminates(statement[2]) && terminates(statement[3]);
+  }
+  return false;
+}
+
+/**
+ * Removes the `break;` that ends a switch case body (also when it's the last
+ * statement of a block that ends the body), and reports whether the body
+ * cannot fall through.
+ */
+function stripTrailingBreak(statements: tinyest.Statement[]): {
+  statements: tinyest.Statement[];
+  terminated: boolean;
+} {
+  const last = statements.at(-1);
+  if (last === undefined) {
+    return { statements, terminated: false };
+  }
+  if (typeof last === 'object' && last[0] === NODE.break) {
+    return { statements: statements.slice(0, -1), terminated: true };
+  }
+  if (typeof last === 'object' && last[0] === NODE.block) {
+    const inner = stripTrailingBreak(last[1]);
+    return {
+      statements: [...statements.slice(0, -1), [NODE.block, inner.statements]],
+      terminated: inner.terminated,
+    };
+  }
+  return { statements, terminated: terminates(last) };
 }
 
 function blockifySingleStatement(statement: tinyest.Statement): tinyest.Block {

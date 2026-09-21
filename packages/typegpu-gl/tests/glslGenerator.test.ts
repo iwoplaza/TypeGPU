@@ -860,3 +860,46 @@ describe('do...while', () => {
     `);
   });
 });
+
+describe('switch', () => {
+  it('emits labels per selector and explicit breaks', () => {
+    const main = tgpu.fn(
+      [d.u32],
+      d.i32,
+    )((x) => {
+      let result = 0;
+      switch (x) {
+        case 1:
+        case 2:
+          result = 12;
+          break;
+        case 3:
+          return 3;
+        default:
+          result = -1;
+      }
+      return result;
+    });
+
+    expect(tgpu.resolve([main], glOptions())).toMatchInlineSnapshot(`
+      "int main(uint x) {
+        int result = 0;
+        switch (x) {
+          case 1u:
+          case 2u: {
+            result = 12;
+            break;
+          }
+          case 3u: {
+            return 3;
+          }
+          default: {
+            result = -1;
+            break;
+          }
+        }
+        return result;
+      }"
+    `);
+  });
+});

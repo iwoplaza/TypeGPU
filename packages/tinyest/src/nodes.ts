@@ -25,6 +25,7 @@ export const NodeTypeCatalog = {
   break: 17,
   forOf: 18,
   doWhile: 19,
+  switch: 20,
 
   // rare
   arrayExpr: 100,
@@ -91,6 +92,17 @@ export type DoWhile = readonly [
   condition: Expression,
 ];
 
+/**
+ * A single `case <test>:` (or `default:` when `test` is null) with the statements that follow it.
+ */
+export type SwitchCase = readonly [test: Expression | null, body: Statement[]];
+
+export type Switch = readonly [
+  type: NodeTypeCatalog['switch'],
+  discriminant: Expression,
+  cases: SwitchCase[],
+];
+
 export type Continue = readonly [type: NodeTypeCatalog['continue']];
 
 export type Break = readonly [type: NodeTypeCatalog['break']];
@@ -115,6 +127,7 @@ export type Statement =
   | For
   | While
   | DoWhile
+  | Switch
   | Continue
   | Break
   | ForOf;

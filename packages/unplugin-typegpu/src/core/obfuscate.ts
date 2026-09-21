@@ -140,6 +140,18 @@ const visitors = {
   doWhile(ctx: Context, node: tinyest.DoWhile) {
     return [NODE.doWhile, obf(ctx, node[1]), obf(ctx, node[2])];
   },
+  switch(ctx: Context, node: tinyest.Switch) {
+    return [
+      NODE.switch,
+      obf(ctx, node[1]),
+      node[2].map(
+        ([test, body]): tinyest.SwitchCase => [
+          test === null ? null : obf(ctx, test),
+          body.map((statement) => obf(ctx, statement)),
+        ],
+      ),
+    ];
+  },
   continue(_ctx: Context, _node: tinyest.Continue) {
     return [NODE.continue];
   },

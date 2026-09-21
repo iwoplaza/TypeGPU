@@ -20,6 +20,7 @@ import type {
   ResolvedSnippet,
   ResolvedStatement,
   BinaryOperator,
+  SwitchClause,
 } from 'typegpu/~internal';
 
 /**
@@ -937,6 +938,45 @@ export class GlslGenerator extends WgslGenerator {
     }
 
     return node;
+  }
+
+  /**
+   * GLSL's `switch` falls through, so every clause that does not already end in
+   * control flow gets an explicit `break;`.
+   * ```
+   * switch (x) {
+   *   case 1:
+   *   case 2: { ... break; }
+   *   default: { ... }
+   * }
+   * ```
+   */
+  protected override _emitSwitch(selectorStr: string, clauses: SwitchClause[]): string {
+    const outerPre = this.ctx.pre;
+    this.ctx.indent();
+    const casePre = this.ctx.pre;
+    this.ctx.indent();
+    const innerPre = this.ctx.pre;
+    this.ctx.dedent();
+    this.ctx.dedent();
+
+    const clauseStrs = clauses.map(({ selectors, isDefault, body }) => {
+      const labels = [
+        ...selectors.map((selector) => `${casePre}case ${selector}:`),
+        ...(isDefault ? [`${casePre}default:`] : []),
+      ];
+
+      let block = body.code;
+      if (body.endsWithControlFlow === undefined) {
+        // `body.code` is either empty, or `{\n<statements>\n<pre>}`
+        const withoutClosingBrace = block ? block.slice(0, -(casePre.length + 1)) : '{\n';
+        block = `${withoutClosingBrace}${innerPre}break;\n${casePre}}`;
+      }
+
+      return `${labels.join('\n')} ${block}`;
+    });
+
+    return `${outerPre}switch (${selectorStr}) {\n${clauseStrs.join('\n')}\n${outerPre}}`;
   }
 
   /**

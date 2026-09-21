@@ -193,6 +193,30 @@ export const baseTranspilers = {
     return [NODE.while, condition, body];
   },
 
+  SwitchStatement(ctx, node, transpile) {
+    const discriminant = transpile(ctx, node.discriminant) as tinyest.Expression;
+
+    const cases = node.cases.map((switchCase): tinyest.SwitchCase => {
+      const test = switchCase.test ? (transpile(ctx, switchCase.test) as tinyest.Expression) : null;
+
+      // Each case gets its own scope. In JS all cases share the switch's scope, but
+      // since fallthrough is not supported, a declaration can only be used in its own case.
+      ctx.stack.push({ declaredNames: [] });
+      try {
+        const body = switchCase.consequent.flatMap((statement) =>
+          statement.type === 'VariableDeclaration'
+            ? transpileVariableDeclaration(ctx, statement, transpile)
+            : [transpile(ctx, statement) as tinyest.Statement],
+        );
+        return [test, body];
+      } finally {
+        ctx.stack.pop();
+      }
+    });
+
+    return [NODE.switch, discriminant, cases];
+  },
+
   DoWhileStatement(ctx, node, transpile) {
     const body = transpile(ctx, node.body) as tinyest.Statement;
     const condition = transpile(ctx, node.test) as tinyest.Expression;

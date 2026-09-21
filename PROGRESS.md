@@ -45,7 +45,7 @@ bottom need a new tinyest node and touch all three.
 | 6 | Multiple declarators `let a = 1, b = 2;` | two declarations | same | tinyest-for-wgsl | done |
 | 7 | Destructuring declarations `const { x, y } = v;` / `const [a, b] = arr;` | `let x = v.x; let y = v.y;` / `let a = arr[0]; ...` | same | tinyest-for-wgsl | done |
 | 8 | `do { } while (cond);` | `loop { ... continuing { break if !(cond); } }` | `do { } while (cond);` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | done |
-| 9 | `switch` | `switch x { case 1, 2: { } default: { } }` | `switch (x) { case 1: case 2: { ... break; } default: { } }` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | planned |
+| 9 | `switch` | `switch x { case 1, 2: { } default: { } }` | `switch (x) { case 1: case 2: { ... break; } default: { } }` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | done |
 | 10 | Template literals in `console.log` | interleaved string/value log arguments | n/a (`console.log` unsupported in GLSL) | tinyest, tinyest-for-wgsl, typegpu | planned |
 
 Bugs discovered while surveying the generator, fixed in their own commits placed **below** the
@@ -157,7 +157,9 @@ functionality commits in the branch history:
     so this is rejected with an error asking for an explicit `break`.
   - WGSL requires exactly one `default` clause; a `switch` without one gets `default: {}` appended.
   - The discriminant must be `i32` or `u32` (abstract ints are concretized to `i32`). Case
-    selectors must be known at comptime and are converted to the discriminant's type.
+    selectors must be known at comptime (JS constants) or be `tgpu.const` values (WGSL
+    const-expressions), and are converted to the discriminant's type. Duplicate selectors are
+    rejected (WGSL requires them to be unique; JS would silently pick the first).
   - `break` inside a `switch` breaks the `switch`, also when the `switch` sits in an unrolled
     loop (the unroll guard only rejects `break`s that target the loop). `continue` inside a
     `switch` inside a loop continues the loop, as in JavaScript.

@@ -17,6 +17,7 @@ describe('noUnsupportedSyntax', () => {
       "const fn = () => { 'use gpu'; let a = 1, b = 2; const c = 3, d = 4; }",
       "const fn = () => { 'use gpu'; const { a, b: { c } } = obj; const [x, , y] = arr; }",
       "const fn = (x) => { 'use gpu'; do { x -= 1; } while (x > 0); }",
+      "const fn = (x) => { 'use gpu'; switch (x) { case 1: case 2: return 1; default: break; } }",
     ],
     invalid: [
       {
@@ -202,15 +203,6 @@ describe('noUnsupportedSyntax', () => {
         code: "const fn = () => { 'use gpu'; const x = [...arr]; }",
         errors: [
           { messageId: 'unexpected', data: { snippet: '...arr', syntax: 'spread element' } },
-        ],
-      },
-      {
-        code: "const fn = () => { 'use gpu'; switch (x) { case 1: break; } }",
-        errors: [
-          {
-            messageId: 'unexpected',
-            data: { snippet: 'switch (x) { case 1: break; }', syntax: 'switch statement' },
-          },
         ],
       },
       {

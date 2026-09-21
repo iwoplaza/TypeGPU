@@ -708,3 +708,35 @@ describe('do...while', () => {
     }),
   );
 });
+
+describe('switch', () => {
+  it(
+    'transpiles switch statements',
+    dualTest((p, transpileFn) => {
+      const { body, externalNames } = transpileFn(
+        p(`(x) => {
+          switch (x) {
+            case 1:
+            case 2: {
+              return 12;
+            }
+            case ext.THREE:
+              const y = x * 2;
+              return y;
+            default:
+              break;
+          }
+        }`),
+      );
+
+      expect(JSON.stringify(body)).toMatchInlineSnapshot(
+        `"[0,[[20,"x",[[[5,"1"],[]],[[5,"2"],[[0,[[10,[5,"12"]]]]]],["ext.THREE",[[13,"y",[1,"x","*",[5,"2"]]],[10,"y"]]],[null,[[17]]]]]]]"`,
+      );
+      expect(externalNames).toMatchInlineSnapshot(`
+        Map {
+          "ext.THREE" => "ext.THREE",
+        }
+      `);
+    }),
+  );
+});
