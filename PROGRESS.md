@@ -18,6 +18,10 @@ construct is mapped onto WGSL (and GLSL, via `@typegpu/gl`).
   - `typegpu` (`WgslGenerator`) — tinyest → WGSL. Owns typing rules and the JS → WGSL mapping.
   - `@typegpu/gl` (`GlslGenerator`) — overrides only where GLSL differs from WGSL, and throws an
     "unsupported" error where GLSL cannot express a construct.
+  - Two more packages mirror the tinyest node set and had to follow along: `unplugin-typegpu`
+    (its obfuscator visits every node type) and `eslint-plugin-typegpu` (its
+    `no-unsupported-syntax` rule flags exactly what the transpiler and generator reject, so every
+    item below also relaxes or refines that rule).
 
 ## How the gaps were found
 
@@ -202,6 +206,7 @@ functionality commits in the branch history:
 | Object methods `{ f() {} }` | Structs have no methods in WGSL. |
 | Regular expressions, `BigInt` | Not representable (BigInt is narrowed to a number with a warning). |
 | `switch` fallthrough | Removed from WGSL; requires an explicit `break`. |
+| `for (let x of ...)` | Only `const` loop variables are supported; a reassignable copy per iteration would hide whether the loop variable aliases the element. |
 | Multiple declarators in `for` initializers | WGSL allows one initializer statement. |
 | `debugger`, `with`, classes, generators, `async`/`await` | No meaning in a shader. |
 
@@ -221,3 +226,23 @@ functionality commits in the branch history:
 | `<<`, `>>` (signed) | `<<`, `>>` |
 | `>>` on `u32` | `>>>` |
 | `pow` | `**` / `**=` / `Math.pow` |
+
+## Verification
+
+Every commit was checked with the repository's own tooling before being made:
+
+- `oxlint` (type-aware, zero warnings) and `oxfmt` on the touched files, and the full
+  `pnpm test:style` at the end,
+- `tsc --noEmit` for `tinyest`, `tinyest-for-wgsl`, `typegpu`, `@typegpu/gl`,
+  `unplugin-typegpu` and `eslint-plugin-typegpu` (source and test configs), and the workspace-wide
+  `test:types` at the end,
+- `pnpm test:circular-deps`,
+- the unit tests of the affected packages after every change, and the full non-browser suite at
+  the end.
+
+In the full suite, the only failures are environmental and unrelated to this work: the
+half-float tests (`halfBits`, `compiledIO`) need the native `Float16Array` that the repository's
+required Node 24 provides but this container's Node 22 does not (they fail identically on the base
+commit), `tgpu-gen` could not install its Git-hosted `wgsl_reflect` dependency behind the
+proxy, and one docs example test hit its 5 s timeout under the full parallel run but passes in
+isolation.
