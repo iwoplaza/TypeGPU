@@ -24,6 +24,7 @@ export const NodeTypeCatalog = {
   continue: 16,
   break: 17,
   forOf: 18,
+  doWhile: 19,
 
   // rare
   arrayExpr: 100,
@@ -84,6 +85,12 @@ export type While = readonly [
   body: Statement,
 ];
 
+export type DoWhile = readonly [
+  type: NodeTypeCatalog['doWhile'],
+  body: Statement,
+  condition: Expression,
+];
+
 export type Continue = readonly [type: NodeTypeCatalog['continue']];
 
 export type Break = readonly [type: NodeTypeCatalog['break']];
@@ -107,6 +114,7 @@ export type Statement =
   | Expression
   | For
   | While
+  | DoWhile
   | Continue
   | Break
   | ForOf;

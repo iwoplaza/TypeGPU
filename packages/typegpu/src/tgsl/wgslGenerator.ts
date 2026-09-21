@@ -1751,6 +1751,16 @@ ${this.ctx.pre}else ${alternate}`,
       }
     }
 
+    if (statement[0] === NODE.doWhile) {
+      const prevUnrollingChain = this.#unrollingChain;
+      this.#unrollingChain = [];
+      try {
+        return this._doWhileStatement(statement);
+      } finally {
+        this.#unrollingChain = prevUnrollingChain;
+      }
+    }
+
     if (statement[0] === NODE.forOf) {
       const [_, loopVar, iterable, body] = statement;
 
@@ -1915,6 +1925,56 @@ ${this.ctx.pre}else ${alternate}`,
     const resolved =
       expr.value !== undefined && expr.value !== null ? this.ctx.resolveSnippet(expr).value : '';
     return { code: resolved ? `${this.ctx.pre}${resolved};` : '', definesInNearestScope: false };
+  }
+
+  protected _doWhileStatement(statement: tinyest.DoWhile): ResolvedStatement {
+    const [_, body, condition] = statement;
+    return this._emitDoWhile(blockifySingleStatement(body), condition);
+  }
+
+  /**
+   * WGSL has no `do...while`, but its `loop` statement is the exact equivalent:
+   * the body runs first, `continue` jumps to the `continuing` block, and
+   * `break if` evaluates the condition after every iteration.
+   * ```
+   * loop {
+   *   <body>
+   *   continuing {
+   *     break if !(<condition>);
+   *   }
+   * }
+   * ```
+   * Languages with a native `do...while` (e.g. GLSL) override this.
+   */
+  protected _emitDoWhile(body: tinyest.Block, condition: tinyest.Expression): ResolvedStatement {
+    // The body is evaluated before the condition, so the condition cannot
+    // see the body's declarations. That's also how JS scopes them.
+    const bodyStr = this._block(body, /* allowInlining */ false).code;
+    const condSnippet = this._typedExpression(condition, bool);
+
+    let continuing = '';
+    // `break if false` would be a no-op, so `do {} while (true)` needs no continuing block.
+    if (!isKnownAtComptime(condSnippet) || !condSnippet.value) {
+      const breakCondition = isKnownAtComptime(condSnippet)
+        ? 'true'
+        : `!${this.ctx.resolveSnippet(condSnippet).value}`;
+      this.ctx.indent();
+      continuing += `${this.ctx.pre}continuing {\n`;
+      this.ctx.indent();
+      continuing += `${this.ctx.pre}break if ${breakCondition};\n`;
+      this.ctx.dedent();
+      continuing += `${this.ctx.pre}}\n`;
+      this.ctx.dedent();
+    }
+
+    // `bodyStr` is either empty, or `{\n<statements>\n<pre>}`, into which the
+    // continuing block is spliced right before the closing brace.
+    const bodyWithoutClosingBrace = bodyStr ? bodyStr.slice(0, -(this.ctx.pre.length + 1)) : '{\n';
+
+    return {
+      code: `${this.ctx.pre}loop ${bodyWithoutClosingBrace}${continuing}${this.ctx.pre}}`,
+      definesInNearestScope: false,
+    };
   }
 
   /**

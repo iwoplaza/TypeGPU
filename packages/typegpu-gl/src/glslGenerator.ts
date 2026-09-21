@@ -1,5 +1,5 @@
 import { NodeTypeCatalog as NODE } from 'tinyest';
-import type { Expression, Return, ObjectExpression, ObjectProperty } from 'tinyest';
+import type { Block, Expression, Return, ObjectExpression, ObjectProperty } from 'tinyest';
 import { tgpu, d, type ShaderStage, std } from 'typegpu';
 import {
   abstractInt,
@@ -937,6 +937,19 @@ export class GlslGenerator extends WgslGenerator {
     }
 
     return node;
+  }
+
+  /**
+   * GLSL has `do { } while (cond);` natively.
+   */
+  protected override _emitDoWhile(body: Block, condition: Expression): ResolvedStatement {
+    const bodyStr = this._block(body, /* allowInlining */ false).code;
+    const condStr = this.ctx.resolveSnippet(this._typedExpression(condition, d.bool)).value;
+
+    return {
+      code: `${this.ctx.pre}do ${bodyStr || '{}'} while (${condStr});`,
+      definesInNearestScope: false,
+    };
   }
 
   /**

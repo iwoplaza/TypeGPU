@@ -2426,3 +2426,190 @@ describe('prefix update statements', () => {
     `);
   });
 });
+
+describe('do...while', () => {
+  it('emits a loop with a continuing block', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      let x = n;
+      let i = 0;
+      do {
+        x = x / 2;
+        i += 1;
+      } while (x > 0);
+      return i;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(n: i32) -> i32 {
+        var x = n;
+        var i = 0;
+        loop {
+          x = i32((f32(x) / 2f));
+          i += 1i;
+          continuing {
+            break if !(x > 0i);
+          }
+        }
+        return i;
+      }"
+    `);
+  });
+
+  it('runs the body before checking the condition', () => {
+    const keepGoing = tgpu.privateVar(d.bool);
+    const main = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
+      let i = 0;
+      do i += 1;
+      while (keepGoing.$);
+      return i;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "var<private> keepGoing: bool;
+
+      fn main() -> i32 {
+        var i = 0;
+        loop {
+          i += 1i;
+          continuing {
+            break if !keepGoing;
+          }
+        }
+        return i;
+      }"
+    `);
+  });
+
+  it('handles continue and break inside the body', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      let i = 0;
+      do {
+        i += 1;
+        if (i === 2) {
+          continue;
+        }
+        if (i > n) {
+          break;
+        }
+      } while (i < 10);
+      return i;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(n: i32) -> i32 {
+        var i = 0;
+        loop {
+          i += 1i;
+          if ((i == 2i)) {
+            continue;
+          }
+          if ((i > n)) {
+            break;
+          }
+          continuing {
+            break if !(i < 10i);
+          }
+        }
+        return i;
+      }"
+    `);
+  });
+
+  it('simplifies comptime-known conditions', () => {
+    const main = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
+      let i = 0;
+      do {
+        i += 1;
+      } while (false);
+      do {
+        i += 1;
+        if (i > 5) {
+          break;
+        }
+      } while (true);
+      return i;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() -> i32 {
+        var i = 0;
+        loop {
+          i += 1i;
+          continuing {
+            break if true;
+          }
+        }
+        loop {
+          i += 1i;
+          if ((i > 5i)) {
+            break;
+          }
+        }
+        return i;
+      }"
+    `);
+  });
+
+  it('emits empty bodies', () => {
+    const keepGoing = tgpu.privateVar(d.bool);
+    const main = tgpu.fn([])(() => {
+      do {} while (keepGoing.$);
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "var<private> keepGoing: bool;
+
+      fn main() {
+        loop {
+          continuing {
+            break if !keepGoing;
+          }
+        }
+      }"
+    `);
+  });
+
+  it('nests correctly inside other blocks', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      let i = 0;
+      if (n > 0) {
+        do {
+          const step = 2;
+          i += step;
+        } while (i < n);
+      }
+      return i;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(n: i32) -> i32 {
+        var i = 0;
+        if ((n > 0i)) {
+          loop {
+            const step_1 = 2;
+            i += step_1;
+            continuing {
+              break if !(i < n);
+            }
+          }
+        }
+        return i;
+      }"
+    `);
+  });
+});

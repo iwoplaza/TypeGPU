@@ -688,3 +688,23 @@ describe('destructuring declarations', () => {
     }),
   );
 });
+
+describe('do...while', () => {
+  it(
+    'transpiles do...while loops',
+    dualTest((p, transpileFn) => {
+      const { body } = transpileFn(
+        p(`(x) => {
+          do {
+            x -= 1;
+          } while (x > 0);
+          do x += 1; while (x < 10);
+        }`),
+      );
+
+      expect(JSON.stringify(body)).toMatchInlineSnapshot(
+        `"[0,[[19,[0,[[2,"x","-=",[5,"1"]]]],[1,"x",">",[5,"0"]]],[19,[2,"x","+=",[5,"1"]],[1,"x","<",[5,"10"]]]]]"`,
+      );
+    }),
+  );
+});

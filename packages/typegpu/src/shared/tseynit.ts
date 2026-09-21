@@ -63,6 +63,12 @@ function stringifyStatement(node: tinyest.Statement, ident: string): string {
     return `${ident}while (${cond}) ${body}`;
   }
 
+  if (node[0] === NODE.doWhile) {
+    const body = stringifyStatement(node[1], ident);
+    const cond = stringifyExpression(node[2], ident);
+    return `${ident}do ${body} while (${cond});`;
+  }
+
   if (node[0] === NODE.continue) {
     return `${ident}continue;`;
   }

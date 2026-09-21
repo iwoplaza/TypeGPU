@@ -16,6 +16,7 @@ describe('noUnsupportedSyntax', () => {
       "const fn = (b) => { 'use gpu'; let a = true; a &&= b; a ||= b; }",
       "const fn = () => { 'use gpu'; let a = 1, b = 2; const c = 3, d = 4; }",
       "const fn = () => { 'use gpu'; const { a, b: { c } } = obj; const [x, , y] = arr; }",
+      "const fn = (x) => { 'use gpu'; do { x -= 1; } while (x > 0); }",
     ],
     invalid: [
       {
@@ -122,15 +123,6 @@ describe('noUnsupportedSyntax', () => {
           {
             messageId: 'unexpected',
             data: { snippet: 'class {}', syntax: 'class expression' },
-          },
-        ],
-      },
-      {
-        code: "const fn = () => { 'use gpu'; do { } while (x); }",
-        errors: [
-          {
-            messageId: 'unexpected',
-            data: { snippet: 'do { } while (x);', syntax: 'do-while loop' },
           },
         ],
       },

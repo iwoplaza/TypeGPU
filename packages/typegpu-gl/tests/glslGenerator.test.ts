@@ -831,3 +831,32 @@ describe('update statements', () => {
     `);
   });
 });
+
+describe('do...while', () => {
+  it('emits the native do...while statement', () => {
+    const main = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      let x = n;
+      let i = 0;
+      do {
+        x = x / 2;
+        i += 1;
+      } while (x > 0);
+      return i;
+    });
+
+    expect(tgpu.resolve([main], glOptions())).toMatchInlineSnapshot(`
+      "int main(int n) {
+        int x = n;
+        int i = 0;
+        do {
+          x = int((float(x) / 2.0));
+          i += 1;
+        } while ((x > 0));
+        return i;
+      }"
+    `);
+  });
+});

@@ -44,7 +44,7 @@ bottom need a new tinyest node and touch all three.
 | 5 | Logical assignment `a &&= b` / `a \|\|= b` | `a = (a && b);` / `a = (a \|\| b);` | same | typegpu | done |
 | 6 | Multiple declarators `let a = 1, b = 2;` | two declarations | same | tinyest-for-wgsl | done |
 | 7 | Destructuring declarations `const { x, y } = v;` / `const [a, b] = arr;` | `let x = v.x; let y = v.y;` / `let a = arr[0]; ...` | same | tinyest-for-wgsl | done |
-| 8 | `do { } while (cond);` | `loop { ... continuing { break if !(cond); } }` | `do { } while (cond);` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | planned |
+| 8 | `do { } while (cond);` | `loop { ... continuing { break if !(cond); } }` | `do { } while (cond);` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | done |
 | 9 | `switch` | `switch x { case 1, 2: { } default: { } }` | `switch (x) { case 1: case 2: { ... break; } default: { } }` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | planned |
 | 10 | Template literals in `console.log` | interleaved string/value log arguments | n/a (`console.log` unsupported in GLSL) | tinyest, tinyest-for-wgsl, typegpu | planned |
 
@@ -133,8 +133,12 @@ functionality commits in the branch history:
     }
   }
   ```
-  When the condition is known at comptime, `do {} while (false)` is emitted as `loop { <body> break; }`
-  (a "run once" loop) and `do {} while (true)` as `loop { <body> }`.
+  When the condition is known at comptime, `do {} while (true)` is emitted as `loop { <body> }`
+  (a `break if false` would be a no-op) and `do {} while (false)` keeps a
+  `continuing { break if true; }` block: a bare `break;` at the end of the body would be skipped
+  by a `continue` inside it, whereas `continue` always reaches the `continuing` block.
+- The body is a block of its own in WGSL, exactly like in JS, so the condition cannot see the
+  body's declarations.
 - GLSL ES 3.0 has `do { } while (cond);` natively, so `GlslGenerator` emits it verbatim.
 - **Packages:** all three (`tinyest` node, `tinyest-for-wgsl` transpile, generators).
 

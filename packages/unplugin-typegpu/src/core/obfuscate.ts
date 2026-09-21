@@ -137,6 +137,9 @@ const visitors = {
   while(ctx: Context, node: tinyest.While) {
     return [NODE.while, obf(ctx, node[1]), obf(ctx, node[2])];
   },
+  doWhile(ctx: Context, node: tinyest.DoWhile) {
+    return [NODE.doWhile, obf(ctx, node[1]), obf(ctx, node[2])];
+  },
   continue(_ctx: Context, _node: tinyest.Continue) {
     return [NODE.continue];
   },

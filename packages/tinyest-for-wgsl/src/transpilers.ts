@@ -193,6 +193,13 @@ export const baseTranspilers = {
     return [NODE.while, condition, body];
   },
 
+  DoWhileStatement(ctx, node, transpile) {
+    const body = transpile(ctx, node.body) as tinyest.Statement;
+    const condition = transpile(ctx, node.test) as tinyest.Expression;
+
+    return [NODE.doWhile, body, condition];
+  },
+
   ForOfStatement(ctx, node, transpile) {
     ctx.stack.push({ declaredNames: [] });
 

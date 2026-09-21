@@ -89,13 +89,6 @@ export const noUnsupportedSyntax = createRule({
         report(node, 'class expression');
       },
 
-      DoWhileStatement(node) {
-        if (!directives.getEnclosingTypegpuFunction()) {
-          return;
-        }
-        report(node, 'do-while loop');
-      },
-
       ForInStatement(node) {
         if (!directives.getEnclosingTypegpuFunction()) {
           return;
