@@ -53,7 +53,7 @@ functionality commits in the branch history:
 
 | Bug | Before | After | Status |
 |---|---|---|---|
-| Assignment used as an expression (`a = b = 3`, `if ((a = 2) === 2)`) | Emitted invalid WGSL (`a = b = 3i;`, `(a = 2i == 2i)`) | Descriptive error: assignments are statements in WGSL | planned |
+| Assignment used as an expression (`a = b = 3`, `if ((a = 2) === 2)`) | Emitted invalid WGSL (`a = b = 3i;`, `(a = 2i == 2i)`) | Descriptive error: assignments are statements in WGSL | fixed |
 | Unary plus `+x` | Emitted `+x`, which WGSL does not have | Emits the operand itself (`x`), validated to be numeric, folded at comptime | planned |
 | `typeof x`, `delete x` | Emitted `typeofx` / `deletex` | Descriptive "unsupported operator" error | planned |
 

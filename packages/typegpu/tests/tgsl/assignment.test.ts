@@ -39,3 +39,51 @@ it('implicitly casts right-hand side, with a warning', () => {
     ]
   `);
 });
+
+it('rejects assignments used as expressions', () => {
+  const chained = tgpu.fn([])(() => {
+    let a = 1;
+    let b = 2;
+    a = b = 3;
+    return a + b;
+  });
+
+  expect(() => tgpu.resolve([chained])).toThrowErrorMatchingInlineSnapshot(`
+    [Error: Resolution of the following tree failed:
+    - <root>
+    - fn:chained: 'b = 3' is invalid, assignments are statements in WGSL and cannot be used as expressions.]
+  `);
+
+  const inCondition = tgpu.fn([])(() => {
+    let a = 1;
+    if ((a = 2) === 2) {
+      return;
+    }
+  });
+
+  expect(() => tgpu.resolve([inCondition])).toThrowErrorMatchingInlineSnapshot(`
+    [Error: Resolution of the following tree failed:
+    - <root>
+    - fn:inCondition: 'a = 2' is invalid, assignments are statements in WGSL and cannot be used as expressions.]
+  `);
+});
+
+it('accepts assignments in statement position, including for clauses', () => {
+  const main = tgpu.fn([])(() => {
+    let a = 0;
+    for (let i = 0; i < 3; i += 1) {
+      a += i;
+    }
+    a *= 2;
+  });
+
+  expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+    "fn main() {
+      var a = 0;
+      for (var i = 0; (i < 3i); i += 1i) {
+        a += i;
+      }
+      a *= 2i;
+    }"
+  `);
+});
