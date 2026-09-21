@@ -35,6 +35,7 @@ export const NodeTypeCatalog = {
   objectExpr: 104,
   conditionalExpr: 105,
   nullLiteral: 106,
+  templateLiteral: 107,
 } as const;
 
 export type NodeTypeCatalog = typeof NodeTypeCatalog;
@@ -266,6 +267,16 @@ export type Str = readonly [type: NodeTypeCatalog['stringLiteral'], string];
 /** null literal */
 export type Null = readonly [type: NodeTypeCatalog['nullLiteral']];
 
+/**
+ * A template literal with at least one substitution, e.g. `` `x: ${x}` ``.
+ * There is always one more quasi (text part) than there are expressions.
+ */
+export type TemplateLiteral = readonly [
+  type: NodeTypeCatalog['templateLiteral'],
+  quasis: string[],
+  expressions: Expression[],
+];
+
 export type Literal = Num | Str | boolean | Null;
 
 /** Identifiers are just strings, since string literals are rare in WGSL, and identifiers are everywhere. */
@@ -283,6 +294,7 @@ export type Expression =
   | PreUpdate
   | PostUpdate
   | Call
+  | TemplateLiteral
   | Literal;
 
 export type AnyNode = Statement | Expression;

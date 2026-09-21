@@ -188,6 +188,16 @@ function stringifyExpression(node: tinyest.Expression, ident: string): string {
     return 'null';
   }
 
+  if (node[0] === NODE.templateLiteral) {
+    const [_, quasis, expressions] = node;
+    const parts = quasis.flatMap((quasi, i) =>
+      i < expressions.length
+        ? [quasi, `\${${stringifyExpression(expressions[i] as tinyest.Expression, ident)}}`]
+        : [quasi],
+    );
+    return `\`${parts.join('')}\``;
+  }
+
   assertExhaustive(node);
 }
 
@@ -213,7 +223,8 @@ function isExpression(node: tinyest.AnyNode): node is tinyest.Expression {
     node[0] === NODE.postUpdate ||
     node[0] === NODE.objectExpr ||
     node[0] === NODE.conditionalExpr ||
-    node[0] === NODE.nullLiteral
+    node[0] === NODE.nullLiteral ||
+    node[0] === NODE.templateLiteral
   ) {
     node satisfies tinyest.Expression;
     return true;
@@ -229,6 +240,7 @@ const SIMPLE_NODES: number[] = [
   NODE.arrayExpr, // [] make things not ambiguous
   NODE.stringLiteral,
   NODE.numericLiteral,
+  NODE.templateLiteral,
 ];
 /**
  * Stringifies expression, and wraps it in parentheses if they cannot be trivially omitted

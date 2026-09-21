@@ -135,9 +135,12 @@ function deserialize(data: Uint32Array, dataType: BaseData): unknown {
  * @param data - The Uint32Array buffer containing the serialized data
  * @param dataTypes - The WGSL data type specification that determines how to interpret the binary data, or string literals
  */
-function deserializeCompound(data: Uint32Array, dataTypes: (BaseData | string)[]): unknown[] {
+function deserializeCompound(
+  data: Uint32Array,
+  dataTypes: (BaseData | string | (BaseData | string)[])[],
+): unknown[] {
   let index = 0;
-  return dataTypes.map((info) => {
+  const deserializeOne = (info: BaseData | string): unknown => {
     if (!isWgslData(info)) {
       return info;
     }
@@ -145,12 +148,18 @@ function deserializeCompound(data: Uint32Array, dataTypes: (BaseData | string)[]
     const value = deserialize(data.subarray(index, index + size), info);
     index += size;
     return value;
-  });
+  };
+  return dataTypes.map((info) =>
+    Array.isArray(info)
+      ? // A template literal, its parts form a single string.
+        info.map(deserializeOne).map(niceStringify).join('')
+      : deserializeOne(info),
+  );
 }
 
 export function deserializeAndStringify(
   serializedData: Uint32Array,
-  argTypes: (AnyWgslData | string)[],
+  argTypes: LogMeta['argTypes'],
 ): string[] {
   return deserializeCompound(serializedData, argTypes).map(niceStringify);
 }

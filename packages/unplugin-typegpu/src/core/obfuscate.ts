@@ -198,6 +198,9 @@ const visitors = {
   nullLiteral(_: Context, node: tinyest.Null) {
     return node;
   },
+  templateLiteral(ctx: Context, node: tinyest.TemplateLiteral) {
+    return [NODE.templateLiteral, node[1], node[2].map((expression) => obf(ctx, expression))];
+  },
 } as const satisfies {
   [N in keyof typeof NODE]: (
     ctx: Context,

@@ -34,6 +34,7 @@ import {
   coerceToSnippet,
   concretize,
   numericLiteralToSnippet,
+  TemplateLiteralExpression,
 } from './generationHelpers.ts';
 import { accessIndex } from './accessIndex.ts';
 import { accessProp } from './accessProp.ts';
@@ -796,7 +797,7 @@ export class WgslGenerator implements ShaderGenerator {
       if (supportedLogOps().includes(callee.value as AnyFn)) {
         return this.ctx.generateLog(
           callee.value as AnyFn,
-          argNodes.map((arg) => this._expression(arg)),
+          argNodes.map((arg) => this._logArgument(arg)),
         );
       }
 
@@ -1145,7 +1146,42 @@ export class WgslGenerator implements ShaderGenerator {
       return snip(null, UnknownData, 'constant', false);
     }
 
+    if (expression[0] === NODE.templateLiteral) {
+      throw new WgslTypeError(
+        `'${stringifyNode(expression)}' is invalid, template literals are only supported as 'console.log' arguments, since WGSL has no strings.`,
+      );
+    }
+
     assertExhaustive(expression);
+  }
+
+  /**
+   * Like `_expression`, but also accepts template literals, which are
+   * split into their text parts and substituted values.
+   */
+  protected _logArgument(expression: tinyest.Expression): Snippet {
+    if (typeof expression !== 'object' || expression[0] !== NODE.templateLiteral) {
+      return this._expression(expression);
+    }
+
+    const [_, quasis, expressionNodes] = expression;
+    const parts: Snippet[] = [];
+    quasis.forEach((quasi, i) => {
+      if (quasi !== '') {
+        parts.push(snip(quasi, UnknownData, 'constant', false));
+      }
+      const expressionNode = expressionNodes[i];
+      if (expressionNode !== undefined) {
+        parts.push(this._expression(expressionNode));
+      }
+    });
+
+    return snip(
+      new TemplateLiteralExpression(parts),
+      UnknownData,
+      'runtime',
+      parts.some((part) => part.possibleSideEffects),
+    );
   }
 
   public declareGlobalConst(options: ConstantDefinitionOptions): ResolvedSnippet {

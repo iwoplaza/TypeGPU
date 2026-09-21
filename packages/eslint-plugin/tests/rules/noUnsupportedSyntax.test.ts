@@ -18,6 +18,7 @@ describe('noUnsupportedSyntax', () => {
       "const fn = () => { 'use gpu'; const { a, b: { c } } = obj; const [x, , y] = arr; }",
       "const fn = (x) => { 'use gpu'; do { x -= 1; } while (x > 0); }",
       "const fn = (x) => { 'use gpu'; switch (x) { case 1: case 2: return 1; default: break; } }",
+      "const fn = (x) => { 'use gpu'; console.log(`x: ${x}`); console.warn(`plain`); }",
     ],
     invalid: [
       {
@@ -206,20 +207,20 @@ describe('noUnsupportedSyntax', () => {
         ],
       },
       {
-        code: "const func = function() { 'use gpu'; const x = `hello`; }",
+        code: "const func = function() { 'use gpu'; const x = `hello ${name}`; }",
         errors: [
           {
             messageId: 'unexpected',
-            data: { snippet: '`hello`', syntax: 'template literal' },
+            data: { snippet: '`hello ${name}`', syntax: 'template literal outside of console.log' },
           },
         ],
       },
       {
-        code: "const fn = () => { 'use gpu'; const x = tag`hello`; }",
+        code: "const fn = () => { 'use gpu'; console.log(tag`hello`); }",
         errors: [
           {
             messageId: 'unexpected',
-            data: { snippet: '`hello`', syntax: 'template literal' },
+            data: { snippet: 'tag`hello`', syntax: 'tagged template literal' },
           },
         ],
       },

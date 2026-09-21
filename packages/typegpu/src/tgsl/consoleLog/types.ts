@@ -35,9 +35,16 @@ export type SerializedLogCallData = WgslStruct<{
   serializedData: WgslArray<U32>;
 }>;
 
+/** A string literal, or the type of a serialized value. */
+export type LogArgType = string | AnyWgslData;
+
 export interface LogMeta {
   op: SupportedLogOp;
-  argTypes: (string | AnyWgslData)[];
+  /**
+   * One entry per logged argument. A nested array stands for a template literal,
+   * whose parts get stringified and concatenated into a single argument.
+   */
+  argTypes: (LogArgType | LogArgType[])[];
 }
 
 /**

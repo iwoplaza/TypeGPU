@@ -46,7 +46,7 @@ bottom need a new tinyest node and touch all three.
 | 7 | Destructuring declarations `const { x, y } = v;` / `const [a, b] = arr;` | `let x = v.x; let y = v.y;` / `let a = arr[0]; ...` | same | tinyest-for-wgsl | done |
 | 8 | `do { } while (cond);` | `loop { ... continuing { break if !(cond); } }` | `do { } while (cond);` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | done |
 | 9 | `switch` | `switch x { case 1, 2: { } default: { } }` | `switch (x) { case 1: case 2: { ... break; } default: { } }` | tinyest, tinyest-for-wgsl, typegpu, @typegpu/gl | done |
-| 10 | Template literals in `console.log` | interleaved string/value log arguments | n/a (`console.log` unsupported in GLSL) | tinyest, tinyest-for-wgsl, typegpu | planned |
+| 10 | Template literals in `console.log` | parts logged as one concatenated argument | n/a (`console.log` unsupported in GLSL) | tinyest, tinyest-for-wgsl, typegpu | done |
 
 Bugs discovered while surveying the generator, fixed in their own commits placed **below** the
 functionality commits in the branch history:
@@ -170,12 +170,17 @@ functionality commits in the branch history:
 ### 10. Template literals
 
 - New tinyest node `templateLiteral: [type, quasis, expressions]`.
+- A template literal without substitutions (`` `plain` ``) is just a string literal, and is
+  transpiled to one.
 - WGSL has no strings; the only place strings already mean something in TypeGPU functions is
   `console.log` (string literal arguments are recorded as format text). A template literal
-  passed to `console.log` is split into its parts: `` console.log(`x=${x}, y=${y}`) `` becomes
-  `console.log('x=', x, ', y=', y)`. Empty text parts are dropped.
+  passed to `console.log` is split into its text parts and substituted values: the values are
+  serialized on the GPU like any other logged argument, and the log metadata records the parts
+  as one group, so the CPU side prints them as a **single concatenated argument**, exactly like
+  JS would (`` console.log(`x=${x}`) `` prints `x=5`, not `x= 5`). Empty text parts are dropped.
 - Anywhere else a template literal is rejected with a descriptive error.
 - Tagged templates are rejected.
+- `@typegpu/gl` does not support `console.log` at all, so nothing changes there.
 - **Packages:** `tinyest`, `tinyest-for-wgsl`, `typegpu`.
 
 ## Intentionally unsupported (with reasons)

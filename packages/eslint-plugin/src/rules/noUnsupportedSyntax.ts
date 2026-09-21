@@ -154,11 +154,30 @@ export const noUnsupportedSyntax = createRule({
         report(node, 'spread element');
       },
 
+      TaggedTemplateExpression(node) {
+        if (!directives.getEnclosingTypegpuFunction()) {
+          return;
+        }
+        report(node, 'tagged template literal');
+      },
+
       TemplateLiteral(node) {
         if (!directives.getEnclosingTypegpuFunction()) {
           return;
         }
-        report(node, 'template literal');
+        // WGSL has no strings, the only consumer of template literals is `console.*()`.
+        const parent = node.parent;
+        if (parent.type === 'TaggedTemplateExpression') {
+          return; // reported as a whole
+        }
+        const isConsoleArgument =
+          parent.type === 'CallExpression' &&
+          parent.callee.type === 'MemberExpression' &&
+          parent.callee.object.type === 'Identifier' &&
+          parent.callee.object.name === 'console';
+        if (!isConsoleArgument) {
+          report(node, 'template literal outside of console.log');
+        }
       },
 
       ThrowStatement(node) {

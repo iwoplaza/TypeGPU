@@ -122,6 +122,25 @@ export const baseTranspilers = {
       : [NODE.postUpdate, operator, argument];
   },
 
+  TemplateLiteral(ctx, node, transpile) {
+    const quasis = node.quasis.map((quasi) => quasi.value.cooked ?? quasi.value.raw);
+
+    if (node.expressions.length === 0) {
+      // Just a string in disguise.
+      return [NODE.stringLiteral, quasis[0] ?? ''];
+    }
+
+    const expressions = node.expressions.map(
+      (expression) => transpile(ctx, expression as JsNode) as tinyest.Expression,
+    );
+
+    return [NODE.templateLiteral, quasis, expressions];
+  },
+
+  TaggedTemplateExpression() {
+    throw new Error('Tagged template literals are not supported in TGSL.');
+  },
+
   ConditionalExpression(ctx, node, transpile) {
     const test = transpile(ctx, node.test) as tinyest.Expression;
     const consequent = transpile(ctx, node.consequent) as tinyest.Expression;

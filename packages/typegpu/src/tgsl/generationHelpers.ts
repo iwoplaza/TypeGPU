@@ -94,6 +94,24 @@ export function coerceToSnippet(value: unknown): Snippet {
 }
 
 /**
+ * A template literal passed to `console.log`. Holds the text parts (snippets
+ * of `UnknownData` with string values) and the substituted values in order,
+ * so they get logged as a single, concatenated string.
+ */
+export class TemplateLiteralExpression {
+  readonly [$internal] = true;
+  readonly parts: Snippet[];
+
+  constructor(parts: Snippet[]) {
+    this.parts = parts;
+  }
+
+  toString(): string {
+    return 'TemplateLiteralExpression';
+  }
+}
+
+/**
  * Intermediate representation for WGSL array expressions.
  * Defers resolution. Stores array elements as snippets so the
  * generator can access them when needed.

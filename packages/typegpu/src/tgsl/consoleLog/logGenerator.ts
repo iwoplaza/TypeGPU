@@ -20,9 +20,10 @@ import type { ResolutionCtx } from '../../internal.ts';
 import { $internal } from '../../shared/symbols.ts';
 import { logger } from '../../tgpuLogger.ts';
 import { convertToCommonType } from '../conversion.ts';
-import { concretizeSnippet } from '../generationHelpers.ts';
+import { concretizeSnippet, TemplateLiteralExpression } from '../generationHelpers.ts';
 import { createLoggingFunction } from './serializers.ts';
 import {
+  type LogArgType,
   type LogGenerator,
   type LogGeneratorOptions,
   type LogMeta,
@@ -87,21 +88,34 @@ export class LogGeneratorImpl implements LogGenerator {
 
     const id = this.#firstUnusedId++;
 
-    const concreteArgsWithStrings = args
-      .map((arg) => {
-        if (arg.dataType === UnknownData) {
-          return arg;
-        }
-        const converted = convertToCommonType(ctx, [arg], [unptr(arg.dataType)])?.[0];
-        invariant(
-          converted,
-          `Internal error. Expected type ${arg.dataType} to be convertible to ${unptr(arg.dataType)}`,
-        );
-        return converted;
-      })
-      .map(concretizeSnippet);
+    const concretizeArg = (arg: Snippet): Snippet => {
+      if (arg.dataType === UnknownData) {
+        return arg;
+      }
+      const converted = convertToCommonType(ctx, [arg], [unptr(arg.dataType)])?.[0];
+      invariant(
+        converted,
+        `Internal error. Expected type ${arg.dataType} to be convertible to ${unptr(arg.dataType)}`,
+      );
+      return concretizeSnippet(converted);
+    };
+    const toArgType = (arg: Snippet): LogArgType =>
+      arg.dataType === UnknownData ? (arg.value as string) : (arg.dataType as AnyWgslData);
 
-    const concreteArgs = concreteArgsWithStrings.filter((arg) => arg.dataType !== UnknownData);
+    // Template literals contribute all of their substituted values, and a
+    // nested entry in the metadata so they can be concatenated when logged.
+    const concreteArgs: Snippet[] = [];
+    const argTypes: LogMeta['argTypes'] = args.map((arg) => {
+      const parts =
+        arg.value instanceof TemplateLiteralExpression
+          ? arg.value.parts.map(concretizeArg)
+          : [concretizeArg(arg)];
+      concreteArgs.push(...parts.filter((part) => part.dataType !== UnknownData));
+      const partTypes = parts.map(toArgType);
+      return arg.value instanceof TemplateLiteralExpression
+        ? partTypes
+        : (partTypes[0] as LogArgType);
+    });
 
     const logFn = createLoggingFunction(
       id,
@@ -117,12 +131,7 @@ export class LogGeneratorImpl implements LogGenerator {
       /* origin */ 'runtime',
     );
 
-    this.#logIdToMeta.set(id, {
-      op,
-      argTypes: concreteArgsWithStrings.map((e) =>
-        e?.dataType === UnknownData ? (e?.value as string) : (e?.dataType as AnyWgslData),
-      ),
-    });
+    this.#logIdToMeta.set(id, { op, argTypes });
 
     return functionSnippet;
   }

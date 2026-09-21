@@ -740,3 +740,33 @@ describe('switch', () => {
     }),
   );
 });
+
+describe('template literals', () => {
+  it(
+    'transpiles template literals, folding substitution-free ones into strings',
+    dualTest((p, transpileFn) => {
+      const { body } = transpileFn(
+        p(`(x) => {
+          console.log(\`x: \${x}, twice: \${x * 2}\`);
+          console.log(\`\${x}\`);
+          console.log(\`plain\`);
+        }`),
+      );
+
+      expect(JSON.stringify(body)).toMatchInlineSnapshot(
+        `"[0,[[6,"console.log",[[107,["x: ",", twice: ",""],["x",[1,"x","*",[5,"2"]]]]]],[6,"console.log",[[107,["",""],["x"]]]],[6,"console.log",[[103,"plain"]]]]]"`,
+      );
+    }),
+  );
+
+  it(
+    'rejects tagged template literals',
+    dualTest((p, transpileFn) => {
+      expect(() =>
+        transpileFn(p(`(x) => { console.log(tag\`x: \${x}\`); }`)),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Tagged template literals are not supported in TGSL.]`,
+      );
+    }),
+  );
+});

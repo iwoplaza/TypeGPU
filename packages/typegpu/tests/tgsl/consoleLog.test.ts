@@ -804,3 +804,78 @@ describe('WgslGenerator with console.log', () => {
     `);
   });
 });
+
+describe('WgslGenerator with template literals', () => {
+  it('logs template literals as a single argument', ({ root }) => {
+    const fn = tgpu.computeFn({
+      workgroupSize: [1],
+      in: { gid: d.builtin.globalInvocationId },
+    })(({ gid }) => {
+      console.log(`gid: ${gid.x}, pos: ${d.vec2f(1, 2)}`, `plain`);
+    });
+
+    const pipeline = root.createComputePipeline({ compute: fn });
+
+    expect(tgpu.resolve([pipeline])).toMatchInlineSnapshot(`
+      "var<private> dataBlockIndex: u32;
+
+      @group(0) @binding(0) var<storage, read_write> indexBuffer: atomic<u32>;
+
+      struct SerializedLogData {
+        id: u32,
+        serializedData: array<u32, 63>,
+      }
+
+      @group(0) @binding(1) var<storage, read_write> dataBuffer: array<SerializedLogData, 64>;
+
+      var<private> dataByteIndex: u32;
+
+      fn nextByteIndex() -> u32 {
+        let i = dataByteIndex;
+        dataByteIndex = dataByteIndex + 1u;
+        return i;
+      }
+
+      fn serializeU32(n: u32) {
+        dataBuffer[dataBlockIndex].serializedData[nextByteIndex()] = n;
+      }
+
+      fn serializeVec2f(v: vec2f) {
+        dataBuffer[dataBlockIndex].serializedData[nextByteIndex()] = bitcast<u32>(v.x);
+        dataBuffer[dataBlockIndex].serializedData[nextByteIndex()] = bitcast<u32>(v.y);
+      }
+
+      fn log1serializer(_arg_0: u32, _arg_1: vec2f) {
+        serializeU32(_arg_0);
+        serializeVec2f(_arg_1);
+      }
+
+      fn log1(_arg_0: u32, _arg_1: vec2f) {
+        dataBlockIndex = atomicAdd(&indexBuffer, 1);
+        if (dataBlockIndex >= 64) {
+          return;
+        }
+        dataBuffer[dataBlockIndex].id = 1;
+        dataByteIndex = 0;
+
+        log1serializer(_arg_0, _arg_1);
+      }
+
+      @compute @workgroup_size(1) fn fn_1(@builtin(global_invocation_id) gid: vec3u) {
+        log1(gid.x, vec2f(1, 2));
+      }"
+    `);
+  });
+
+  it('rejects template literals outside of console.log', () => {
+    const fn = tgpu.fn([d.f32])((x) => {
+      const label = `x: ${x}`;
+    });
+
+    expect(() => tgpu.resolve([fn])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:fn: '\`x: \${x}\`' is invalid, template literals are only supported as 'console.log' arguments, since WGSL has no strings.]
+    `);
+  });
+});

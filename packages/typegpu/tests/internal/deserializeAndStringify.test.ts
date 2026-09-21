@@ -130,3 +130,20 @@ describe('deserializeAndStringify', () => {
     );
   });
 });
+
+describe('deserializeAndStringify with template literals', () => {
+  it('concatenates the parts of a template literal into one argument', () => {
+    const data = new Uint32Array([7, 1, 2, 3, 42]);
+    const logInfo: Parameters<typeof deserializeAndStringify>[1] = [
+      ['id: ', d.u32, ', v: ', d.vec3u],
+      d.u32,
+    ];
+
+    expect(deserializeAndStringify(data, logInfo)).toMatchInlineSnapshot(`
+      [
+        "id: 7, v: vec3u(1, 2, 3)",
+        "42",
+      ]
+    `);
+  });
+});
