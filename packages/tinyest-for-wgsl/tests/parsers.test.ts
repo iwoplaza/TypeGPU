@@ -616,3 +616,75 @@ describe('multiple declarators', () => {
     }),
   );
 });
+
+describe('destructuring declarations', () => {
+  it(
+    'desugars object and array patterns on simple chains',
+    dualTest((p, transpileFn) => {
+      const { body, externalNames } = transpileFn(
+        p(`(v) => {
+          const { x, y: py } = v;
+          let [a, , b] = ext.arr;
+          const { pos: { z }, 'quoted': q } = v.nested;
+          return x + py + a + b + z + q;
+        }`),
+      );
+
+      expect(JSON.stringify(body)).toMatchInlineSnapshot(
+        `"[0,[[13,"x",[7,"v","x"]],[13,"py",[7,"v","y"]],[12,"a",[8,"ext.arr",[5,"0"]]],[12,"b",[8,"ext.arr",[5,"2"]]],[13,"z",[7,[7,[7,"v","nested"],"pos"],"z"]],[13,"q",[7,[7,"v","nested"],"quoted"]],[10,[1,[1,[1,[1,[1,"x","+","py"],"+","a"],"+","b"],"+","z"],"+","q"]]]]"`,
+      );
+      expect(externalNames).toMatchInlineSnapshot(`
+        Map {
+          "ext.arr" => "ext.arr",
+        }
+      `);
+    }),
+  );
+
+  it(
+    'hoists sources that are not simple chains into a temporary',
+    dualTest((p, transpileFn) => {
+      const { body } = transpileFn(
+        p(`(v) => {
+          const { x, y } = getVec(v);
+          const [a, b] = arr[i];
+        }`),
+      );
+
+      expect(JSON.stringify(body)).toMatchInlineSnapshot(
+        `"[0,[[13,"#destructured",[6,"getVec",["v"]]],[13,"x",[7,"#destructured","x"]],[13,"y",[7,"#destructured","y"]],[13,"#destructured",[8,"arr","i"]],[13,"a",[8,"#destructured",[5,"0"]]],[13,"b",[8,"#destructured",[5,"1"]]]]]"`,
+      );
+    }),
+  );
+
+  it(
+    'rejects defaults, rest elements, computed keys, and for...of heads',
+    dualTest((p, transpileFn) => {
+      expect(() =>
+        transpileFn(p(`(v) => { const { x = 1 } = v; }`)),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Default values in destructuring declarations are not supported, since there is no \`undefined\` in WGSL.]`,
+      );
+      expect(() =>
+        transpileFn(p(`(v) => { const [a, ...rest] = v; }`)),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Rest elements in destructuring declarations are not supported.]`,
+      );
+      expect(() =>
+        transpileFn(p(`(v) => { const { ...rest } = v; }`)),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Rest elements in destructuring declarations are not supported.]`,
+      );
+      expect(() =>
+        transpileFn(p(`(v) => { const { [key]: a } = v; }`)),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Computed keys in destructuring declarations are not supported.]`,
+      );
+      expect(() =>
+        transpileFn(p(`(arr) => { for (const [a, b] of arr) {} }`)),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Destructuring in \`for...of\` heads is not supported.]`,
+      );
+    }),
+  );
+});

@@ -196,6 +196,13 @@ export const baseTranspilers = {
   ForOfStatement(ctx, node, transpile) {
     ctx.stack.push({ declaredNames: [] });
 
+    if (
+      node.left.type === 'VariableDeclaration' &&
+      node.left.declarations[0]?.id.type !== 'Identifier'
+    ) {
+      throw new Error('Destructuring in `for...of` heads is not supported.');
+    }
+
     const loopVar = transpile(ctx, node.left) as tinyest.Const | tinyest.Let;
     const iterable = transpile(ctx, node.right) as tinyest.Expression;
     const body = transpile(ctx, node.body) as tinyest.Statement;

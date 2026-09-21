@@ -124,3 +124,113 @@ describe('multiple declarators', () => {
     `);
   });
 });
+
+describe('destructuring declarations', () => {
+  it('destructures vectors and structs without temporaries', () => {
+    const Boid = d.struct({ pos: d.vec3f, vel: d.vec3f });
+
+    const main = tgpu.fn(
+      [d.vec2f, Boid],
+      d.f32,
+    )((v, boid) => {
+      const { x, y } = v;
+      const {
+        pos: { z },
+        vel,
+      } = boid;
+      return x + y + z + vel.x;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "struct Boid {
+        pos: vec3f,
+        vel: vec3f,
+      }
+
+      fn main(v: vec2f, boid: Boid) -> f32 {
+        let x = v.x;
+        let y = v.y;
+        let z = boid.pos.z;
+        let vel = boid.vel;
+        return (((x + y) + z) + vel.x);
+      }"
+    `);
+  });
+
+  it('destructures arrays', () => {
+    const main = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
+      const arr: [number, number, number] = [1, 2, 3];
+      let [a, , c] = arr;
+      a += c;
+      return a;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() -> i32 {
+        let arr = array<i32, 3>(1, 2, 3);
+        var a = arr[0i];
+        let c = arr[2i];
+        a += c;
+        return a;
+      }"
+    `);
+  });
+
+  it('evaluates non-trivial sources once', () => {
+    const getVec = tgpu.fn([d.f32], d.vec2f)((x) => d.vec2f(x, x * 2));
+
+    const main = tgpu.fn(
+      [d.f32],
+      d.f32,
+    )((n) => {
+      const { x, y } = getVec(n);
+      const [a, b] = [n, n * 3];
+      return x + y + a + b;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn getVec(x: f32) -> vec2f {
+        return vec2f(x, (x * 2f));
+      }
+
+      fn main(n: f32) -> f32 {
+        let destructured = getVec(n);
+        let x = destructured.x;
+        let y = destructured.y;
+        let destructured_1 = array<f32, 2>(n, (n * 3f));
+        let a = destructured_1[0i];
+        let b = destructured_1[1i];
+        return (((x + y) + a) + b);
+      }"
+    `);
+  });
+
+  it('destructures references to buffers', ({ root }) => {
+    const Boid = d.struct({ pos: d.vec3f, mass: d.f32 });
+    const boids = root.createMutable(d.arrayOf(Boid, 4));
+
+    const main = tgpu.fn([d.u32])((i) => {
+      const { pos, mass } = boids.$[i] as d.Infer<typeof Boid>;
+      pos.x = mass;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "struct Boid {
+        pos: vec3f,
+        mass: f32,
+      }
+
+      @group(0) @binding(0) var<storage, read_write> boids: array<Boid, 4>;
+
+      fn main(i: u32) {
+        let destructured = (&boids[i]);
+        let pos = (&(*destructured).pos);
+        let mass = (*destructured).mass;
+        (*pos).x = mass;
+      }"
+    `);
+  });
+});

@@ -140,6 +140,13 @@ export const noUnsupportedSyntax = createRule({
         report(node, `'new' expression`);
       },
 
+      RestElement(node) {
+        if (!directives.getEnclosingTypegpuFunction()) {
+          return;
+        }
+        report(node, 'rest element');
+      },
+
       SequenceExpression(node) {
         if (!directives.getEnclosingTypegpuFunction()) {
           return;
@@ -200,15 +207,6 @@ export const noUnsupportedSyntax = createRule({
         }
         if (node.declarations.length > 1 && node.parent.type === 'ForStatement') {
           report(node, "multiple variable declarations in a 'for' initializer");
-        }
-      },
-
-      VariableDeclarator(node) {
-        if (!directives.getEnclosingTypegpuFunction()) {
-          return;
-        }
-        if (node.id.type !== 'Identifier') {
-          report(node, 'variable declaration using destructuring');
         }
       },
 

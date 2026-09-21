@@ -15,6 +15,7 @@ describe('noUnsupportedSyntax', () => {
       "const fn = () => { 'use gpu'; let a = 2; a **= 3; }",
       "const fn = (b) => { 'use gpu'; let a = true; a &&= b; a ||= b; }",
       "const fn = () => { 'use gpu'; let a = 1, b = 2; const c = 3, d = 4; }",
+      "const fn = () => { 'use gpu'; const { a, b: { c } } = obj; const [x, , y] = arr; }",
     ],
     invalid: [
       {
@@ -282,20 +283,15 @@ describe('noUnsupportedSyntax', () => {
         ],
       },
       {
-        code: "const fn = () => { 'use gpu'; const { a } = obj; }",
+        code: "const fn = () => { 'use gpu'; const [a, ...rest] = arr; const { b, ...others } = obj; }",
         errors: [
           {
             messageId: 'unexpected',
-            data: { snippet: '{ a } = obj', syntax: 'variable declaration using destructuring' },
+            data: { snippet: '...rest', syntax: 'rest element' },
           },
-        ],
-      },
-      {
-        code: "const fn = () => { 'use gpu'; const [a] = arr; }",
-        errors: [
           {
             messageId: 'unexpected',
-            data: { snippet: '[a] = arr', syntax: 'variable declaration using destructuring' },
+            data: { snippet: '...others', syntax: 'rest element' },
           },
         ],
       },
