@@ -39,7 +39,7 @@ bottom need a new tinyest node and touch all three.
 |---|---|---|---|---|---|
 | 1 | Empty statement `;` | nothing emitted | nothing emitted | tinyest-for-wgsl | done |
 | 2 | Prefix update `++i` / `--i` (statement) | `i++;` / `i--;` | `++i;` / `--i;` | tinyest-for-wgsl, typegpu, @typegpu/gl | done |
-| 3 | Bitwise complement `~x` | `~x` (validated to integers, folded at comptime) | same | typegpu | planned |
+| 3 | Bitwise complement `~x` | `~x` (validated to integers, folded at comptime) | same | typegpu | done |
 | 4 | Exponentiation assignment `a **= b` | `a = pow(a, b);` | same | typegpu | planned |
 | 5 | Logical assignment `a &&= b` / `a \|\|= b` | `a = (a && b);` / `a = (a \|\| b);` | same | typegpu | planned |
 | 6 | Multiple declarators `let a = 1, b = 2;` | two declarations | same | tinyest-for-wgsl | planned |

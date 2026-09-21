@@ -19,7 +19,10 @@ describe('unary plus', () => {
   });
 
   it('is folded for comptime-known operands', () => {
-    const main = tgpu.fn([], d.i32)(() => {
+    const main = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
       const a = +5;
       const b = -+5;
       return a + b + +2.5;
@@ -74,6 +77,63 @@ describe('unsupported unary operators', () => {
       [Error: Resolution of the following tree failed:
       - <root>
       - fn:main: The \`delete\` operator is unsupported in TypeGPU functions.]
+    `);
+  });
+});
+
+describe('bitwise complement', () => {
+  it('works on runtime integer operands', () => {
+    const main = tgpu.fn(
+      [d.i32, d.u32, d.vec3u],
+      d.vec3u,
+    )((a, b, v) => {
+      const x = ~a;
+      const y = ~b;
+      const w = ~v;
+      return d.vec3u(y);
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(a: i32, b: u32, v: vec3u) -> vec3u {
+        let x = ~a;
+        let y = ~b;
+        let w = ~v;
+        return vec3u(y);
+      }"
+    `);
+  });
+
+  it('is folded for comptime-known operands', () => {
+    const main = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
+      const a = ~5;
+      const b = ~d.u32(5);
+      return a + d.i32(b);
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() -> i32 {
+        const a = -6;
+        const b = 4294967290u;
+        return (a + i32(b));
+      }"
+    `);
+  });
+
+  it('throws on non-integer operands', () => {
+    const main = tgpu.fn(
+      [d.f32],
+      d.f32,
+    )((x) => {
+      return ~x;
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: Unary operator ~ requires an integer or vector of integers operand. Got f32.]
     `);
   });
 });

@@ -196,6 +196,31 @@ const unaryOpCodeToCodegen = {
     );
   },
   void: () => snip(undefined, wgsl.Void, 'constant', false),
+  '~': (ctx: ResolutionCtx, [argExpr]: Snippet[]) => {
+    if (argExpr === undefined) {
+      throw new Error('The unary operator `~` expects 1 argument, but 0 were provided.');
+    }
+
+    const dataType = argExpr.dataType;
+    if (!wgsl.isInteger(dataType) && !wgsl.isIntegerVec(dataType)) {
+      throw new WgslTypeError(
+        `Unary operator ~ requires an integer or vector of integers operand. Got ${String(dataType)}.`,
+      );
+    }
+
+    if (isKnownAtComptime(argExpr) && typeof argExpr.value === 'number') {
+      // Mimicking 32-bit two's complement, keeping unsigned values unsigned.
+      const result = dataType.type === 'u32' ? ~argExpr.value >>> 0 : ~argExpr.value;
+      return snip(result, dataType, 'constant', false);
+    }
+
+    return snip(
+      `~${ctx.resolveSnippet(argExpr).value}`,
+      dataType,
+      'runtime',
+      argExpr.possibleSideEffects,
+    );
+  },
   get typeof(): never {
     throw new Error('The `typeof` operator is unsupported in TypeGPU functions.');
   },
@@ -225,7 +250,7 @@ const unaryOpCodeToCodegen = {
 
     return snip(`!(${argStr})`, bool, 'runtime', argExpr.possibleSideEffects);
   },
-} satisfies Partial<Record<tinyest.UnaryOperator, (...args: never[]) => unknown>>;
+} satisfies Record<tinyest.UnaryOperator, (...args: never[]) => unknown>;
 
 const binaryOpCodeToCodegen = {
   '+': add[$gpuCallable].call.bind(add),
@@ -712,16 +737,11 @@ export class WgslGenerator implements ShaderGenerator {
       const [_, op, arg] = expression;
       const argExpr = this._expression(arg);
 
-      const codegen = unaryOpCodeToCodegen[op as keyof typeof unaryOpCodeToCodegen];
-      if (codegen) {
-        return codegen(this.ctx, [argExpr]);
+      const codegen = unaryOpCodeToCodegen[op];
+      if (!codegen) {
+        throw new Error(`Unary operator '${op}' is not supported in TypeGPU functions.`);
       }
-
-      const argStr = this.ctx.resolveSnippet(argExpr).value;
-
-      const type = operatorToType(argExpr.dataType, op);
-      // Result of an operation, so not a reference to anything
-      return snip(`${op}${argStr}`, type, /* origin */ 'runtime', argExpr.possibleSideEffects);
+      return codegen(this.ctx, [argExpr]);
     }
 
     if (expression[0] === NODE.memberAccess) {
