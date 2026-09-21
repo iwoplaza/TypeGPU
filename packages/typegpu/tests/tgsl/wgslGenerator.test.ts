@@ -2348,3 +2348,31 @@ describe('WgslGenerator', () => {
     });
   });
 });
+
+describe('empty statements', () => {
+  it('emits nothing for lone semicolons', () => {
+    const main = tgpu.fn([])(() => {
+      let a = 1;
+      a += 1;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() {
+        var a = 1;
+        a += 1i;
+      }"
+    `);
+  });
+
+  it('emits empty loop bodies', () => {
+    const main = tgpu.fn([])(() => {
+      for (let i = 0; i < 3; i++);
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() {
+        for (var i = 0; (i < 3i); i++) {}
+      }"
+    `);
+  });
+});

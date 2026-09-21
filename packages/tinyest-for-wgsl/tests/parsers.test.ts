@@ -534,3 +534,23 @@ describe('legacy transpileFn', () => {
     );
   });
 });
+
+describe('empty statements', () => {
+  it(
+    'transpiles lone semicolons to empty blocks',
+    dualTest((p, transpileFn) => {
+      const { body } = transpileFn(
+        p(`() => {
+          ;
+          let a = 1;;
+          for (;;);
+          while (a > 0);
+        }`),
+      );
+
+      expect(JSON.stringify(body)).toMatchInlineSnapshot(
+        `"[0,[[0,[]],[12,"a",[5,"1"]],[0,[]],[14,null,null,null,[0,[]]],[15,[1,"a",">",[5,"0"]],[0,[]]]]]"`,
+      );
+    }),
+  );
+});

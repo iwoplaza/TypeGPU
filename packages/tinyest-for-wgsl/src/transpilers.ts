@@ -22,6 +22,11 @@ export const baseTranspilers = {
     return transpile(ctx, node.expression);
   },
 
+  EmptyStatement() {
+    // A lone `;` does nothing, which an empty block conveys without introducing a node.
+    return [NODE.block, []];
+  },
+
   ArrowFunctionExpression() {
     throw new Error('Arrow functions are not supported inside TGSL.');
   },
