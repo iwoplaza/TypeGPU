@@ -2,6 +2,7 @@ import type * as acorn from 'acorn';
 import type * as babel from '@babel/types';
 import * as tinyest from 'tinyest';
 import type { Context, JsNode, Transpile, Transpilers } from './types.ts';
+import { transpileVariableDeclaration } from './declarations.ts';
 
 const { NodeTypeCatalog: NODE } = tinyest;
 
@@ -37,7 +38,12 @@ export const baseTranspilers = {
     try {
       return [
         NODE.block,
-        node.body.map((statement) => transpile(ctx, statement) as tinyest.Statement),
+        node.body.flatMap((statement) =>
+          // Declarations can expand into multiple statements, e.g. `let a = 1, b = 2;`
+          statement.type === 'VariableDeclaration'
+            ? transpileVariableDeclaration(ctx, statement, transpile)
+            : [transpile(ctx, statement) as tinyest.Statement],
+        ),
       ] as const;
     } finally {
       ctx.stack.pop();
@@ -144,32 +150,17 @@ export const baseTranspilers = {
   },
 
   VariableDeclaration(ctx, node, transpile) {
-    if (node.declarations.length !== 1 || !node.declarations[0]) {
-      throw new Error('Currently only one declaration in a statement is supported.');
+    // Only reached outside of statement lists (e.g. `for` initializers and
+    // `for...of` heads), where a declaration has to stay a single statement.
+    const statements = transpileVariableDeclaration(ctx, node, transpile);
+
+    if (statements.length !== 1 || !statements[0]) {
+      throw new Error(
+        'Only one declaration is allowed in a `for` initializer. Declare the remaining variables in separate statements.',
+      );
     }
 
-    const decl = node.declarations[0];
-    ctx.ignoreExternalDepth++;
-    const id = transpile(ctx, decl.id);
-    ctx.ignoreExternalDepth--;
-
-    if (typeof id !== 'string') {
-      throw new Error('Invalid variable declaration, expected identifier.');
-    }
-
-    ctx.stack[ctx.stack.length - 1]?.declaredNames.push(id);
-
-    const init = decl.init ? (transpile(ctx, decl.init) as tinyest.Expression) : undefined;
-
-    if (node.kind === 'var') {
-      throw new Error('`var` declarations are not supported.');
-    }
-
-    if (node.kind === 'const') {
-      return init !== undefined ? [NODE.const, id, init] : [NODE.const, id];
-    }
-
-    return init !== undefined ? [NODE.let, id, init] : [NODE.let, id];
+    return statements[0];
   },
 
   IfStatement(ctx, node, transpile) {

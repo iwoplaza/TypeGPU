@@ -198,8 +198,8 @@ export const noUnsupportedSyntax = createRule({
         if (node.kind === 'var') {
           report(node, `'var' declaration`);
         }
-        if (node.declarations.length > 1) {
-          report(node, 'multiple variable declarations in one statement');
+        if (node.declarations.length > 1 && node.parent.type === 'ForStatement') {
+          report(node, "multiple variable declarations in a 'for' initializer");
         }
       },
 

@@ -97,3 +97,30 @@ describe('let declarations', () => {
     `);
   });
 });
+
+describe('multiple declarators', () => {
+  it('declares each variable separately', () => {
+    const main = tgpu.fn(
+      [],
+      d.f32,
+    )(() => {
+      let a = 1,
+        b = 2.5;
+      const c = a + b,
+        v = d.vec2f(c);
+      a += 1;
+      return v.x + d.f32(a);
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() -> f32 {
+        var a = 1;
+        let b = 2.5;
+        let c = (f32(a) + b);
+        let v = vec2f(c);
+        a += 1i;
+        return (v.x + f32(a));
+      }"
+    `);
+  });
+});

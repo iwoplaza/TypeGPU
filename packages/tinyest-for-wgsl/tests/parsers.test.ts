@@ -575,3 +575,44 @@ describe('update expressions', () => {
     }),
   );
 });
+
+describe('multiple declarators', () => {
+  it(
+    'splits declarations in statement lists',
+    dualTest((p, transpileFn) => {
+      const { body, externalNames } = transpileFn(
+        p(`() => {
+          let a = 1, b = a;
+          const c = b, d = ext;
+          if (c) {
+            let e = 1, f;
+          }
+        }`),
+      );
+
+      expect(JSON.stringify(body)).toMatchInlineSnapshot(
+        `"[0,[[12,"a",[5,"1"]],[12,"b","a"],[13,"c","b"],[13,"d","ext"],[11,"c",[0,[[12,"e",[5,"1"]],[12,"f"]]]]]]"`,
+      );
+      expect(externalNames).toMatchInlineSnapshot(`
+        Map {
+          "ext" => "ext",
+        }
+      `);
+    }),
+  );
+
+  it(
+    'rejects multiple declarators in for initializers',
+    dualTest((p, transpileFn) => {
+      expect(() =>
+        transpileFn(
+          p(`() => {
+            for (let i = 0, j = 0; i < 3; i++) {}
+          }`),
+        ),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Only one declaration is allowed in a \`for\` initializer. Declare the remaining variables in separate statements.]`,
+      );
+    }),
+  );
+});

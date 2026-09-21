@@ -14,6 +14,7 @@ describe('noUnsupportedSyntax', () => {
       "const fn = () => { 'use gpu'; let x = 0; ++x; x++; --x; }",
       "const fn = () => { 'use gpu'; let a = 2; a **= 3; }",
       "const fn = (b) => { 'use gpu'; let a = true; a &&= b; a ||= b; }",
+      "const fn = () => { 'use gpu'; let a = 1, b = 2; const c = 3, d = 4; }",
     ],
     invalid: [
       {
@@ -269,13 +270,13 @@ describe('noUnsupportedSyntax', () => {
         ],
       },
       {
-        code: "const fn = () => { 'use gpu'; let a = 1, b = 2; }",
+        code: "const fn = () => { 'use gpu'; for (let a = 1, b = 2; a < b; a++) {} }",
         errors: [
           {
             messageId: 'unexpected',
             data: {
-              snippet: 'let a = 1, b = 2;',
-              syntax: 'multiple variable declarations in one statement',
+              snippet: 'let a = 1, b = 2',
+              syntax: "multiple variable declarations in a 'for' initializer",
             },
           },
         ],
