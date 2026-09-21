@@ -1,0 +1,52 @@
+{
+  "name": "@typegpu/inspector",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A drop-in inspector overlay for any WebGPU app. Visualizes render and compute passes as a graph, with intermediate results and GPU timings.",
+  "keywords": [
+    "debug",
+    "inspector",
+    "profiling",
+    "webgpu"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/software-mansion/TypeGPU.git",
+    "directory": "packages/typegpu-inspector"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist",
+    "exports": {
+      "./package.json": "./dist/package.json",
+      ".": {
+        "types": "./dist/index.d.ts",
+        "module": "./dist/index.mjs",
+        "import": "./dist/index.mjs",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "linkDirectory": false,
+    "main": "./dist/index.mjs",
+    "types": "./dist/index.d.ts"
+  },
+  "scripts": {
+    "build": "unbuild",
+    "test:types": "pnpm tsc --p ./tsconfig.json --noEmit && pnpm tsc --p ./tsconfig.test.json",
+    "prepublishOnly": "tgpu-dev-cli prepack"
+  },
+  "devDependencies": {
+    "@typegpu/tgpu-dev-cli": "workspace:*",
+    "@webgpu/types": "catalog:types",
+    "typescript": "catalog:types",
+    "unbuild": "catalog:build",
+    "vitest": "catalog:test"
+  }
+}

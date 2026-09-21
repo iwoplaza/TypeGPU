@@ -1,3 +1,4 @@
+import { installWebGPUInspectorFromUrl } from '@typegpu/inspector';
 import type { d } from 'typegpu';
 import type { ExampleControlParam } from './exampleControlAtom.ts';
 import type { ExampleState } from './exampleState.ts';
@@ -57,6 +58,10 @@ export async function executeExample(tsImport: () => unknown): Promise<ExampleSt
       initializeParam(param);
     }
   }
+
+  // Opening an example with `?inspect` in the URL overlays a pass graph with
+  // intermediate results and GPU timings on top of the page.
+  installWebGPUInspectorFromUrl('inspect');
 
   const entryExampleFile = await tsImport();
   const { controls, onCleanup } = entryExampleFile as {
