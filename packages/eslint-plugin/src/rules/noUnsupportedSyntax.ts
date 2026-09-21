@@ -222,6 +222,6 @@ export const noUnsupportedSyntax = createRule({
   }),
 });
 
-const unsupportedAssignmentOps = ['&&=', '**=', '||=', '??='];
+const unsupportedAssignmentOps = ['&&=', '||=', '??='];
 const unsupportedBinaryOps = ['==', '!=', 'in', 'instanceof', '|>'];
 const unsupportedUnaryOps = ['typeof', 'void', 'delete'];

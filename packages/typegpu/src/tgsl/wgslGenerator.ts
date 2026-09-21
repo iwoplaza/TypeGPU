@@ -126,9 +126,6 @@ const OP_MAP = {
   // assignment
   //
   '>>>=': '>>=',
-  get '**='(): never {
-    throw new Error('The `**=` operator is unsupported in TypeGPU functions.');
-  },
   get '??='(): never {
     throw new Error('The `??=` operator is unsupported in TypeGPU functions.');
   },
@@ -1917,17 +1914,39 @@ ${this.ctx.pre}else ${alternate}`,
     }
 
     if (statement[0] === NODE.assignmentExpr) {
-      const expr = this._binaryExpression(statement);
-      return {
-        code: `${this.ctx.pre}${this.ctx.resolveSnippet(expr).value};`,
-        definesInNearestScope: false,
-      };
+      return this._assignmentStatement(statement);
     }
 
     const expr = this._expression(statement);
     const resolved =
       expr.value !== undefined && expr.value !== null ? this.ctx.resolveSnippet(expr).value : '';
     return { code: resolved ? `${this.ctx.pre}${resolved};` : '', definesInNearestScope: false };
+  }
+
+  /**
+   * Handles assignment statements. Compound assignments that WGSL lacks
+   * (e.g. `a **= b`) are desugared into `a = a <op> b`, which mirrors how
+   * JS defines them, as long as evaluating `a` twice cannot be observed.
+   */
+  protected _assignmentStatement(statement: tinyest.AssignmentExpression): ResolvedStatement {
+    const [_, lhs, op, rhs] = statement;
+
+    let desugared: tinyest.AssignmentExpression = statement;
+    if (op === '**=') {
+      desugared = [NODE.assignmentExpr, lhs, '=', [NODE.binaryExpr, lhs, '**', rhs]];
+    }
+
+    if (desugared !== statement && this._expression(lhs).possibleSideEffects) {
+      throw new WgslTypeError(
+        `'${stringifyNode(statement)}' is invalid, the left-hand side of '${op}' cannot have side effects, since it's evaluated twice in WGSL.`,
+      );
+    }
+
+    const expr = this._binaryExpression(desugared);
+    return {
+      code: `${this.ctx.pre}${this.ctx.resolveSnippet(expr).value};`,
+      definesInNearestScope: false,
+    };
   }
 
   /**

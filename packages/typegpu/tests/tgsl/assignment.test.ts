@@ -1,4 +1,4 @@
-import { beforeEach, expect, type MockInstance, vi } from 'vitest';
+import { beforeEach, describe, expect, type MockInstance, vi } from 'vitest';
 import { it } from 'typegpu-testing-utility';
 import { tgpu, d } from 'typegpu';
 
@@ -86,4 +86,67 @@ it('accepts assignments in statement position, including for clauses', () => {
       a *= 2i;
     }"
   `);
+});
+
+describe('exponentiation assignment', () => {
+  it('is emitted as an assignment of pow', () => {
+    const main = tgpu.fn(
+      [d.f32, d.i32],
+      d.f32,
+    )((x, n) => {
+      let a = x;
+      a **= 2;
+      let b = n;
+      b **= n;
+      return a + d.f32(b);
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main(x: f32, n: i32) -> f32 {
+        var a = x;
+        a = pow(a, 2f);
+        var b = n;
+        b = i32(pow(f32(b), f32(n)));
+        return (a + f32(b));
+      }"
+    `);
+  });
+
+  it('works on struct properties', () => {
+    const Boid = d.struct({ pos: d.vec3f, mass: d.f32 });
+    const main = tgpu.fn([])(() => {
+      const boid = Boid();
+      boid.mass **= 0.5;
+      boid.pos.x **= 2;
+    });
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "struct Boid {
+        pos: vec3f,
+        mass: f32,
+      }
+
+      fn main() {
+        var boid = Boid();
+        boid.mass = pow(boid.mass, 0.5f);
+        boid.pos.x = pow(boid.pos.x, 2f);
+      }"
+    `);
+  });
+
+  it('cannot be used as an expression', () => {
+    const main = tgpu.fn(
+      [d.f32],
+      d.f32,
+    )((x) => {
+      let a = x;
+      return (a **= 2);
+    });
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:main: 'a **= 2' is invalid, assignments are statements in WGSL and cannot be used as expressions.]
+    `);
+  });
 });
