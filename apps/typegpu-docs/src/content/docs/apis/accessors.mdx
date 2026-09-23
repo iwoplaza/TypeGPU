@@ -499,5 +499,6 @@ Bind groups operate at **runtime**: the WGSL is fixed, and the GPU receives diff
 :::
 
 Accessors and slots are complementary — you can combine them. For example, an accessor's default can reference a bind group layout entry (`() => layout.$.image`), and you can override it with `.with()` the same way as a slot.
+The [Slots and Accessors](/TypeGPU/examples#example=simple--slots-and-accessors) example combines both: a slot picks the pattern function, and an accessor is bound to a constant, a uniform buffer, and a GPU function in three different pipelines.
 For more on slots, see the [Slots guide](/TypeGPU/apis/slots).
 For more on bind groups, see the [Bind Groups guide](/TypeGPU/apis/bind-groups).

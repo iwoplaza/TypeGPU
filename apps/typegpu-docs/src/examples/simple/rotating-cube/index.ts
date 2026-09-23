@@ -66,7 +66,8 @@ const colorUniform = root.createUniform(d.vec3f, d.vec3f(0.35, 0.6, 1));
 
 // wgpu-matrix can write straight into TypeGPU matrices, so nothing is
 // allocated per frame.
-const view = mat4.lookAt([0, 2.2, 5], [0, 0, 0], [0, 1, 0], d.mat4x4f());
+const cameraPosition = d.vec3f(0, 2.2, 5);
+const view = mat4.lookAt(cameraPosition, [0, 0, 0], [0, 1, 0], d.mat4x4f());
 const projection = d.mat4x4f();
 const model = d.mat4x4f();
 
@@ -84,6 +85,9 @@ function updateProjection() {
 // #region Pipeline
 
 const lightDirection = std.normalize(d.vec3f(0.5, 1, 0.8));
+// The camera is far away compared to the cube's size, so the direction towards it
+// is treated as the same for every pixel.
+const viewDirection = std.normalize(cameraPosition);
 
 const pipeline = root.createRenderPipeline({
   attribs: vertexLayout.attrib,
@@ -103,7 +107,7 @@ const pipeline = root.createRenderPipeline({
     const n = std.normalize(worldNormal);
     const diffuse = std.max(std.dot(n, lightDirection), 0);
     // A cheap highlight: how well the normal points between the light and the camera.
-    const halfVector = std.normalize(lightDirection + d.vec3f(0, 0.4, 1));
+    const halfVector = std.normalize(lightDirection + viewDirection);
     const specular = std.pow(std.max(std.dot(n, halfVector), 0), 32) * 0.4;
     // A checkerboard from the UVs, so the faces are easy to tell apart.
     const cell = std.floor(uv * 4);
@@ -112,7 +116,9 @@ const pipeline = root.createRenderPipeline({
     return d.vec4f(color, 1);
   },
   primitive: { cullMode: 'back' },
-  // The depth test makes sure the front faces win over the back faces.
+  // Back-face culling already drops the faces pointing away from the camera, and
+  // a single cube never overlaps itself otherwise. The depth buffer is here so the
+  // setup keeps working once more objects are added to the scene.
   depthStencil: {
     format: 'depth24plus',
     depthWriteEnabled: true,

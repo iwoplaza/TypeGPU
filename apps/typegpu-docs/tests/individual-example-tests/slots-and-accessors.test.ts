@@ -21,7 +21,9 @@ describe('slots and accessors example', () => {
     );
 
     expect(shaderCodes).toMatchInlineSnapshot(`
-      "@group(0) @binding(0) var<uniform> columnAspectUniform: f32;
+      "const quadCorners: array<vec2f, 6> = array<vec2f, 6>(vec2f(), vec2f(1, 0), vec2f(0, 1), vec2f(0, 1), vec2f(1, 0), vec2f(1));
+
+      @group(0) @binding(0) var<uniform> columnAspectUniform: f32;
 
       struct vertex_Output {
         @builtin(position) position: vec4f,
@@ -29,7 +31,7 @@ describe('slots and accessors example', () => {
       }
 
       @vertex fn vertex(@builtin(vertex_index) index: u32) -> vertex_Output {
-        let corner = vec2f((f32((index & 1u)) * 2f), (f32((index >> 1u)) * 2f));
+        let corner = quadCorners[index];
         const columnWidth = 0.6666666666666666;
         let left = (-1f + (0f * columnWidth));
         return vertex_Output(vec4f((left + (corner.x * columnWidth)), ((corner.y * 2f) - 1f), 0f, 1f), vec2f((((corner.x - 0.5f) * columnAspectUniform) + 0.5f), (1f - corner.y)));
@@ -53,6 +55,8 @@ describe('slots and accessors example', () => {
         return vec4f((vec3f(1, 0.44999998807907104, 0.3499999940395355) * brightness), 1f);
       }
 
+      const quadCorners: array<vec2f, 6> = array<vec2f, 6>(vec2f(), vec2f(1, 0), vec2f(0, 1), vec2f(0, 1), vec2f(1, 0), vec2f(1));
+
       @group(0) @binding(0) var<uniform> columnAspectUniform: f32;
 
       struct vertex_Output {
@@ -61,7 +65,7 @@ describe('slots and accessors example', () => {
       }
 
       @vertex fn vertex(@builtin(vertex_index) index: u32) -> vertex_Output {
-        let corner = vec2f((f32((index & 1u)) * 2f), (f32((index >> 1u)) * 2f));
+        let corner = quadCorners[index];
         const columnWidth = 0.6666666666666666;
         let left = (-1f + (1f * columnWidth));
         return vertex_Output(vec4f((left + (corner.x * columnWidth)), ((corner.y * 2f) - 1f), 0f, 1f), vec2f((((corner.x - 0.5f) * columnAspectUniform) + 0.5f), (1f - corner.y)));
@@ -87,6 +91,8 @@ describe('slots and accessors example', () => {
         return vec4f((animatedTint * brightness), 1f);
       }
 
+      const quadCorners: array<vec2f, 6> = array<vec2f, 6>(vec2f(), vec2f(1, 0), vec2f(0, 1), vec2f(0, 1), vec2f(1, 0), vec2f(1));
+
       @group(0) @binding(0) var<uniform> columnAspectUniform: f32;
 
       struct vertex_Output {
@@ -95,7 +101,7 @@ describe('slots and accessors example', () => {
       }
 
       @vertex fn vertex(@builtin(vertex_index) index: u32) -> vertex_Output {
-        let corner = vec2f((f32((index & 1u)) * 2f), (f32((index >> 1u)) * 2f));
+        let corner = quadCorners[index];
         const columnWidth = 0.6666666666666666;
         let left = (-1f + (2f * columnWidth));
         return vertex_Output(vec4f((left + (corner.x * columnWidth)), ((corner.y * 2f) - 1f), 0f, 1f), vec2f((((corner.x - 0.5f) * columnAspectUniform) + 0.5f), (1f - corner.y)));
@@ -113,7 +119,7 @@ describe('slots and accessors example', () => {
         return select(0.2f, 1f, (((cell.x + cell.y) % 2f) == 0f));
       }
 
-      fn item() -> vec3f {
+      fn cyclingTint() -> vec3f {
         return mix(vec3f(0.30000001192092896, 0.6000000238418579, 1), vec3f(0.699999988079071, 1, 0.800000011920929), ((sin(timeUniform) * 0.5f) + 0.5f));
       }
 
@@ -123,7 +129,7 @@ describe('slots and accessors example', () => {
 
       @fragment fn fragment(_arg_0: fragment_Input) -> @location(0) vec4f {
         let brightness = checker(_arg_0.uv);
-        return vec4f((item() * brightness), 1f);
+        return vec4f((cyclingTint() * brightness), 1f);
       }"
     `);
   });

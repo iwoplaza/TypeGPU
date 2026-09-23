@@ -45,9 +45,8 @@ describe('instancing example', () => {
         let p = (&particleBuffer[index]);
         let swirl = (vec2f(-((*p).position.y), (*p).position.x) * 0.15f);
         let drift = (vec2f(sin((params.time + ((*p).position.y * 3f))), cos(((params.time * 0.7f) + ((*p).position.x * 3f)))) * 0.1f);
-        var position = ((*p).position + (((((*p).velocity + swirl) + drift) * params.deltaTime) * params.speed));
-        position = ((fract(((position + 1f) * 0.5f)) * 2f) - 1f);
-        particleBuffer[index].position = position;
+        let moved = ((*p).position + (((((*p).velocity + swirl) + drift) * params.deltaTime) * params.speed));
+        particleBuffer[index].position = ((fract(((moved + 1f) * 0.5f)) * 2f) - 1f);
       }
 
       @compute @workgroup_size(256, 1, 1) fn mainCompute(@builtin(global_invocation_id) id: vec3u) {

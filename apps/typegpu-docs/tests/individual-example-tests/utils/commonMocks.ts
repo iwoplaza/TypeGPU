@@ -120,11 +120,14 @@ const audioRegExp = /\.ogg$|\.wav$/;
 const imageRegExp = /(\.jpg$|\.png$)/;
 const mnistRegExp = /^\/TypeGPU\/assets\/mnist-weights\//;
 const objRegExp = /\.obj$/;
-const fetchMockMap = new Map<RegExp, () => Response>();
-async function mockFetch(url: string): Promise<Response> {
+const glyphFontRegExp = /\/TypeGPU\/assets\/glyph\/.*\.font\.glb$/;
+const wasmRegExp = /\.wasm$/;
+const fetchMockMap = new Map<RegExp, (url: string) => Response | Promise<Response>>();
+async function mockFetch(input: string | URL | Request): Promise<Response> {
+  const url = input instanceof Request ? input.url : input.toString();
   for (const [pattern, handler] of fetchMockMap) {
     if (pattern.test(url)) {
-      return handler();
+      return handler(url);
     }
   }
   return new Response();
@@ -228,4 +231,34 @@ export function mock3DModelLoading() {
         },
       }),
   );
+}
+
+/**
+ * Serves the baked Glyph fonts from the docs' public directory, and Glyph's own
+ * WASM binaries from disk, so that `glyph.init()` and font loading work in tests.
+ */
+export function mockGlyphLoading() {
+  if (!fetchMockMap.has(glyphFontRegExp)) {
+    fetchMockMap.set(glyphFontRegExp, async (url) => {
+      const { readFile } = await import('node:fs/promises');
+      const { resolve } = await import('node:path');
+      const { pathname } = new URL(url, 'http://localhost');
+      const publicDir = resolve(import.meta.dirname, '../../../public');
+      const bytes = await readFile(resolve(publicDir, pathname.replace(/^\/TypeGPU\//, '')));
+      return new Response(bytes, { headers: { 'Content-Type': 'model/gltf-binary' } });
+    });
+  }
+  if (!fetchMockMap.has(wasmRegExp)) {
+    fetchMockMap.set(wasmRegExp, async (url) => {
+      const { readFile } = await import('node:fs/promises');
+      // Vite serves the WASM next to Glyph's modules, as `/@fs/<absolute path>`.
+      const { pathname } = new URL(url);
+      const bytes = await readFile(
+        pathname.startsWith('/@fs/')
+          ? decodeURIComponent(pathname.slice('/@fs'.length))
+          : new URL(url),
+      );
+      return new Response(bytes, { headers: { 'Content-Type': 'application/wasm' } });
+    });
+  }
 }

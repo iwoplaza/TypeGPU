@@ -16,7 +16,7 @@ const LANES = 6;
 const LANE_PITCH = (2 * Math.PI * RADIUS * PX_PER_UNIT) / LANES;
 const FONT_SIZE = 140;
 const WORD_GAP = 120;
-const LOOP_LENGTH = 34 * PX_PER_UNIT;
+const LANE_LENGTH = 34 * PX_PER_UNIT;
 const LANE_COLORS = ['#ff4d6d', '#ffd166', '#06d6a0', '#4cc9f0', '#c77dff', '#ff9f1c'];
 const DEFAULT_MESSAGE = `TYPEGPU WEBGPU SLUG ANALYTIC CURVES NO ATLAS @PMNDRS/GLYPH
 TYPE-SAFE SHADERS IN TYPESCRIPT RESOLUTION INDEPENDENT BÉZIER GPU TEXT`;
@@ -52,6 +52,21 @@ const postParams = root.createUniform(PostParams, {
 
 await glyph.init();
 
+// Fonts are loaded before the handle is registered. Handle names are global, so
+// a handle left behind by a failed load would make every reload of this example throw.
+const fonts = {
+  'Bebas Neue': glyph.fontFace('/TypeGPU/assets/glyph/bebas-neue.font.glb', { format: slug }),
+  'Inter Bold': glyph.fontFace('/TypeGPU/assets/glyph/inter-bold.font.glb', { format: slug }),
+};
+try {
+  await Promise.all(Object.values(fonts).map((font) => font.load()));
+} catch (error) {
+  for (const face of Object.values(fonts)) {
+    face.dispose();
+  }
+  throw error;
+}
+
 const handle = glyph.handle(
   'slug-text-tunnel',
   defineTypeGpuConfig({
@@ -80,12 +95,6 @@ const handle = glyph.handle(
     },
   }),
 );
-
-const fonts = {
-  'Bebas Neue': glyph.fontFace('/TypeGPU/assets/glyph/bebas-neue.font.glb', { format: slug }),
-  'Inter Bold': glyph.fontFace('/TypeGPU/assets/glyph/inter-bold.font.glb', { format: slug }),
-};
-await Promise.all(Object.values(fonts).map((font) => font.load()));
 
 // #region Words
 
@@ -122,11 +131,12 @@ function buildWords() {
   const startX = cameraX + 2 * PX_PER_UNIT;
   laneEnd.fill(startX);
   let token = 0;
-  // Fill every lane until it covers one full loop of the tunnel.
+  // Fill every lane a fixed distance ahead of the camera. Nothing loops:
+  // words that fall behind are recycled to the end of their lane.
   for (let lane = 0; lane < LANES; lane++) {
     // Stagger the lanes so the words don't line up.
     laneEnd[lane] += ((lane * 7919) % 1000) * 0.6;
-    while (laneEnd[lane] < startX + LOOP_LENGTH) {
+    while (laneEnd[lane] < startX + LANE_LENGTH) {
       const text = handle.createText({
         font,
         text: tokens[token % tokens.length],
@@ -160,20 +170,15 @@ function recycleWords() {
 
 // #region Rendering
 
-let post = createPostProcessing(
-  root,
-  Math.max(1, canvas.width),
-  Math.max(1, canvas.height),
-  postParams,
-);
+// Pipelines are created once, only the textures and bind groups follow the canvas size.
+const post = createPostProcessing(root, postParams);
 
 function resize() {
   const { width, height } = canvas;
   if (width === 0 || height === 0) {
     return;
   }
-  post.destroy();
-  post = createPostProcessing(root, width, height, postParams);
+  post.resize(width, height);
   projection.write(mat4.perspective((70 / 180) * Math.PI, width / height, 0.05, 100, d.mat4x4f()));
   postParams.patch({ aspect: width / height });
 }
@@ -223,10 +228,7 @@ function frame(timestamp: number) {
   postParams.patch({ time: timestamp / 1000, speed: currentSpeed });
   recycleWords();
 
-  if (
-    canvas.width !== post.hdrTexture.props.size[0] ||
-    canvas.height !== post.hdrTexture.props.size[1]
-  ) {
+  if (!post.isSized(canvas.width, canvas.height)) {
     resize();
   }
 

@@ -2,6 +2,6 @@
   "title": "Slots and Accessors",
   "description": "Builds three pipelines from one shader by injecting different pattern functions and tint sources through slots and accessors.",
   "category": "simple",
-  "tags": ["basics", "slots"],
+  "tags": ["basics"],
   "coolFactor": 3
 }

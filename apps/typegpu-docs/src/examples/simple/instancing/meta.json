@@ -2,6 +2,6 @@
   "title": "Instancing",
   "description": "Simulates thousands of particles in a compute shader and draws them in one instanced draw call through a per-instance vertex layout.",
   "category": "simple",
-  "tags": ["basics", "compute", "particles"],
+  "tags": ["basics", "compute", "instancing", "particles"],
   "coolFactor": 4
 }

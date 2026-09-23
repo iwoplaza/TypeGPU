@@ -57,8 +57,10 @@ const pipeline = root.createRenderPipeline({
     const p = params.$;
     // Tilt the plane away from the camera so the far part shrinks a lot.
     // That is where mipmaps (or their absence) become visible.
-    const depth = 1 + (1 - uv.y) * 3;
-    const planeUv = d.vec2f((uv.x - 0.5) * depth * p.aspect + 0.5, uv.y * depth);
+    // Perspective divide: the distance grows steadily from 1 at the bottom edge
+    // to 5 at the top edge, with the horizon just above the screen.
+    const depth = 1.25 / (uv.y + 0.25);
+    const planeUv = d.vec2f((uv.x - 0.5) * depth * p.aspect + 0.5, depth);
     const rotation = p.time * 0.1;
     const c = std.cos(rotation);
     const s = std.sin(rotation);

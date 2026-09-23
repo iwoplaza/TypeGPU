@@ -53,6 +53,16 @@ const hueColor = (phase: number) => {
 
 await glyph.init();
 
+// Fonts are loaded before the handle is registered. Handle names are global, so
+// a handle left behind by a failed load would make every reload of this example throw.
+const font = glyph.fontFace('/TypeGPU/assets/glyph/inter-bold.font.glb', { format: slug });
+try {
+  await font.load();
+} catch (error) {
+  font.dispose();
+  throw error;
+}
+
 const handle = glyph.handle(
   'text-radiance-cascades',
   defineTypeGpuConfig({
@@ -71,9 +81,6 @@ const handle = glyph.handle(
     },
   }),
 );
-
-const font = glyph.fontFace('/TypeGPU/assets/glyph/inter-bold.font.glb', { format: slug });
-await font.load();
 
 const headline = handle.createText({
   font,
@@ -280,9 +287,10 @@ function onPointerMove(event: PointerEvent) {
   pointer.active = true;
 }
 canvas.addEventListener('pointermove', onPointerMove);
-canvas.addEventListener('pointerleave', () => {
+function onPointerLeave() {
   pointer.active = false;
-});
+}
+canvas.addEventListener('pointerleave', onPointerLeave);
 
 layoutTexts();
 
@@ -389,6 +397,7 @@ export const controls = defineControls({
 export function onCleanup() {
   cancelAnimationFrame(frameId);
   canvas.removeEventListener('pointermove', onPointerMove);
+  canvas.removeEventListener('pointerleave', onPointerLeave);
   headline.dispose();
   body.dispose();
   handle.dispose();

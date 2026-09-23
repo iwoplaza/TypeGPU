@@ -13,7 +13,21 @@ const timeUniform = root.createUniform(d.f32);
 // 1. Start the Glyph engine (text shaping and layout, powered by WASM).
 await glyph.init();
 
-// 2. Route Glyph's rendering through our TypeGPU root. The optional
+// 2. Load a font baked with `glyph bake` (MSDF atlas + metrics in one .glb).
+//    The raster options have to match the ones the font was baked with.
+//    Loading happens before creating the handle: handle names are global, so a
+//    handle left behind by a failed load would break every later run.
+const inter = glyph.fontFace('/TypeGPU/assets/glyph/inter-regular.font.glb', {
+  format: msdf({ emSize: 32, pixelRange: 4 }),
+});
+try {
+  await inter.load();
+} catch (error) {
+  inter.dispose();
+  throw error;
+}
+
+// 3. Route Glyph's rendering through our TypeGPU root. The optional
 //    `transformColor` hook is a plain 'use gpu' function that runs per fragment.
 const handle = glyph.handle(
   'simple-glyph-text',
@@ -22,21 +36,15 @@ const handle = glyph.handle(
     format: navigator.gpu.getPreferredCanvasFormat(),
     transformColor: (color, fragPos) => {
       'use gpu';
-      // A rainbow sweeping across the screen. `color.a` is the glyph coverage,
-      // so we keep it intact to preserve the anti-aliased edges.
+      // A rainbow sweeping across the screen, tinted by each text's own color
+      // (white for the title, grey-blue for the subtitle). `color.a` is the glyph
+      // coverage, so we keep it intact to preserve the anti-aliased edges.
       const phase = fragPos.x * 0.004 - timeUniform.$ * 2;
       const rainbow = std.cos(d.vec3f(phase, phase + 2.1, phase + 4.2)) * 0.5 + 0.5;
-      return d.vec4f(std.mix(color.rgb, rainbow, color.a), color.a);
+      return d.vec4f(color.rgb * rainbow, color.a);
     },
   }),
 );
-
-// 3. Load a font baked with `glyph bake` (MSDF atlas + metrics in one .glb).
-//    The raster options have to match the ones the font was baked with.
-const inter = glyph.fontFace('/TypeGPU/assets/glyph/inter-regular.font.glb', {
-  format: msdf({ emSize: 32, pixelRange: 4 }),
-});
-await inter.load();
 
 // 4. Create retained text. Positions are in pixels, origin at the top-left corner.
 const title = handle.createText({

@@ -117,6 +117,8 @@ The pipeline above resolves to the following WGSL:
 }
 ```
 
+The [Slots and Accessors](/TypeGPU/examples#example=simple--slots-and-accessors) example uses this to build three render pipelines from one shader, each with its own pattern function and column index filled in.
+
 :::note
 Static code analysis does not verify whether all slots have been filled.
 If you forget to assign a value to a slot, a runtime error will be thrown instead.

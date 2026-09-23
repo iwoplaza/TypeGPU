@@ -56,25 +56,7 @@ const aces = (x: d.v3f) => {
   return std.saturate((x * (x * 2.51 + 0.03)) / (x * (x * 2.43 + 0.59) + 0.14));
 };
 
-export function createPostProcessing(
-  root: TgpuRoot,
-  width: number,
-  height: number,
-  postParams: TgpuUniform<typeof PostParams>,
-) {
-  const bloomWidth = Math.max(1, Math.floor(width / 4));
-  const bloomHeight = Math.max(1, Math.floor(height / 4));
-
-  const hdrTexture = root
-    .createTexture({ size: [width, height], format: 'rgba16float' })
-    .$usage('render', 'sampled');
-  const bloomA = root
-    .createTexture({ size: [bloomWidth, bloomHeight], format: 'rgba16float' })
-    .$usage('storage', 'sampled');
-  const bloomB = root
-    .createTexture({ size: [bloomWidth, bloomHeight], format: 'rgba16float' })
-    .$usage('storage', 'sampled');
-
+export function createPostProcessing(root: TgpuRoot, postParams: TgpuUniform<typeof PostParams>) {
   const linear = root.createSampler({ magFilter: 'linear', minFilter: 'linear' });
 
   const downsample = root.createGuardedComputePipeline((x, y) => {
@@ -134,8 +116,10 @@ export function createPostProcessing(
     );
     color += d.vec3f(0.45, 0.35, 1) * streaks * 0.5;
 
-    // Text is straight-alpha over the background, bloom is additive.
-    color = std.mix(color, text.rgb, text.a);
+    // Glyph blends with src-alpha into a transparent target, so the text texture
+    // holds premultiplied color: its rgb is already scaled by alpha.
+    color = color * (1 - text.a) + text.rgb;
+    // Bloom is additive.
     color += bloom * params.bloomIntensity;
 
     const vignette = 1 - std.smoothstep(0.45, 1.05, dist);
@@ -147,45 +131,83 @@ export function createPostProcessing(
     fragment: compositeFragment,
   });
 
-  const hdrView = hdrTexture.createView(d.texture2d(d.f32));
-  const bloomAView = bloomA.createView(d.texture2d(d.f32));
-  const bloomBView = bloomB.createView(d.texture2d(d.f32));
-  const bloomAStore = bloomA.createView(d.textureStorage2d('rgba16float'));
-  const bloomBStore = bloomB.createView(d.textureStorage2d('rgba16float'));
+  // Size dependent resources, recreated by `resize`.
+  function createTargets(width: number, height: number) {
+    const bloomWidth = Math.max(1, Math.floor(width / 4));
+    const bloomHeight = Math.max(1, Math.floor(height / 4));
 
-  const downsampleGroup = root.createBindGroup(blurLayout, {
-    src: hdrView,
-    dst: bloomAStore,
-    linear,
-  });
-  const blurHGroup = root.createBindGroup(blurLayout, {
-    src: bloomAView,
-    dst: bloomBStore,
-    linear,
-  });
-  const blurVGroup = root.createBindGroup(blurLayout, {
-    src: bloomBView,
-    dst: bloomAStore,
-    linear,
-  });
-  const compositeGroup = root.createBindGroup(compositeLayout, {
-    hdr: hdrView,
-    bloom: bloomAView,
-    linear,
-  });
+    const hdrTexture = root
+      .createTexture({ size: [width, height], format: 'rgba16float' })
+      .$usage('render', 'sampled');
+    const bloomA = root
+      .createTexture({ size: [bloomWidth, bloomHeight], format: 'rgba16float' })
+      .$usage('storage', 'sampled');
+    const bloomB = root
+      .createTexture({ size: [bloomWidth, bloomHeight], format: 'rgba16float' })
+      .$usage('storage', 'sampled');
+
+    const hdrView = hdrTexture.createView(d.texture2d(d.f32));
+    const bloomAView = bloomA.createView(d.texture2d(d.f32));
+    const bloomBView = bloomB.createView(d.texture2d(d.f32));
+    const bloomAStore = bloomA.createView(d.textureStorage2d('rgba16float'));
+    const bloomBStore = bloomB.createView(d.textureStorage2d('rgba16float'));
+
+    return {
+      width,
+      height,
+      bloomWidth,
+      bloomHeight,
+      hdrTexture,
+      downsampleGroup: root.createBindGroup(blurLayout, {
+        src: hdrView,
+        dst: bloomAStore,
+        linear,
+      }),
+      blurHGroup: root.createBindGroup(blurLayout, {
+        src: bloomAView,
+        dst: bloomBStore,
+        linear,
+      }),
+      blurVGroup: root.createBindGroup(blurLayout, {
+        src: bloomBView,
+        dst: bloomAStore,
+        linear,
+      }),
+      compositeGroup: root.createBindGroup(compositeLayout, {
+        hdr: hdrView,
+        bloom: bloomAView,
+        linear,
+      }),
+      destroy() {
+        hdrTexture.destroy();
+        bloomA.destroy();
+        bloomB.destroy();
+      },
+    };
+  }
+
+  let targets = createTargets(1, 1);
 
   return {
-    hdrTexture,
+    get hdrTexture() {
+      return targets.hdrTexture;
+    },
+    isSized(width: number, height: number) {
+      return targets.width === width && targets.height === height;
+    },
+    resize(width: number, height: number) {
+      targets.destroy();
+      targets = createTargets(width, height);
+    },
     render(target: ColorAttachment['view']) {
-      downsample.with(downsampleGroup).dispatchThreads(bloomWidth, bloomHeight);
-      blurHorizontal.with(blurHGroup).dispatchThreads(bloomWidth, bloomHeight);
-      blurVertical.with(blurVGroup).dispatchThreads(bloomWidth, bloomHeight);
-      composite.with(compositeGroup).withColorAttachment({ view: target }).draw(3);
+      const { bloomWidth, bloomHeight } = targets;
+      downsample.with(targets.downsampleGroup).dispatchThreads(bloomWidth, bloomHeight);
+      blurHorizontal.with(targets.blurHGroup).dispatchThreads(bloomWidth, bloomHeight);
+      blurVertical.with(targets.blurVGroup).dispatchThreads(bloomWidth, bloomHeight);
+      composite.with(targets.compositeGroup).withColorAttachment({ view: target }).draw(3);
     },
     destroy() {
-      hdrTexture.destroy();
-      bloomA.destroy();
-      bloomB.destroy();
+      targets.destroy();
     },
   };
 }

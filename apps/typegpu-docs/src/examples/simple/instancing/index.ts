@@ -66,10 +66,9 @@ const simulate = root.createGuardedComputePipeline((index: number) => {
       std.sin(params.$.time + p.position.y * 3),
       std.cos(params.$.time * 0.7 + p.position.x * 3),
     ) * 0.1;
-  let position = p.position + (p.velocity + swirl + drift) * params.$.deltaTime * params.$.speed;
+  const moved = p.position + (p.velocity + swirl + drift) * params.$.deltaTime * params.$.speed;
   // Wrap around the edges of the screen.
-  position = std.fract((position + 1) * 0.5) * 2 - 1;
-  particles.$[index].position = d.vec2f(position);
+  particles.$[index].position = std.fract((moved + 1) * 0.5) * 2 - 1;
 });
 
 // #endregion
