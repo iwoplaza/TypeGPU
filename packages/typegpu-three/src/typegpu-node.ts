@@ -38,10 +38,16 @@ class GenerateStageData extends StageData {
    * transitively, but then is passed directly into toTSL
    */
   existingDeclarations: ResolvedDeclaration[];
+  /**
+   * Resolved identifiers of bridge variables, so each assignment
+   * does not need a resolution of its own.
+   */
+  readonly bridgeVarNames: Map<TgpuVar<'private', d.AnyWgslData>, string>;
 
   constructor(stage: 'vertex' | 'fragment' | 'compute' | null) {
     super(stage);
     this.existingDeclarations = [];
+    this.bridgeVarNames = new Map();
   }
 }
 
@@ -176,7 +182,11 @@ function isWebGL(builder: THREE.NodeBuilder): boolean {
   return (backend as { isWebGLBackend?: boolean } | undefined)?.isWebGLBackend === true;
 }
 
-class TgpuFnNode<T> extends THREE.Node {
+/**
+ * A TempNode, so that a result used more than once is computed once into a temporary instead of
+ * re-emitting the bridge assignments and the call at every use site.
+ */
+class TgpuFnNode<T> extends THREE.TempNode {
   #impl: () => T;
 
   constructor(impl: () => T) {
@@ -299,6 +309,12 @@ class TgpuFnNode<T> extends THREE.Node {
    */
   analyze(builder: THREE.NodeBuilder, output?: THREE.Node | null) {
     super.analyze(builder, output);
+    // Resolving the function once per stage finds every TSL accessor; later uses only count usage.
+    const nodeData = builder.getDataFromNode(this) as { tgpuAnalyzed?: boolean };
+    if (nodeData.tgpuAnalyzed) {
+      return;
+    }
+    nodeData.tgpuAnalyzed = true;
     this.#analyzeFunction(builder); // making sure it will find all TSL accessors
   }
 
@@ -328,16 +344,19 @@ class TgpuFnNode<T> extends THREE.Node {
 
       const varValue = dep.node.build(builder);
 
-      const code = tgpu.resolve({
-        names: stageData.namespace,
-        // oxlint-disable-next-line typescript/no-base-to-string
-        template: `$var$ = ${varValue};\n`,
-        externals: { $var$: bridgeVar },
-        ...(webgl ? glOptions() : {}),
-      });
+      let varName = stageData.bridgeVarNames.get(bridgeVar);
+      if (varName === undefined) {
+        varName = tgpu.resolve({
+          names: stageData.namespace,
+          template: '$var$',
+          externals: { $var$: bridgeVar },
+          ...(webgl ? glOptions() : {}),
+        });
+        stageData.bridgeVarNames.set(bridgeVar, varName);
+      }
 
       // @ts-expect-error: it's there
-      builder.addLineFlowCode(code, this);
+      builder.addLineFlowCode(`${varName} = ${varValue};\n`, this);
     }
 
     return output === 'property' ? nodeData.custom.functionId : `${nodeData.custom.functionId}()`;

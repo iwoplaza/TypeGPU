@@ -288,3 +288,21 @@ describe('TSL texture access', () => {
     expect(builder.getCodes('fragment')).not.toContain('nodeUniform0_sampler');
   });
 });
+
+describe('toTSL result reuse', () => {
+  it('calls a reused toTSL function once', () => {
+    const node = toTSL(() => {
+      'use gpu';
+      return std.sqrt(d.f32(4));
+    });
+
+    const builder = builderFor('analyze');
+    TSL.add(node, node).build(builder);
+    builder.setBuildStage('generate');
+    const snippet = TSL.add(node, node).build(builder) as string;
+
+    const flow = (builder as unknown as { flow: { code: string } }).flow.code;
+    expect(flow.match(/item\(\)/g)).toHaveLength(1);
+    expect(snippet).not.toContain('item()');
+  });
+});
