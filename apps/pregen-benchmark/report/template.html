@@ -381,9 +381,11 @@
           show almost none.
         </li>
         <li>
-          <strong>The optimized TypeGPU ships 6.6% less gzipped JS</strong> (5.9–6.7 kB per app) and
-          starts its app code 20–90 ms sooner on mobile. CPU-side vector math got much cheaper:
-          jelly-slider spends a third of the JS time per frame it used to.
+          <strong>The optimized TypeGPU ships 6.5% less gzipped JS</strong> (5.8–6.7 kB per app). On
+          mobile it reaches the first frame 50–100 ms sooner in three of the four examples and
+          blocks the main thread 30–80 ms less; slime-mold-3d is unchanged within noise. CPU-side
+          vector math and buffer writes got several times faster: jelly-slider spends under a third
+          of the JS time per frame it used to (42.5 → 12.2 ms on mobile).
         </li>
         <li>
           <strong>What's left is structural.</strong> The shader generator and the root object's
@@ -567,18 +569,30 @@
         <div class="effect">TypeGPU module evaluation 47 → 39 ms at 4× CPU (boids)</div>
       </div>
       <div class="opt">
-        <div class="what">Faster CPU-side vectors</div>
+        <div class="what">Vector components are read by name in hot paths</div>
         <p>
-          <code>d.vec2f(x, y)</code> copied its arguments into an intermediate array, and each
-          component was cast through the callable <code>d.f32</code> schema, behind a getter that
-          allocated a fresh object. A scalar-only fast path and direct cast functions fix all three.
-          This matters for apps that create many vectors while filling buffers, like the initial
-          boids positions.
+          Reading a vector by index (<code>v[0]</code>) goes through the index accessors that make
+          <code>v[0] = 1.5</code> cast on assignment, and V8 handles those on a slow path: about 155
+          ns per read, against 9 ns for <code>v.x</code>. The compiled buffer writer, swizzles and
+          the helpers behind CPU-side <code>std</code> functions read by index. They now read
+          components by name, with a fallback for tuples and typed arrays in the writer.
         </p>
         <div class="effect">
-          d.vec2f(x, y): ~700 → ~115 ns per call warm; 4,000 vectors in a fresh process: 9–20 → 2–3
-          ms
+          Writing 1,000 vec2f structs: 0.67 → 0.03 ms · v.xyz: 605 → 80 ns · std.add(v2, v2): 2.7 →
+          0.6 µs · std.mix: 4.4 → 0.9 µs
         </div>
+      </div>
+      <div class="opt">
+        <div class="what">Cheaper vector construction and CPU-side std calls</div>
+        <p>
+          <code>d.vec2f(x, y)</code> copied its arguments into an intermediate array and cast each
+          component through the callable <code>d.f32</code> schema, behind a getter that allocated a
+          fresh object. Callable schemas and std functions forwarded calls through rest/spread
+          wrappers, and the generic component-wise helper allocated arrays per component. A scalar
+          fast path, direct cast functions, bound functions instead of wrappers, and plain loops
+          remove all of that.
+        </p>
+        <div class="effect">d.vec2f(x, y): ~630 → ~95 ns · std.sin(x): 155 → 71 ns</div>
       </div>
       <div class="opt">
         <div class="what">No uniform-alignment analysis when its warning is off</div>
@@ -635,9 +649,11 @@
       <h3>Every dispatch and draw is its own submit</h3>
       <p>
         Pipeline <code>.dispatchWorkgroups()</code> and <code>.draw()</code> each create a command
-        encoder and call <code>queue.submit</code>. Raw WebGPU code usually records a whole frame
-        into one encoder, which is part of why pregenerated stable-fluid (9 passes per frame) spends
-        less CPU per frame.
+        encoder and call <code>queue.submit</code>. That keeps them ordered with the
+        <code>buffer.write()</code> calls around them, and TypeGPU already offers batching through
+        <code>root['~unstable'].createCommandEncoder()</code>. Raw WebGPU code usually records a
+        whole frame into one encoder, which is part of why pregenerated stable-fluid (9 passes per
+        frame) spends less CPU per frame.
       </p>
       <h3>Directions that would move these numbers</h3>
       <ul>
@@ -653,8 +669,8 @@
           query sets and logging would let bundlers drop what an app doesn't use.
         </li>
         <li>
-          <strong>Batch submits by default.</strong> Record into a per-frame encoder and submit
-          once.
+          <strong>For apps with many passes per frame:</strong> record them through
+          <code>createCommandEncoder()</code> and submit once.
         </li>
         <li>
           <strong>For apps:</strong> creating pipelines during an idle period, before the first
