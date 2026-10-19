@@ -134,11 +134,15 @@ abstract class Vec2<S> extends VecBase<S> implements Tuple2<S> {
   e0: S;
   e1: S;
 
-  constructor(x?: S, y?: S) {
+  /**
+   * Takes components that are already cast to the element type. Each concrete vector class
+   * casts in its own constructor, with its type's cast function, which is much faster than
+   * looking the cast up dynamically for every vector created.
+   */
+  constructor(x: S, y: S) {
     super(2);
-    const cast = this.castElement();
-    this.e0 = cast(x);
-    this.e1 = cast(y ?? x);
+    this.e0 = x;
+    this.e1 = y;
   }
 
   get 0() {
@@ -197,12 +201,16 @@ abstract class Vec3<S> extends VecBase<S> implements Tuple3<S> {
   e1: S;
   e2: S;
 
-  constructor(x?: S, y?: S, z?: S) {
+  /**
+   * Takes components that are already cast to the element type. Each concrete vector class
+   * casts in its own constructor, with its type's cast function, which is much faster than
+   * looking the cast up dynamically for every vector created.
+   */
+  constructor(x: S, y: S, z: S) {
     super(3);
-    const cast = this.castElement();
-    this.e0 = cast(x);
-    this.e1 = cast(y ?? x);
-    this.e2 = cast(z ?? x);
+    this.e0 = x;
+    this.e1 = y;
+    this.e2 = z;
   }
 
   get 0() {
@@ -286,13 +294,17 @@ abstract class Vec4<S> extends VecBase<S> implements Tuple4<S> {
   e2: S;
   e3: S;
 
-  constructor(x?: S, y?: S, z?: S, w?: S) {
+  /**
+   * Takes components that are already cast to the element type. Each concrete vector class
+   * casts in its own constructor, with its type's cast function, which is much faster than
+   * looking the cast up dynamically for every vector created.
+   */
+  constructor(x: S, y: S, z: S, w: S) {
     super(4);
-    const cast = this.castElement();
-    this.e0 = cast(x);
-    this.e1 = cast(y ?? x);
-    this.e2 = cast(z ?? x);
-    this.e3 = cast(w ?? x);
+    this.e0 = x;
+    this.e1 = y;
+    this.e2 = z;
+    this.e3 = w;
   }
 
   get 0() {
@@ -393,6 +405,10 @@ abstract class Vec4<S> extends VecBase<S> implements Tuple4<S> {
 }
 
 export class Vec2fImpl extends Vec2<number> {
+  constructor(x?: number, y?: number) {
+    super(castToF32(x), castToF32(y ?? x));
+  }
+
   get [$internal]() {
     return f32Internal;
   }
@@ -413,6 +429,10 @@ export class Vec2fImpl extends Vec2<number> {
 }
 
 export class Vec2hImpl extends Vec2<number> {
+  constructor(x?: number, y?: number) {
+    super(castToF16(x), castToF16(y ?? x));
+  }
+
   get [$internal]() {
     return f16Internal;
   }
@@ -433,6 +453,10 @@ export class Vec2hImpl extends Vec2<number> {
 }
 
 export class Vec2iImpl extends Vec2<number> {
+  constructor(x?: number, y?: number) {
+    super(castToI32(x), castToI32(y ?? x));
+  }
+
   get [$internal]() {
     return i32Internal;
   }
@@ -453,6 +477,10 @@ export class Vec2iImpl extends Vec2<number> {
 }
 
 export class Vec2uImpl extends Vec2<number> {
+  constructor(x?: number, y?: number) {
+    super(castToU32(x), castToU32(y ?? x));
+  }
+
   get [$internal]() {
     return u32Internal;
   }
@@ -473,6 +501,10 @@ export class Vec2uImpl extends Vec2<number> {
 }
 
 export class Vec2bImpl extends Vec2<boolean> {
+  constructor(x?: boolean, y?: boolean) {
+    super(castToBool(x), castToBool(y ?? x));
+  }
+
   get [$internal]() {
     return boolInternal;
   }
@@ -493,6 +525,10 @@ export class Vec2bImpl extends Vec2<boolean> {
 }
 
 export class Vec3fImpl extends Vec3<number> {
+  constructor(x?: number, y?: number, z?: number) {
+    super(castToF32(x), castToF32(y ?? x), castToF32(z ?? x));
+  }
+
   get [$internal]() {
     return f32Internal;
   }
@@ -513,6 +549,10 @@ export class Vec3fImpl extends Vec3<number> {
 }
 
 export class Vec3hImpl extends Vec3<number> {
+  constructor(x?: number, y?: number, z?: number) {
+    super(castToF16(x), castToF16(y ?? x), castToF16(z ?? x));
+  }
+
   get [$internal]() {
     return f16Internal;
   }
@@ -533,6 +573,10 @@ export class Vec3hImpl extends Vec3<number> {
 }
 
 export class Vec3iImpl extends Vec3<number> {
+  constructor(x?: number, y?: number, z?: number) {
+    super(castToI32(x), castToI32(y ?? x), castToI32(z ?? x));
+  }
+
   get [$internal]() {
     return i32Internal;
   }
@@ -553,6 +597,10 @@ export class Vec3iImpl extends Vec3<number> {
 }
 
 export class Vec3uImpl extends Vec3<number> {
+  constructor(x?: number, y?: number, z?: number) {
+    super(castToU32(x), castToU32(y ?? x), castToU32(z ?? x));
+  }
+
   get [$internal]() {
     return u32Internal;
   }
@@ -573,6 +621,10 @@ export class Vec3uImpl extends Vec3<number> {
 }
 
 export class Vec3bImpl extends Vec3<boolean> {
+  constructor(x?: boolean, y?: boolean, z?: boolean) {
+    super(castToBool(x), castToBool(y ?? x), castToBool(z ?? x));
+  }
+
   get [$internal]() {
     return boolInternal;
   }
@@ -593,6 +645,10 @@ export class Vec3bImpl extends Vec3<boolean> {
 }
 
 export class Vec4fImpl extends Vec4<number> {
+  constructor(x?: number, y?: number, z?: number, w?: number) {
+    super(castToF32(x), castToF32(y ?? x), castToF32(z ?? x), castToF32(w ?? x));
+  }
+
   get [$internal]() {
     return f32Internal;
   }
@@ -613,6 +669,10 @@ export class Vec4fImpl extends Vec4<number> {
 }
 
 export class Vec4hImpl extends Vec4<number> {
+  constructor(x?: number, y?: number, z?: number, w?: number) {
+    super(castToF16(x), castToF16(y ?? x), castToF16(z ?? x), castToF16(w ?? x));
+  }
+
   get [$internal]() {
     return f16Internal;
   }
@@ -633,6 +693,10 @@ export class Vec4hImpl extends Vec4<number> {
 }
 
 export class Vec4iImpl extends Vec4<number> {
+  constructor(x?: number, y?: number, z?: number, w?: number) {
+    super(castToI32(x), castToI32(y ?? x), castToI32(z ?? x), castToI32(w ?? x));
+  }
+
   get [$internal]() {
     return i32Internal;
   }
@@ -653,6 +717,10 @@ export class Vec4iImpl extends Vec4<number> {
 }
 
 export class Vec4uImpl extends Vec4<number> {
+  constructor(x?: number, y?: number, z?: number, w?: number) {
+    super(castToU32(x), castToU32(y ?? x), castToU32(z ?? x), castToU32(w ?? x));
+  }
+
   get [$internal]() {
     return u32Internal;
   }
@@ -673,6 +741,10 @@ export class Vec4uImpl extends Vec4<number> {
 }
 
 export class Vec4bImpl extends Vec4<boolean> {
+  constructor(x?: boolean, y?: boolean, z?: boolean, w?: boolean) {
+    super(castToBool(x), castToBool(y ?? x), castToBool(z ?? x), castToBool(w ?? x));
+  }
+
   get [$internal]() {
     return boolInternal;
   }
