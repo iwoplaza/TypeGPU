@@ -3,6 +3,7 @@
  *
  * Usage: node scripts/report.ts <out.html> [baselineLabel=baseline] [optimizedLabel=optimized]
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -46,4 +47,5 @@ writeFileSync(
   out,
   template.replace(/\/\*__DATA__\*\/\s*null/, () => JSON.stringify(data)),
 );
+execFileSync('npx', ['oxfmt', out], { stdio: 'ignore' });
 console.log(`Wrote ${out}`);

@@ -5,6 +5,7 @@
  * Usage: node scripts/bench.ts [--label=name] [--runs=7] [--only=example] [--profiles=desktop,mobile]
  *        [--variants=runtime,pregen]
  */
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
@@ -267,4 +268,6 @@ writeFileSync(
   `${resultsDir}${label}.json`,
   JSON.stringify({ label, date: new Date().toISOString(), runs, results }, null, 2),
 );
+// Keeping results in the repo's code style
+execFileSync('npx', ['oxfmt', `${resultsDir}${label}.json`], { stdio: 'ignore' });
 console.log(`Saved results/${label}.json`);
