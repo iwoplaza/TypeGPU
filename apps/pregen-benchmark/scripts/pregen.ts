@@ -8,6 +8,7 @@
  *
  * The browser bundle of a `pregen` variant then never imports TypeGPU.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import typegpu from 'unplugin-typegpu/vite';
@@ -46,7 +47,10 @@ try {
       const code = Array.isArray(items) ? tgpu.resolve(items) : tgpu.resolve(items);
       output += `\nexport const ${name} = ${JSON.stringify(code)};\n`;
     }
-    writeFileSync(`${examplesDir}${example}/pregen/generated.ts`, output);
+    const outPath = `${examplesDir}${example}/pregen/generated.ts`;
+    writeFileSync(outPath, output);
+    // Keeping the generated file in the repo's code style, so rebuilding doesn't produce diffs
+    execFileSync('npx', ['oxfmt', outPath], { stdio: 'ignore' });
     console.log(
       `Pregenerated ${Object.keys(shaderModules).length} shader module(s) for ${example}`,
     );

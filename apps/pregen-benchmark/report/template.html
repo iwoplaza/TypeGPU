@@ -479,8 +479,8 @@
     <h2>What changed in TypeGPU</h2>
     <div id="opt-text">
       <p>
-        Every change keeps the public API and the generated WGSL unchanged; the typegpu test
-        suite passes as before. They're on the <code>perf/typegpu-load-time</code> branch.
+        Every change keeps the public API and the generated WGSL unchanged; the typegpu test suite
+        passes as before. They're on the <code>perf/typegpu-load-time</code> branch.
       </p>
       <div class="opt">
         <div class="what">Dropped the <code>typed-binary</code> dependency</div>
@@ -493,22 +493,22 @@
       </div>
       <div class="opt">
         <div class="what">
-          Marked <code>dualImpl</code>, <code>struct</code> and a signature helper as free of
-          side effects
+          Marked <code>dualImpl</code>, <code>struct</code> and a signature helper as free of side
+          effects
         </div>
         <p>
           Bundlers dropped the unused <code>std</code> bindings but kept the
-          <code>dualImpl({…})</code> calls that created them, along with their CPU
-          implementations. With <code>/*#__NO_SIDE_EFFECTS__*/</code> (already used elsewhere in
-          the package), unused std functions now disappear: 54 dead calls in boids.
+          <code>dualImpl({…})</code> calls that created them, along with their CPU implementations.
+          With <code>/*#__NO_SIDE_EFFECTS__*/</code> (already used elsewhere in the package), unused
+          std functions now disappear: 54 dead calls in boids.
         </p>
         <div class="effect">−17.4 kB minified · −3.3 kB gzip in boids</div>
       </div>
       <div class="opt">
         <div class="what">Console-log serializers are created on first use</div>
         <p>
-          About 30 <code>tgpu.fn</code> objects for shader-side <code>console.log</code> were
-          built on import, in every app, logging or not.
+          About 30 <code>tgpu.fn</code> objects for shader-side <code>console.log</code> were built
+          on import, in every app, logging or not.
         </p>
         <div class="effect">TypeGPU module evaluation 47 → 39 ms at 4× CPU (boids)</div>
       </div>
@@ -517,19 +517,19 @@
         <p>
           <code>d.vec2f(x, y)</code> copied its arguments into an intermediate array, and each
           component cast allocated a fresh object through a getter. A scalar-only fast path and
-          shared per-type constants fix both. This matters for apps that create many vectors
-          while filling buffers, like the initial boids positions.
+          shared per-type constants fix both. This matters for apps that create many vectors while
+          filling buffers, like the initial boids positions.
         </p>
         <div class="effect">d.vec2f(x, y): 664 → 110 ns per call (Node 22, warm)</div>
       </div>
       <div class="opt">
         <div class="what">Less work on shader generation's happy path</div>
         <p>
-          The numeric-literal check stringified the AST node for its error message on every
-          literal; messages are now built only on failure. Each pipeline's namespace no longer
-          copies ~500 reserved words into a new Set, function externals aren't copied when
-          there's nothing to merge, texture views reuse their value proxy, and the hottest type
-          guards test the cheap property first.
+          The numeric-literal check stringified the AST node for its error message on every literal;
+          messages are now built only on failure. Each pipeline's namespace no longer copies ~500
+          reserved words into a new Set, function externals aren't copied when there's nothing to
+          merge, texture views reuse their value proxy, and the hottest type guards test the cheap
+          property first.
         </p>
         <div class="effect">
           Warm resolve −20–25% (stable-fluid 10.5 → 7.8 ms); cold first resolve −3–9%
@@ -542,45 +542,44 @@
     <h2>Where the remaining cost comes from</h2>
     <div id="analysis-text">
       <p>
-        These are the reasons a runtime TypeGPU app stays behind a pregenerated one, even after
-        the changes above. None of them can be fixed with local tweaks; each needs an
-        architectural decision.
+        These are the reasons a runtime TypeGPU app stays behind a pregenerated one, even after the
+        changes above. None of them can be fixed with local tweaks; each needs an architectural
+        decision.
       </p>
       <h3>The root object reaches everything</h3>
       <p>
         <code>tgpu.init()</code> returns a root whose methods create buffers, textures, samplers,
-        query sets, pipelines and command encoders. Bundlers can't drop unused class methods, so
-        an app that only calls <code>tgpu.init()</code> and creates one buffer already ships
-        about 320 kB (80 kB gzip). In practice every app ships the whole library, including
-        texture uploads, mipmap generation, timestamp queries and the shader-side
-        <code>console.log</code> machinery.
+        query sets, pipelines and command encoders. Bundlers can't drop unused class methods, so an
+        app that only calls <code>tgpu.init()</code> and creates one buffer already ships about 320
+        kB (80 kB gzip). In practice every app ships the whole library, including texture uploads,
+        mipmap generation, timestamp queries and the shader-side <code>console.log</code> machinery.
       </p>
       <h3>The shader generator is a third of the bundle and runs cold</h3>
       <p>
-        The WGSL generator and resolution context are 31% of TypeGPU's minified code in the
-        boids bundle (78 of 255 kB), and 39% with <code>std</code>, which serves both CPU and
-        shader code. Generation also runs
-        exactly when it hurts most: during the first frame or the first pipeline creation, on
-        code the JIT has never seen. In Node, the first <code>tgpu.resolve</code> of the boids
-        shaders takes about 21 ms, and later ones about 2 ms. That 10× cold penalty is spread
-        across hundreds of small functions with no single hotspot. Disabling lazy compilation
-        doesn't remove it either, so it's interpretation and inline-cache warm-up, not parsing.
+        The WGSL generator and resolution context are 31% of TypeGPU's minified code in the boids
+        bundle (78 of 255 kB), and 39% with <code>std</code>, which serves both CPU and shader code.
+        Generation also runs exactly when it hurts most: during the first frame or the first
+        pipeline creation, on code the JIT has never seen. In Node, the first
+        <code>tgpu.resolve</code> of the boids shaders takes about 21 ms, and later ones about 2 ms.
+        That 10× cold penalty is spread across hundreds of small functions with no single hotspot.
+        Disabling lazy compilation doesn't remove it either, so it's interpretation and inline-cache
+        warm-up, not parsing.
       </p>
       <h3>Every dispatch and draw is its own submit</h3>
       <p>
-        Pipeline <code>.dispatchWorkgroups()</code> and <code>.draw()</code> each create a
-        command encoder and call <code>queue.submit</code>. Raw WebGPU code usually records a
-        whole frame into one encoder, which is part of why pregenerated stable-fluid (9 passes
-        per frame) spends less CPU per frame.
+        Pipeline <code>.dispatchWorkgroups()</code> and <code>.draw()</code> each create a command
+        encoder and call <code>queue.submit</code>. Raw WebGPU code usually records a whole frame
+        into one encoder, which is part of why pregenerated stable-fluid (9 passes per frame) spends
+        less CPU per frame.
       </p>
       <h3>Directions that would move these numbers</h3>
       <ul>
         <li>
-          <strong>Ship host-side TypeGPU without the generator.</strong> Precompiled pipelines
-          could take WGSL from <code>tgpu.resolve</code> at build time and still use TypeGPU's
-          typed buffers, layouts and pipelines. That keeps the API's safety and drops close
-          to a third of the library and all first-frame generation. This is what the pregenerated
-          variants approximate by hand.
+          <strong>Ship host-side TypeGPU without the generator.</strong> Precompiled pipelines could
+          take WGSL from <code>tgpu.resolve</code> at build time and still use TypeGPU's typed
+          buffers, layouts and pipelines. That keeps the API's safety and drops close to a third of
+          the library and all first-frame generation. This is what the pregenerated variants
+          approximate by hand.
         </li>
         <li>
           <strong>Make subsystems opt-in.</strong> Separate entry points or plugins for textures,
