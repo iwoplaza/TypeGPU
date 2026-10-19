@@ -356,14 +356,41 @@
       TypeGPU at runtime vs. WGSL pregenerated with
       <code style="font-size: 0.8em">tgpu.resolve</code>
     </h1>
-    <p class="lede" id="lede"></p>
+    <p class="lede" id="lede">
+      Some teams resolve all their TypeGPU shaders to WGSL at build time so they don't ship the
+      library. We rebuilt four docs examples both ways to see what that buys, then made the runtime
+      path cheaper.
+    </p>
     <p class="meta" id="meta"></p>
   </header>
 
   <section id="summary">
     <h2>Summary</h2>
     <div class="figures" id="figures"></div>
-    <div id="summary-text"></div>
+    <div id="summary-text">
+      <ul>
+        <li>
+          <strong>Pregenerating saves 78–90 kB of gzipped JS per app</strong>: everything except a
+          few kB of host code and the WGSL strings. On the mobile profile that alone is 470–600 ms
+          before any app code runs.
+        </li>
+        <li>
+          <strong>The first frame arrives 0.7–1.1 s later with runtime TypeGPU on mobile</strong>
+          (median per example), from download, parsing, and generating WGSL on the main thread.
+          Runtime variants also show 130–310 ms of total blocking time on mobile; pregenerated ones
+          show almost none.
+        </li>
+        <li>
+          <strong>The optimized TypeGPU ships 6.6% less gzipped JS</strong> (5.9–6.7 kB per app) and
+          starts its app code 20–90 ms sooner on mobile. CPU-side vector math got much cheaper:
+          jelly-slider spends a third of the JS time per frame it used to.
+        </li>
+        <li>
+          <strong>What's left is structural.</strong> The shader generator and the root object's
+          reach account for most of the remaining gap; see the last section.
+        </li>
+      </ul>
+    </div>
   </section>
 
   <section>
@@ -433,7 +460,13 @@
       This is what crosses the network.
     </p>
     <div class="chart" id="chart-size"></div>
-    <div id="size-text"></div>
+    <div id="size-text">
+      <p>
+        The pregenerated builds of slime-mold-3d and jelly-slider are larger than boids' because
+        they bundle <code>wgpu-matrix</code> (as do their runtime builds) and carry their WGSL as
+        strings: jelly-slider's shaders are about 29 kB of text before compression.
+      </p>
+    </div>
   </section>
 
   <section>
@@ -454,7 +487,28 @@
     <div class="chart" id="chart-interaction"></div>
     <div class="chart" id="chart-frame"></div>
     <div class="chart" id="chart-tbt"></div>
-    <div id="load-text"></div>
+    <div class="chart" id="chart-framecpu"></div>
+    <div id="load-text">
+      <p>
+        On the mobile profile the runtime variants start executing app code 470–600 ms after the
+        pregenerated ones, which is the extra download and parse. Generating WGSL then adds a
+        main-thread task of 180–280 ms before the first frame. The optimized build trims both a
+        little; most of the gap remains.
+      </p>
+      <p>
+        Per-frame JS is where the optimizations show most, in apps that do CPU-side vector math:
+        jelly-slider's slider physics builds many vectors per frame. The remaining per-frame
+        difference to pregenerated code is largely TypeGPU submitting each pass separately, while
+        the hand-written stable-fluid and slime-mold-3d variants record a frame into one command
+        encoder.
+      </p>
+      <p class="callout">
+        We also measured when a scripted click on the first control gets handled (see the table). On
+        SwiftShader that number mostly reflects when the emulated GPU releases the main thread after
+        the first submit, so it sometimes favors the runtime variant. It's reported, but not
+        charted.
+      </p>
+    </div>
   </section>
 
   <section>
@@ -516,11 +570,24 @@
         <div class="what">Faster CPU-side vectors</div>
         <p>
           <code>d.vec2f(x, y)</code> copied its arguments into an intermediate array, and each
-          component cast allocated a fresh object through a getter. A scalar-only fast path and
-          shared per-type constants fix both. This matters for apps that create many vectors while
-          filling buffers, like the initial boids positions.
+          component was cast through the callable <code>d.f32</code> schema, behind a getter that
+          allocated a fresh object. A scalar-only fast path and direct cast functions fix all three.
+          This matters for apps that create many vectors while filling buffers, like the initial
+          boids positions.
         </p>
-        <div class="effect">d.vec2f(x, y): 664 → 110 ns per call (Node 22, warm)</div>
+        <div class="effect">
+          d.vec2f(x, y): ~700 → ~115 ns per call warm; 4,000 vectors in a fresh process: 9–20 → 2–3
+          ms
+        </div>
+      </div>
+      <div class="opt">
+        <div class="what">No uniform-alignment analysis when its warning is off</div>
+        <p>
+          Every <code>$usage('uniform')</code> computed full memory layouts to decide whether to
+          warn about non-portable alignment, a warning that is silenced in production builds. The
+          logger can now say whether a warning would be shown, and the check is skipped otherwise.
+        </p>
+        <div class="effect">Less setup work per uniform buffer in production builds</div>
       </div>
       <div class="opt">
         <div class="what">Less work on shader generation's happy path</div>
@@ -763,9 +830,9 @@
   function renderLoad() {
     const p = loadProfile;
     barChart(document.getElementById('chart-interaction'), {
-      title: 'Time to first handled interaction',
-      sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · from navigation start, lower is better`,
-      valueOf: (s, e) => get(s, e, [p, 'firstInteractionHandled']),
+      title: 'Time until the UI is ready',
+      sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · from navigation start until every control handler is attached`,
+      valueOf: (s, e) => get(s, e, [p, 'interactive']),
       fmt: fmtMs,
     });
     barChart(document.getElementById('chart-frame'), {
@@ -779,6 +846,12 @@
       sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · sum of long-task time above 50 ms`,
       valueOf: (s, e) => get(s, e, [p, 'totalBlockingTimeMs']),
       fmt: fmtMs,
+    });
+    barChart(document.getElementById('chart-framecpu'), {
+      title: 'JavaScript time per frame',
+      sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · median CPU time spent in the frame callback, after the first 10 frames`,
+      valueOf: (s, e) => get(s, e, [p, 'frameCpuMedianMs']),
+      fmt: (v) => `${v.toFixed(1)} ms`,
     });
   }
 
@@ -889,15 +962,12 @@
     const tti = avg(
       EXAMPLES.map(
         (e) =>
-          get('base', e, ['mobile', 'firstInteractionHandled']) -
-          get('pregen', e, ['mobile', 'firstInteractionHandled']),
+          get('base', e, ['mobile', 'firstSubmit']) - get('pregen', e, ['mobile', 'firstSubmit']),
       ),
     );
     const ttiOpt = avg(
       EXAMPLES.map(
-        (e) =>
-          get('base', e, ['mobile', 'firstInteractionHandled']) -
-          get('opt', e, ['mobile', 'firstInteractionHandled']),
+        (e) => get('base', e, ['mobile', 'firstSubmit']) - get('opt', e, ['mobile', 'firstSubmit']),
       ),
     );
     const f = document.getElementById('figures');
@@ -908,7 +978,7 @@
         'gzip, average over the four examples',
       ),
       figure(
-        'Later first interaction (mobile)',
+        'Later first frame (mobile)',
         `+${fmtMs(tti)}`,
         'runtime 0.12.7 vs. pregenerated, average',
       ),
@@ -918,9 +988,9 @@
         'optimized vs. 0.12.7, gzip, average',
       ),
       figure(
-        'Earlier first interaction (mobile)',
-        `−${fmtMs(ttiOpt)}`,
-        'optimized vs. 0.12.7, average',
+        'JS per frame, jelly-slider (mobile)',
+        `${get('base', 'jelly-slider', ['mobile', 'frameCpuMedianMs']).toFixed(1)} → ${get('opt', 'jelly-slider', ['mobile', 'frameCpuMedianMs']).toFixed(1)} ms`,
+        'optimized vs. 0.12.7, median',
       ),
     );
   }

@@ -1,0 +1,1440 @@
+<title>TypeGPU Runtime vs Pregenerated WGSL</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap"
+/>
+<style>
+  /* Layout: one reading column (~68ch) with full-bleed-within-column charts and tables; summary figures in a wrapping grid. */
+  :root {
+    --bg: #f7f8f9;
+    --surface: #ffffff;
+    --fg: #14171a;
+    --fg-2: #4a5159;
+    --fg-3: #6b737c;
+    --rule: #dfe3e7;
+    --grid: #e9ecef;
+    --accent: #2a5bd7;
+    --code-bg: #eef1f4;
+    --good: #1a7f37;
+    --s1: #2a78d6;
+    --s2: #eb6834;
+    --s3: #1baf7a;
+    --font-display: 'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+    --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --bg: #121416;
+      --surface: #1a1d20;
+      --fg: #eceff1;
+      --fg-2: #b9c0c7;
+      --fg-3: #8c949c;
+      --rule: #2c3136;
+      --grid: #262a2e;
+      --accent: #7aa2ff;
+      --code-bg: #20252a;
+      --good: #4cc26b;
+      --s1: #3987e5;
+      --s2: #d95926;
+      --s3: #199e70;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme='dark'] {
+    --bg: #121416;
+    --surface: #1a1d20;
+    --fg: #eceff1;
+    --fg-2: #b9c0c7;
+    --fg-3: #8c949c;
+    --rule: #2c3136;
+    --grid: #262a2e;
+    --accent: #7aa2ff;
+    --code-bg: #20252a;
+    --good: #4cc26b;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.6 var(--font-body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 40px 80px;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+  }
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0;
+    line-height: 1.15;
+  }
+  h1 {
+    font-size: clamp(30px, 6vw, 42px);
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-size: 26px;
+    padding-top: 8px;
+    border-top: 1px solid var(--rule);
+  }
+  h3 {
+    font-size: 19px;
+    margin-top: 8px;
+  }
+  p,
+  ul,
+  ol {
+    margin: 0;
+    max-width: 68ch;
+  }
+  ul,
+  ol {
+    padding-left: 1.3em;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .eyebrow {
+    font: 500 12px/1 var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+  .lede {
+    font-size: 18px;
+    color: var(--fg-2);
+  }
+  .meta {
+    font: 13px/1.5 var(--font-mono);
+    color: var(--fg-3);
+  }
+  code {
+    font: 0.88em var(--font-mono);
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  a {
+    color: var(--accent);
+  }
+  strong {
+    font-weight: 600;
+  }
+
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 12px;
+  }
+  .figure {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .figure .label {
+    font-size: 13px;
+    color: var(--fg-2);
+  }
+  .figure .value {
+    font: 600 30px/1.1 var(--font-body);
+  }
+  .figure .note {
+    font-size: 13px;
+    color: var(--fg-3);
+  }
+
+  .chart {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+    position: relative;
+  }
+  .chart-title {
+    font-weight: 600;
+    font-size: 15px;
+  }
+  .chart-sub {
+    font-size: 13px;
+    color: var(--fg-3);
+    margin-top: -6px;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 13px;
+    color: var(--fg-2);
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend i {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+  .chart svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+  }
+  .chart svg text {
+    font: 12px var(--font-body);
+    fill: var(--fg-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .chart svg .cat {
+    font-weight: 600;
+    fill: var(--fg);
+  }
+  .chart svg .tick {
+    fill: var(--fg-3);
+    font-size: 11px;
+  }
+  .chart svg .gridline {
+    stroke: var(--grid);
+    stroke-width: 1;
+  }
+  .chart svg .bar {
+    cursor: default;
+  }
+  .chart svg .bar:hover,
+  .chart svg .bar:focus {
+    filter: brightness(1.15);
+    outline: none;
+  }
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--fg);
+    color: var(--bg);
+    font-size: 13px;
+    padding: 6px 9px;
+    border-radius: 6px;
+    white-space: nowrap;
+    z-index: 2;
+  }
+  .tooltip b {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .tooltip[hidden] {
+    display: none !important;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  th,
+  td {
+    padding: 7px 10px;
+    text-align: right;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--grid);
+  }
+  th:first-child,
+  td:first-child {
+    text-align: left;
+  }
+  thead th {
+    font-weight: 600;
+    color: var(--fg-2);
+    background: var(--code-bg);
+    position: sticky;
+    top: 0;
+  }
+  tbody tr.group td {
+    font-weight: 600;
+    background: color-mix(in srgb, var(--code-bg) 50%, transparent);
+  }
+  td.delta-good {
+    color: var(--good);
+  }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tabs button {
+    font: 500 13px var(--font-body);
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--fg-2);
+    cursor: pointer;
+  }
+  .tabs button[aria-pressed='true'] {
+    background: var(--fg);
+    color: var(--bg);
+    border-color: var(--fg);
+  }
+  .tabs button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .callout {
+    border-left: 3px solid var(--accent);
+    padding: 4px 0 4px 14px;
+    color: var(--fg-2);
+  }
+  .opt {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .opt:last-child {
+    border-bottom: 0;
+  }
+  .opt .what {
+    font-weight: 600;
+  }
+  .opt .effect {
+    font: 13px var(--font-mono);
+    color: var(--good);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>
+
+<main>
+  <header style="display: flex; flex-direction: column; gap: 12px">
+    <div class="eyebrow">Benchmark report · TypeGPU 0.12.7</div>
+    <h1>
+      TypeGPU at runtime vs. WGSL pregenerated with
+      <code style="font-size: 0.8em">tgpu.resolve</code>
+    </h1>
+    <p class="lede" id="lede">
+      Some teams resolve all their TypeGPU shaders to WGSL at build time so they don't ship the
+      library. We rebuilt four docs examples both ways to see what that buys, then made the runtime
+      path cheaper.
+    </p>
+    <p class="meta" id="meta"></p>
+  </header>
+
+  <section id="summary">
+    <h2>Summary</h2>
+    <div class="figures" id="figures"></div>
+    <div id="summary-text">
+      <ul>
+        <li>
+          <strong>Pregenerating saves 78–90 kB of gzipped JS per app</strong>: everything except a
+          few kB of host code and the WGSL strings. On the mobile profile that alone is 470–600 ms
+          before any app code runs.
+        </li>
+        <li>
+          <strong>The first frame arrives 0.7–1.1 s later with runtime TypeGPU on mobile</strong>
+          (median per example), from download, parsing, and generating WGSL on the main thread.
+          Runtime variants also show 130–310 ms of total blocking time on mobile; pregenerated ones
+          show almost none.
+        </li>
+        <li>
+          <strong>The optimized TypeGPU ships 6.6% less gzipped JS</strong> (5.9–6.7 kB per app) and
+          starts its app code 20–90 ms sooner on mobile. CPU-side vector math got much cheaper:
+          jelly-slider spends a third of the JS time per frame it used to.
+        </li>
+        <li>
+          <strong>What's left is structural.</strong> The shader generator and the root object's
+          reach account for most of the remaining gap; see the last section.
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>What was compared</h2>
+    <p>
+      Four examples from the TypeGPU docs were extracted into standalone Vite apps, each in two
+      variants:
+    </p>
+    <ul>
+      <li>
+        <strong>Runtime</strong>: the docs example as written, with <code>typegpu</code> (and
+        <code>@typegpu/noise</code> / <code>@typegpu/sdf</code> where used) bundled and shaders
+        generated in the browser. Measured against the published 0.12.7 build and against the
+        optimized build from this work.
+      </li>
+      <li>
+        <strong>Pregenerated</strong>: the same shaders, resolved to WGSL at build time with
+        <code>tgpu.resolve</code> (through <code>unplugin-typegpu</code>), and host code written
+        against the raw WebGPU API. No TypeGPU code reaches the browser.
+      </li>
+    </ul>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Example</th>
+            <th>What it exercises</th>
+            <th>Shader modules</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>boids</td>
+            <td>1 compute + 1 instanced render pipeline, 1,000 agents</td>
+            <td>2</td>
+          </tr>
+          <tr>
+            <td>stable-fluid</td>
+            <td>9 compute passes per frame, textures, pointer input</td>
+            <td>12</td>
+          </tr>
+          <tr>
+            <td>slime-mold-3d</td>
+            <td>800k agents, 256³ volume, <code>@typegpu/noise</code>, ray-marched render</td>
+            <td>4</td>
+          </tr>
+          <tr>
+            <td>jelly-slider</td>
+            <td>SDF ray marching, TAA, <code>@typegpu/sdf</code> + noise, timestamp queries</td>
+            <td>4</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      Generated WGSL was checked to be equivalent between variants (by hooking
+      <code>createShaderModule</code>); the only differences are identifier names, binding numbers,
+      and explicit bounds checks where the runtime variant used guarded compute pipelines. Both
+      variants share the same controls UI and instrumentation code.
+    </p>
+  </section>
+
+  <section>
+    <h2>JavaScript shipped</h2>
+    <p>
+      Total JS of each production build (Vite 8, default minifier), compressed with gzip level 9.
+      This is what crosses the network.
+    </p>
+    <div class="chart" id="chart-size"></div>
+    <div id="size-text">
+      <p>
+        The pregenerated builds of slime-mold-3d and jelly-slider are larger than boids' because
+        they bundle <code>wgpu-matrix</code> (as do their runtime builds) and carry their WGSL as
+        strings: jelly-slider's shaders are about 29 kB of text before compression.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Loading: first frame and first interaction</h2>
+    <p>
+      Medians of <span class="runs"></span> cold loads each (fresh browser context, cache disabled,
+      one discarded warm-up). The <strong>mobile</strong> profile approximates Lighthouse's: 4× CPU
+      slowdown, 1.6 Mbps down / 150 ms RTT. <strong>Desktop</strong> has no throttling.
+    </p>
+    <div class="tabs" role="group" aria-label="Device profile">
+      <button type="button" id="tab-mobile" aria-pressed="true" data-profile="mobile">
+        Mobile profile
+      </button>
+      <button type="button" id="tab-desktop" aria-pressed="false" data-profile="desktop">
+        Desktop profile
+      </button>
+    </div>
+    <div class="chart" id="chart-interaction"></div>
+    <div class="chart" id="chart-frame"></div>
+    <div class="chart" id="chart-tbt"></div>
+    <div class="chart" id="chart-framecpu"></div>
+    <div id="load-text">
+      <p>
+        On the mobile profile the runtime variants start executing app code 470–600 ms after the
+        pregenerated ones, which is the extra download and parse. Generating WGSL then adds a
+        main-thread task of 180–280 ms before the first frame. The optimized build trims both a
+        little; most of the gap remains.
+      </p>
+      <p>
+        Per-frame JS is where the optimizations show most, in apps that do CPU-side vector math:
+        jelly-slider's slider physics builds many vectors per frame. The remaining per-frame
+        difference to pregenerated code is largely TypeGPU submitting each pass separately, while
+        the hand-written stable-fluid and slime-mold-3d variants record a frame into one command
+        encoder.
+      </p>
+      <p class="callout">
+        We also measured when a scripted click on the first control gets handled (see the table). On
+        SwiftShader that number mostly reflects when the emulated GPU releases the main thread after
+        the first submit, so it sometimes favors the runtime variant. It's reported, but not
+        charted.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>All metrics</h2>
+    <p>
+      Every median, per profile. "First interaction" is when the example's handler received a click
+      that a scripted user sent as soon as the first control was visible; "input delay" is how long
+      that click waited for the main thread.
+    </p>
+    <div class="tabs" role="group" aria-label="Table profile">
+      <button type="button" id="ttab-mobile" aria-pressed="true" data-profile="mobile">
+        Mobile profile
+      </button>
+      <button type="button" id="ttab-desktop" aria-pressed="false" data-profile="desktop">
+        Desktop profile
+      </button>
+    </div>
+    <div class="table-wrap"><table id="metrics-table"></table></div>
+  </section>
+
+  <section id="optimizations">
+    <h2>What changed in TypeGPU</h2>
+    <div id="opt-text">
+      <p>
+        Every change keeps the public API and the generated WGSL unchanged; the typegpu test suite
+        passes as before. They're on the <code>perf/typegpu-load-time</code> branch.
+      </p>
+      <div class="opt">
+        <div class="what">Dropped the <code>typed-binary</code> dependency</div>
+        <p>
+          TypeGPU used four small classes from it, but the package ships impure top-level code
+          (schema instances, compiled class fields), so bundlers kept all of it. A ~200-line
+          internal reader/writer replaces it.
+        </p>
+        <div class="effect">−12.9 kB minified · −2.9 kB gzip in every app</div>
+      </div>
+      <div class="opt">
+        <div class="what">
+          Marked <code>dualImpl</code>, <code>struct</code> and a signature helper as free of side
+          effects
+        </div>
+        <p>
+          Bundlers dropped the unused <code>std</code> bindings but kept the
+          <code>dualImpl({…})</code> calls that created them, along with their CPU implementations.
+          With <code>/*#__NO_SIDE_EFFECTS__*/</code> (already used elsewhere in the package), unused
+          std functions now disappear: 54 dead calls in boids.
+        </p>
+        <div class="effect">−17.4 kB minified · −3.3 kB gzip in boids</div>
+      </div>
+      <div class="opt">
+        <div class="what">Console-log serializers are created on first use</div>
+        <p>
+          About 30 <code>tgpu.fn</code> objects for shader-side <code>console.log</code> were built
+          on import, in every app, logging or not.
+        </p>
+        <div class="effect">TypeGPU module evaluation 47 → 39 ms at 4× CPU (boids)</div>
+      </div>
+      <div class="opt">
+        <div class="what">Faster CPU-side vectors</div>
+        <p>
+          <code>d.vec2f(x, y)</code> copied its arguments into an intermediate array, and each
+          component was cast through the callable <code>d.f32</code> schema, behind a getter that
+          allocated a fresh object. A scalar-only fast path and direct cast functions fix all three.
+          This matters for apps that create many vectors while filling buffers, like the initial
+          boids positions.
+        </p>
+        <div class="effect">
+          d.vec2f(x, y): ~700 → ~115 ns per call warm; 4,000 vectors in a fresh process: 9–20 → 2–3
+          ms
+        </div>
+      </div>
+      <div class="opt">
+        <div class="what">No uniform-alignment analysis when its warning is off</div>
+        <p>
+          Every <code>$usage('uniform')</code> computed full memory layouts to decide whether to
+          warn about non-portable alignment, a warning that is silenced in production builds. The
+          logger can now say whether a warning would be shown, and the check is skipped otherwise.
+        </p>
+        <div class="effect">Less setup work per uniform buffer in production builds</div>
+      </div>
+      <div class="opt">
+        <div class="what">Less work on shader generation's happy path</div>
+        <p>
+          The numeric-literal check stringified the AST node for its error message on every literal;
+          messages are now built only on failure. Each pipeline's namespace no longer copies ~500
+          reserved words into a new Set, function externals aren't copied when there's nothing to
+          merge, texture views reuse their value proxy, and the hottest type guards test the cheap
+          property first.
+        </p>
+        <div class="effect">
+          Warm resolve −20–25% (stable-fluid 10.5 → 7.8 ms); cold first resolve −3–9%
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="analysis">
+    <h2>Where the remaining cost comes from</h2>
+    <div id="analysis-text">
+      <p>
+        These are the reasons a runtime TypeGPU app stays behind a pregenerated one, even after the
+        changes above. None of them can be fixed with local tweaks; each needs an architectural
+        decision.
+      </p>
+      <h3>The root object reaches everything</h3>
+      <p>
+        <code>tgpu.init()</code> returns a root whose methods create buffers, textures, samplers,
+        query sets, pipelines and command encoders. Bundlers can't drop unused class methods, so an
+        app that only calls <code>tgpu.init()</code> and creates one buffer already ships about 320
+        kB (80 kB gzip). In practice every app ships the whole library, including texture uploads,
+        mipmap generation, timestamp queries and the shader-side <code>console.log</code> machinery.
+      </p>
+      <h3>The shader generator is a third of the bundle and runs cold</h3>
+      <p>
+        The WGSL generator and resolution context are 31% of TypeGPU's minified code in the boids
+        bundle (78 of 255 kB), and 39% with <code>std</code>, which serves both CPU and shader code.
+        Generation also runs exactly when it hurts most: during the first frame or the first
+        pipeline creation, on code the JIT has never seen. In Node, the first
+        <code>tgpu.resolve</code> of the boids shaders takes about 21 ms, and later ones about 2 ms.
+        That 10× cold penalty is spread across hundreds of small functions with no single hotspot.
+        Disabling lazy compilation doesn't remove it either, so it's interpretation and inline-cache
+        warm-up, not parsing.
+      </p>
+      <h3>Every dispatch and draw is its own submit</h3>
+      <p>
+        Pipeline <code>.dispatchWorkgroups()</code> and <code>.draw()</code> each create a command
+        encoder and call <code>queue.submit</code>. Raw WebGPU code usually records a whole frame
+        into one encoder, which is part of why pregenerated stable-fluid (9 passes per frame) spends
+        less CPU per frame.
+      </p>
+      <h3>Directions that would move these numbers</h3>
+      <ul>
+        <li>
+          <strong>Ship host-side TypeGPU without the generator.</strong> Precompiled pipelines could
+          take WGSL from <code>tgpu.resolve</code> at build time and still use TypeGPU's typed
+          buffers, layouts and pipelines. That keeps the API's safety and drops close to a third of
+          the library and all first-frame generation. This is what the pregenerated variants
+          approximate by hand.
+        </li>
+        <li>
+          <strong>Make subsystems opt-in.</strong> Separate entry points or plugins for textures,
+          query sets and logging would let bundlers drop what an app doesn't use.
+        </li>
+        <li>
+          <strong>Batch submits by default.</strong> Record into a per-frame encoder and submit
+          once.
+        </li>
+        <li>
+          <strong>For apps:</strong> creating pipelines during an idle period, before the first
+          frame or after the UI is wired, keeps the long generation task away from the first
+          interaction.
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Method and caveats</h2>
+    <ul>
+      <li>
+        Headless Chromium 141 with WebGPU on SwiftShader (Vulkan, CPU-emulated GPU). GPU-side times,
+        especially shader compilation and the frame rate of the heavier scenes, are much slower than
+        on real hardware and identical between variants, since the WGSL is the same. Read the
+        first-frame numbers for their difference, not their absolute value.
+      </li>
+      <li>CPU throttling applies to the page's main thread only, not to the GPU process.</li>
+      <li>The static server serves gzip; brotli sizes are in the table.</li>
+      <li>
+        Frame CPU time is the JS time spent inside the frame callback, sampled after the first 10
+        frames. On SwiftShader the heavy scenes only render a handful of frames, so treat those
+        numbers as rough.
+      </li>
+      <li>
+        The harness, examples and scripts live in <code>apps/pregen-benchmark</code>;
+        <code>node scripts/build.ts</code> then <code>node scripts/bench.ts</code> reproduces the
+        results.
+      </li>
+    </ul>
+  </section>
+</main>
+
+<script>
+  const DATA = {
+    runs: 5,
+    date: '2026-10-19T22:50:23.917Z',
+    baseline: {
+      'boids/runtime': {
+        sizes: { raw: 303329, gzip: 83663, brotli: 70552 },
+        desktop: {
+          appStart: 64.70000000018626,
+          interactive: 103.5,
+          firstSubmit: 136.09999999962747,
+          firstFrame: 261.40000000037253,
+          firstInteractionHandled: 270.40000000037253,
+          firstInteractionDelay: 1,
+          domContentLoaded: 84.5,
+          jsTransferBytes: 83963,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 110.825,
+          jsHeapUsedMB: 5.111808776855469,
+          frameCpuMedianMs: 0.599999999627471,
+          frameCpuP90Ms: 1.6000000005587935,
+        },
+        mobile: {
+          appStart: 838.5,
+          interactive: 1033.8999999994412,
+          firstSubmit: 1155.2999999998137,
+          firstFrame: 1302.0999999996275,
+          firstInteractionHandled: 1360.2999999998137,
+          firstInteractionDelay: 7.2999999998137355,
+          domContentLoaded: 944.5999999996275,
+          jsTransferBytes: 83963,
+          totalBlockingTimeMs: 249,
+          longestTaskMs: 187,
+          scriptEvalMs: 485.217,
+          jsHeapUsedMB: 5.130893707275391,
+          frameCpuMedianMs: 2.8999999994412065,
+          frameCpuP90Ms: 6.099999999627471,
+        },
+      },
+      'boids/pregen': {
+        sizes: { raw: 9424, gzip: 3638, brotli: 3202 },
+        desktop: {
+          appStart: 26.90000000037253,
+          interactive: 56.09999999962747,
+          firstSubmit: 73.09999999962747,
+          firstFrame: 193.29999999981374,
+          firstInteractionHandled: 188.20000000018626,
+          firstInteractionDelay: 0.900000000372529,
+          domContentLoaded: 32.5,
+          jsTransferBytes: 3938,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 29.04,
+          jsHeapUsedMB: 2.8995513916015625,
+          frameCpuMedianMs: 0.20000000018626451,
+          frameCpuP90Ms: 0.30000000074505806,
+        },
+        mobile: {
+          appStart: 373.8999999994412,
+          interactive: 421.70000000018626,
+          firstSubmit: 426.70000000018626,
+          firstFrame: 598,
+          firstInteractionHandled: 658.2999999998137,
+          firstInteractionDelay: 5.400000000372529,
+          domContentLoaded: 393.29999999981374,
+          jsTransferBytes: 3938,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 75.84100000000001,
+          jsHeapUsedMB: 2.9586181640625,
+          frameCpuMedianMs: 0.8999999994412065,
+          frameCpuP90Ms: 1.599999999627471,
+        },
+      },
+      'jelly-slider/runtime': {
+        sizes: { raw: 452550, gzip: 116818, brotli: 97583 },
+        desktop: {
+          appStart: 91.5,
+          interactive: 308.70000000018626,
+          firstSubmit: 321.59999999962747,
+          firstFrame: 1857.7999999998137,
+          firstInteractionHandled: 435.70000000018626,
+          firstInteractionDelay: 12.200000000186265,
+          domContentLoaded: 122.20000000018626,
+          jsTransferBytes: 117118,
+          totalBlockingTimeMs: 2,
+          longestTaskMs: 52,
+          scriptEvalMs: 624.405,
+          jsHeapUsedMB: 6.330471038818359,
+          frameCpuMedianMs: 13,
+          frameCpuP90Ms: 18.09999999962747,
+        },
+        mobile: {
+          appStart: 1084.0999999996275,
+          interactive: 2236.5,
+          firstSubmit: 2308.2999999998137,
+          firstFrame: 4163.4000000003725,
+          firstInteractionHandled: 4256.299999999814,
+          firstInteractionDelay: 98.20000000018626,
+          domContentLoaded: 1235.2000000001863,
+          jsTransferBytes: 117118,
+          totalBlockingTimeMs: 312,
+          longestTaskMs: 279,
+          scriptEvalMs: 2106.1459999999997,
+          jsHeapUsedMB: 6.110771179199219,
+          frameCpuMedianMs: 42.5,
+          frameCpuP90Ms: 56,
+        },
+      },
+      'jelly-slider/pregen': {
+        sizes: { raw: 87519, gzip: 24300, brotli: 20443 },
+        desktop: {
+          appStart: 28.600000000558794,
+          interactive: 171.29999999981374,
+          firstSubmit: 172.79999999981374,
+          firstFrame: 1706.2000000001863,
+          firstInteractionHandled: 1707,
+          firstInteractionDelay: 1.5,
+          domContentLoaded: 36.200000000186265,
+          jsTransferBytes: 24600,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 80.206,
+          jsHeapUsedMB: 3.202484130859375,
+          frameCpuMedianMs: 0.6999999992549419,
+          frameCpuP90Ms: 3.3999999994412065,
+        },
+        mobile: {
+          appStart: 487.3999999994412,
+          interactive: 1185.8999999994412,
+          firstSubmit: 1194.8999999994412,
+          firstFrame: 3135.5999999996275,
+          firstInteractionHandled: 3081.5,
+          firstInteractionDelay: 8.100000000558794,
+          domContentLoaded: 516.2000000001863,
+          jsTransferBytes: 24600,
+          totalBlockingTimeMs: 1,
+          longestTaskMs: 51,
+          scriptEvalMs: 229.59199999999998,
+          jsHeapUsedMB: 3.2282562255859375,
+          frameCpuMedianMs: 2.7999999998137355,
+          frameCpuP90Ms: 6.2999999998137355,
+        },
+      },
+      'slime-mold-3d/runtime': {
+        sizes: { raw: 388602, gzip: 101682, brotli: 84974 },
+        desktop: {
+          appStart: 75.5,
+          interactive: 139.6000000005588,
+          firstSubmit: 180.8999999994412,
+          firstFrame: 2583.2000000001863,
+          firstInteractionHandled: 331.29999999981374,
+          firstInteractionDelay: 1,
+          domContentLoaded: 103.3999999994412,
+          jsTransferBytes: 101982,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 102.9,
+          jsHeapUsedMB: 6.281745910644531,
+          frameCpuMedianMs: 0.599999999627471,
+          frameCpuP90Ms: 0.7999999998137355,
+        },
+        mobile: {
+          appStart: 922.3000000007451,
+          interactive: 1220.699999999255,
+          firstSubmit: 1349.5,
+          firstFrame: 3732.199999999255,
+          firstInteractionHandled: 3705.5,
+          firstInteractionDelay: 4.2000000001862645,
+          domContentLoaded: 1040.5,
+          jsTransferBytes: 101982,
+          totalBlockingTimeMs: 234,
+          longestTaskMs: 189,
+          scriptEvalMs: 381.55899999999997,
+          jsHeapUsedMB: 6.142173767089844,
+          frameCpuMedianMs: 4.2999999998137355,
+          frameCpuP90Ms: 4.2999999998137355,
+        },
+      },
+      'slime-mold-3d/pregen': {
+        sizes: { raw: 65435, gzip: 16580, brotli: 13740 },
+        desktop: {
+          appStart: 30.40000000037253,
+          interactive: 62.40000000037253,
+          firstSubmit: 71.20000000018626,
+          firstFrame: 2432.899999999441,
+          firstInteractionHandled: 433.59999999962747,
+          firstInteractionDelay: 1.400000000372529,
+          domContentLoaded: 36.90000000037253,
+          jsTransferBytes: 16880,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 30.551,
+          jsHeapUsedMB: 2.8968505859375,
+          frameCpuMedianMs: 0.30000000074505806,
+          frameCpuP90Ms: 2.699999999254942,
+        },
+        mobile: {
+          appStart: 442.70000000018626,
+          interactive: 499.70000000018626,
+          firstSubmit: 503.90000000037253,
+          firstFrame: 3305.9000000003725,
+          firstInteractionHandled: 808.8000000007451,
+          firstInteractionDelay: 5.7999999998137355,
+          domContentLoaded: 464.90000000037253,
+          jsTransferBytes: 16880,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 96.54899999999999,
+          jsHeapUsedMB: 2.95758056640625,
+          frameCpuMedianMs: 1.2999999998137355,
+          frameCpuP90Ms: 1.2999999998137355,
+        },
+      },
+      'stable-fluid/runtime': {
+        sizes: { raw: 328744, gzip: 87462, brotli: 73736 },
+        desktop: {
+          appStart: 71,
+          interactive: 337.09999999962747,
+          firstSubmit: 334.09999999962747,
+          firstFrame: 1295.8999999994412,
+          firstInteractionHandled: 625.8999999994412,
+          firstInteractionDelay: 1.3999999994412065,
+          domContentLoaded: 93.59999999962747,
+          jsTransferBytes: 87762,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 110.064,
+          jsHeapUsedMB: 5.018852233886719,
+          frameCpuMedianMs: 0.7999999998137355,
+          frameCpuP90Ms: 2.2000000001862645,
+        },
+        mobile: {
+          appStart: 877.0999999996275,
+          interactive: 3232.100000000559,
+          firstSubmit: 3220.100000000559,
+          firstFrame: 4388.799999999814,
+          firstInteractionHandled: 4476,
+          firstInteractionDelay: 7.5,
+          domContentLoaded: 981.0999999996275,
+          jsTransferBytes: 87762,
+          totalBlockingTimeMs: 134,
+          longestTaskMs: 184,
+          scriptEvalMs: 435.66700000000003,
+          jsHeapUsedMB: 4.972064971923828,
+          frameCpuMedianMs: 4.099999999627471,
+          frameCpuP90Ms: 9.900000000372529,
+        },
+      },
+      'stable-fluid/pregen': {
+        sizes: { raw: 23804, gzip: 6116, brotli: 5429 },
+        desktop: {
+          appStart: 29.799999999813735,
+          interactive: 253.20000000018626,
+          firstSubmit: 251.5,
+          firstFrame: 1027.5999999996275,
+          firstInteractionHandled: 1362.5999999996275,
+          firstInteractionDelay: 3.400000000372529,
+          domContentLoaded: 36.700000000186265,
+          jsTransferBytes: 6416,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 40.660000000000004,
+          jsHeapUsedMB: 2.8850326538085938,
+          frameCpuMedianMs: 0.2999999998137355,
+          frameCpuP90Ms: 0.599999999627471,
+        },
+        mobile: {
+          appStart: 388.59999999962747,
+          interactive: 2449.100000000559,
+          firstSubmit: 2437.600000000559,
+          firstFrame: 3337.4000000003725,
+          firstInteractionHandled: 3788.100000000559,
+          firstInteractionDelay: 7.7999999998137355,
+          domContentLoaded: 408.5,
+          jsTransferBytes: 6416,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 125.46,
+          jsHeapUsedMB: 2.996234893798828,
+          frameCpuMedianMs: 1.199999999254942,
+          frameCpuP90Ms: 2.900000000372529,
+        },
+      },
+    },
+    optimized: {
+      'boids/runtime': {
+        sizes: { raw: 273345, gzip: 77497, brotli: 65712 },
+        desktop: {
+          appStart: 58.59999999962747,
+          interactive: 99.09999999962747,
+          firstSubmit: 122.5,
+          firstFrame: 242,
+          firstInteractionHandled: 251.29999999981374,
+          firstInteractionDelay: 0.900000000372529,
+          domContentLoaded: 76.09999999962747,
+          jsTransferBytes: 77797,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 94.529,
+          jsHeapUsedMB: 4.536029815673828,
+          frameCpuMedianMs: 0.599999999627471,
+          frameCpuP90Ms: 0.900000000372529,
+        },
+        mobile: {
+          appStart: 780.5,
+          interactive: 951.5,
+          firstSubmit: 1092.4000000003725,
+          firstFrame: 1227.0999999996275,
+          firstInteractionHandled: 1284.5999999996275,
+          firstInteractionDelay: 8.899999999441206,
+          domContentLoaded: 872.6000000005588,
+          jsTransferBytes: 77797,
+          totalBlockingTimeMs: 206,
+          longestTaskMs: 175,
+          scriptEvalMs: 421.509,
+          jsHeapUsedMB: 4.5880584716796875,
+          frameCpuMedianMs: 2.2999999998137355,
+          frameCpuP90Ms: 5.5,
+        },
+      },
+      'jelly-slider/runtime': {
+        sizes: { raw: 422146, gzip: 110789, brotli: 92919 },
+        desktop: {
+          appStart: 94.70000000018626,
+          interactive: 313.79999999981374,
+          firstSubmit: 327.09999999962747,
+          firstFrame: 1844.0999999996275,
+          firstInteractionHandled: 415.19999999925494,
+          firstInteractionDelay: 4.3999999994412065,
+          domContentLoaded: 121.8999999994412,
+          jsTransferBytes: 111089,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 275.071,
+          jsHeapUsedMB: 6.343418121337891,
+          frameCpuMedianMs: 3.2000000001862645,
+          frameCpuP90Ms: 8.299999999813735,
+        },
+        mobile: {
+          appStart: 996.6999999992549,
+          interactive: 2158.2999999998137,
+          firstSubmit: 2221.7000000001863,
+          firstFrame: 4087.699999999255,
+          firstInteractionHandled: 4010.7000000001863,
+          firstInteractionDelay: 34.799999999813735,
+          domContentLoaded: 1148.3999999994412,
+          jsTransferBytes: 111089,
+          totalBlockingTimeMs: 264,
+          longestTaskMs: 239,
+          scriptEvalMs: 952.446,
+          jsHeapUsedMB: 5.8315582275390625,
+          frameCpuMedianMs: 14.399999999441206,
+          frameCpuP90Ms: 21.09999999962747,
+        },
+      },
+      'slime-mold-3d/runtime': {
+        sizes: { raw: 356840, gzip: 95425, brotli: 80095 },
+        desktop: {
+          appStart: 67.79999999981374,
+          interactive: 129.29999999981374,
+          firstSubmit: 169.29999999981374,
+          firstFrame: 2463,
+          firstInteractionHandled: 541.2999999998137,
+          firstInteractionDelay: 1,
+          domContentLoaded: 90.90000000037253,
+          jsTransferBytes: 95725,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 88.785,
+          jsHeapUsedMB: 5.5783233642578125,
+          frameCpuMedianMs: 0.5,
+          frameCpuP90Ms: 1.3999999994412065,
+        },
+        mobile: {
+          appStart: 905.2999999998137,
+          interactive: 1232.4000000003725,
+          firstSubmit: 1401.4000000003725,
+          firstFrame: 3934.5,
+          firstInteractionHandled: 3538,
+          firstInteractionDelay: 4.7000000001862645,
+          domContentLoaded: 1016.2999999998137,
+          jsTransferBytes: 95725,
+          totalBlockingTimeMs: 274,
+          longestTaskMs: 195,
+          scriptEvalMs: 429.782,
+          jsHeapUsedMB: 5.600231170654297,
+          frameCpuMedianMs: 0.6000000005587935,
+          frameCpuP90Ms: 0.6000000005587935,
+        },
+      },
+      'stable-fluid/runtime': {
+        sizes: { raw: 294794, gzip: 80621, brotli: 68372 },
+        desktop: {
+          appStart: 73.6000000005588,
+          interactive: 341.1000000005588,
+          firstSubmit: 338.90000000037253,
+          firstFrame: 1262.800000000745,
+          firstInteractionHandled: 436.1000000005588,
+          firstInteractionDelay: 1.400000000372529,
+          domContentLoaded: 96.5,
+          jsTransferBytes: 80921,
+          totalBlockingTimeMs: 0,
+          longestTaskMs: 0,
+          scriptEvalMs: 108.229,
+          jsHeapUsedMB: 5.986911773681641,
+          frameCpuMedianMs: 0.7999999998137355,
+          frameCpuP90Ms: 4,
+        },
+        mobile: {
+          appStart: 806.7000000001863,
+          interactive: 3189.2000000001863,
+          firstSubmit: 3174.399999999441,
+          firstFrame: 4346.5999999996275,
+          firstInteractionHandled: 4445.799999999814,
+          firstInteractionDelay: 10.299999999813735,
+          domContentLoaded: 902.8999999994412,
+          jsTransferBytes: 80921,
+          totalBlockingTimeMs: 106,
+          longestTaskMs: 156,
+          scriptEvalMs: 365.996,
+          jsHeapUsedMB: 5.12298583984375,
+          frameCpuMedianMs: 3.7999999998137355,
+          frameCpuP90Ms: 9.699999999254942,
+        },
+      },
+    },
+  };
+  const EXAMPLES = ['boids', 'stable-fluid', 'slime-mold-3d', 'jelly-slider'];
+  const SERIES = [
+    { key: 'base', name: 'Runtime · typegpu 0.12.7', color: 'var(--s1)' },
+    { key: 'opt', name: 'Runtime · optimized typegpu', color: 'var(--s2)' },
+    { key: 'pregen', name: 'Pregenerated WGSL', color: 'var(--s3)' },
+  ];
+
+  function get(series, example, path) {
+    const src = series === 'opt' ? DATA.optimized : DATA.baseline;
+    const variant = series === 'pregen' ? 'pregen' : 'runtime';
+    let v = src[`${example}/${variant}`];
+    for (const p of path) v = v?.[p];
+    return v;
+  }
+  const fmtKB = (b) => `${(b / 1024).toFixed(1)} kB`;
+  const fmtMs = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${Math.round(ms)} ms`);
+
+  function niceMax(v) {
+    const p = 10 ** Math.floor(Math.log10(v || 1));
+    for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+    return v;
+  }
+
+  function barChart(el, { title, sub, valueOf, fmt, ticksFmt }) {
+    el.replaceChildren();
+    const t = document.createElement('div');
+    t.className = 'chart-title';
+    t.textContent = title;
+    el.append(t);
+    if (sub) {
+      const s = document.createElement('div');
+      s.className = 'chart-sub';
+      s.textContent = sub;
+      el.append(s);
+    }
+    const legend = document.createElement('div');
+    legend.className = 'legend';
+    for (const s of SERIES) {
+      const span = document.createElement('span');
+      const i = document.createElement('i');
+      i.style.background = s.color;
+      span.append(i, document.createTextNode(s.name));
+      legend.append(span);
+    }
+    el.append(legend);
+
+    const W = 700,
+      labelW = 110,
+      valueW = 64,
+      barH = 14,
+      gap = 2,
+      groupGap = 18;
+    const groupH = SERIES.length * (barH + gap) - gap;
+    const H = 20 + EXAMPLES.length * (groupH + groupGap);
+    const plotW = W - labelW - valueW;
+    const values = EXAMPLES.flatMap((e) => SERIES.map((s) => valueOf(s.key, e))).filter((v) =>
+      Number.isFinite(v),
+    );
+    const max = niceMax(Math.max(...values));
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', title);
+    const mk = (tag, attrs) => {
+      const n = document.createElementNS(ns, tag);
+      for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+      return n;
+    };
+
+    for (let i = 0; i <= 4; i++) {
+      const x = labelW + (plotW * i) / 4;
+      svg.append(mk('line', { x1: x, x2: x, y1: 14, y2: H, class: 'gridline' }));
+      const tx = mk('text', {
+        x,
+        y: 10,
+        'text-anchor': i === 0 ? 'start' : 'middle',
+        class: 'tick',
+      });
+      tx.textContent = (ticksFmt ?? fmt)((max * i) / 4);
+      svg.append(tx);
+    }
+
+    const tip = document.createElement('div');
+    tip.className = 'tooltip';
+    tip.hidden = true;
+    EXAMPLES.forEach((e, gi) => {
+      const y0 = 20 + gi * (groupH + groupGap);
+      const cat = mk('text', { x: 0, y: y0 + groupH / 2 + 4, class: 'cat' });
+      cat.textContent = e;
+      svg.append(cat);
+      SERIES.forEach((s, si) => {
+        const v = valueOf(s.key, e);
+        if (!Number.isFinite(v)) return;
+        const y = y0 + si * (barH + gap);
+        const w = Math.max(2, (plotW * v) / max);
+        const r = Math.min(4, w / 2);
+        const path = `M${labelW},${y} h${w - r} a${r},${r} 0 0 1 ${r},${r} v${barH - 2 * r} a${r},${r} 0 0 1 -${r},${r} h-${w - r} z`;
+        const bar = mk('path', { d: path, fill: s.color, class: 'bar', tabindex: '0' });
+        bar.setAttribute('aria-label', `${e}, ${s.name}: ${fmt(v)}`);
+        const show = (ev) => {
+          tip.replaceChildren();
+          const b = document.createElement('b');
+          b.textContent = fmt(v);
+          tip.append(b, document.createTextNode(` · ${s.name} · ${e}`));
+          tip.hidden = false;
+          const box = el.getBoundingClientRect();
+          const bb = bar.getBoundingClientRect();
+          const left = Math.min(bb.right - box.left + 8, box.width - tip.offsetWidth - 8);
+          tip.style.left = `${Math.max(8, left)}px`;
+          tip.style.top = `${bb.top - box.top - 6}px`;
+        };
+        bar.addEventListener('pointerenter', show);
+        bar.addEventListener('focus', show);
+        bar.addEventListener('pointerleave', () => (tip.hidden = true));
+        bar.addEventListener('blur', () => (tip.hidden = true));
+        svg.append(bar);
+        const lbl = mk('text', { x: labelW + w + 6, y: y + barH - 3 });
+        lbl.textContent = fmt(v);
+        svg.append(lbl);
+      });
+    });
+    el.append(svg, tip);
+  }
+
+  function renderSizes() {
+    barChart(document.getElementById('chart-size'), {
+      title: 'JS transferred, gzip',
+      sub: 'All JavaScript of the page, including example code and wgpu-matrix where used',
+      valueOf: (s, e) => get(s, e, ['sizes', 'gzip']),
+      fmt: fmtKB,
+    });
+  }
+
+  let loadProfile = 'mobile';
+  function renderLoad() {
+    const p = loadProfile;
+    barChart(document.getElementById('chart-interaction'), {
+      title: 'Time until the UI is ready',
+      sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · from navigation start until every control handler is attached`,
+      valueOf: (s, e) => get(s, e, [p, 'interactive']),
+      fmt: fmtMs,
+    });
+    barChart(document.getElementById('chart-frame'), {
+      title: 'Time to first frame submitted',
+      sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · first queue.submit of the first frame; excludes GPU execution`,
+      valueOf: (s, e) => get(s, e, [p, 'firstSubmit']),
+      fmt: fmtMs,
+    });
+    barChart(document.getElementById('chart-tbt'), {
+      title: 'Total blocking time until first frame',
+      sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · sum of long-task time above 50 ms`,
+      valueOf: (s, e) => get(s, e, [p, 'totalBlockingTimeMs']),
+      fmt: fmtMs,
+    });
+    barChart(document.getElementById('chart-framecpu'), {
+      title: 'JavaScript time per frame',
+      sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · median CPU time spent in the frame callback, after the first 10 frames`,
+      valueOf: (s, e) => get(s, e, [p, 'frameCpuMedianMs']),
+      fmt: (v) => `${v.toFixed(1)} ms`,
+    });
+  }
+
+  const METRICS = [
+    ['JS raw', (s, e) => get(s, e, ['sizes', 'raw']), fmtKB],
+    ['JS gzip', (s, e) => get(s, e, ['sizes', 'gzip']), fmtKB],
+    ['JS brotli', (s, e) => get(s, e, ['sizes', 'brotli']), fmtKB],
+    ['App code starts', (s, e, p) => get(s, e, [p, 'appStart']), fmtMs],
+    ['UI interactive', (s, e, p) => get(s, e, [p, 'interactive']), fmtMs],
+    ['First frame submitted', (s, e, p) => get(s, e, [p, 'firstSubmit']), fmtMs],
+    ['First frame on GPU done', (s, e, p) => get(s, e, [p, 'firstFrame']), fmtMs],
+    ['First interaction handled', (s, e, p) => get(s, e, [p, 'firstInteractionHandled']), fmtMs],
+    ['Input delay', (s, e, p) => get(s, e, [p, 'firstInteractionDelay']), fmtMs],
+    ['Total blocking time', (s, e, p) => get(s, e, [p, 'totalBlockingTimeMs']), fmtMs],
+    ['Longest task', (s, e, p) => get(s, e, [p, 'longestTaskMs']), fmtMs],
+    ['Script evaluation', (s, e, p) => get(s, e, [p, 'scriptEvalMs']), fmtMs],
+    ['JS heap', (s, e, p) => get(s, e, [p, 'jsHeapUsedMB']), (v) => `${v.toFixed(1)} MB`],
+    [
+      'Frame CPU, median',
+      (s, e, p) => get(s, e, [p, 'frameCpuMedianMs']),
+      (v) => `${v.toFixed(2)} ms`,
+    ],
+  ];
+
+  let tableProfile = 'mobile';
+  function renderTable() {
+    const table = document.getElementById('metrics-table');
+    table.replaceChildren();
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    for (const h of ['Metric', ...SERIES.map((s) => s.name), 'Optimized vs 0.12.7']) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      hr.append(th);
+    }
+    thead.append(hr);
+    table.append(thead);
+    const tbody = document.createElement('tbody');
+    for (const e of EXAMPLES) {
+      const gr = document.createElement('tr');
+      gr.className = 'group';
+      const gtd = document.createElement('td');
+      gtd.colSpan = SERIES.length + 2;
+      gtd.textContent = e;
+      gr.append(gtd);
+      tbody.append(gr);
+      for (const [name, fn, fmt] of METRICS) {
+        const tr = document.createElement('tr');
+        const td0 = document.createElement('td');
+        td0.textContent = name;
+        tr.append(td0);
+        const vals = SERIES.map((s) => fn(s.key, e, tableProfile));
+        for (const v of vals) {
+          const td = document.createElement('td');
+          td.textContent = Number.isFinite(v) ? fmt(v) : '–';
+          tr.append(td);
+        }
+        const td = document.createElement('td');
+        const [b, o] = vals;
+        if (Number.isFinite(b) && Number.isFinite(o) && b > 0) {
+          const pct = ((o - b) / b) * 100;
+          td.textContent = `${pct > 0 ? '+' : ''}${pct.toFixed(0)}%`;
+          if (pct <= -5) td.className = 'delta-good';
+        } else td.textContent = '–';
+        tr.append(td);
+        tbody.append(tr);
+      }
+    }
+    table.append(tbody);
+  }
+
+  function wireTabs(prefix, set) {
+    for (const id of ['mobile', 'desktop']) {
+      document.getElementById(`${prefix}-${id}`).addEventListener('click', () => {
+        for (const o of ['mobile', 'desktop'])
+          document.getElementById(`${prefix}-${o}`).setAttribute('aria-pressed', String(o === id));
+        set(id);
+      });
+    }
+  }
+
+  function figure(label, value, note) {
+    const d = document.createElement('div');
+    d.className = 'figure';
+    const l = document.createElement('div');
+    l.className = 'label';
+    l.textContent = label;
+    const v = document.createElement('div');
+    v.className = 'value';
+    v.textContent = value;
+    const n = document.createElement('div');
+    n.className = 'note';
+    n.textContent = note;
+    d.append(l, v, n);
+    return d;
+  }
+
+  function avg(xs) {
+    return xs.reduce((a, b) => a + b, 0) / xs.length;
+  }
+  function renderFigures() {
+    const ratio = avg(
+      EXAMPLES.map((e) => get('base', e, ['sizes', 'gzip']) - get('pregen', e, ['sizes', 'gzip'])),
+    );
+    const sizeCut = avg(
+      EXAMPLES.map((e) => 1 - get('opt', e, ['sizes', 'gzip']) / get('base', e, ['sizes', 'gzip'])),
+    );
+    const tti = avg(
+      EXAMPLES.map(
+        (e) =>
+          get('base', e, ['mobile', 'firstSubmit']) - get('pregen', e, ['mobile', 'firstSubmit']),
+      ),
+    );
+    const ttiOpt = avg(
+      EXAMPLES.map(
+        (e) => get('base', e, ['mobile', 'firstSubmit']) - get('opt', e, ['mobile', 'firstSubmit']),
+      ),
+    );
+    const f = document.getElementById('figures');
+    f.append(
+      figure(
+        'Extra JS for runtime TypeGPU',
+        `+${fmtKB(ratio)}`,
+        'gzip, average over the four examples',
+      ),
+      figure(
+        'Later first frame (mobile)',
+        `+${fmtMs(tti)}`,
+        'runtime 0.12.7 vs. pregenerated, average',
+      ),
+      figure(
+        'Smaller runtime bundle',
+        `−${(sizeCut * 100).toFixed(1)}%`,
+        'optimized vs. 0.12.7, gzip, average',
+      ),
+      figure(
+        'JS per frame, jelly-slider (mobile)',
+        `${get('base', 'jelly-slider', ['mobile', 'frameCpuMedianMs']).toFixed(1)} → ${get('opt', 'jelly-slider', ['mobile', 'frameCpuMedianMs']).toFixed(1)} ms`,
+        'optimized vs. 0.12.7, median',
+      ),
+    );
+  }
+
+  document.querySelectorAll('.runs').forEach((n) => (n.textContent = String(DATA.runs)));
+  document.getElementById('meta').textContent =
+    `Measured ${new Date(DATA.date).toISOString().slice(0, 10)} · headless Chromium 141, WebGPU on SwiftShader · ${DATA.runs} runs per cell`;
+  renderFigures();
+  renderSizes();
+  renderLoad();
+  renderTable();
+  wireTabs('tab', (p) => {
+    loadProfile = p;
+    renderLoad();
+  });
+  wireTabs('ttab', (p) => {
+    tableProfile = p;
+    renderTable();
+  });
+</script>
