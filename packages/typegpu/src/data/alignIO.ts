@@ -1,4 +1,4 @@
-import type { IMeasurer, ISerialInput, ISerialOutput } from 'typed-binary';
+import type { IMeasurer, ISerialInput, ISerialOutput } from './binaryIO.ts';
 
 /**
  * @param io the IO to align

@@ -286,6 +286,20 @@ function makeVecSchema<TValue, S extends number | boolean>(
   const componentCount = length as 2 | 3 | 4;
 
   const cpuConstruct = (...args: (S | AnyVecInstance)[]): TValue => {
+    // Fast path for the most common case: only scalars, one for each component (or one to splat)
+    if (args.length === componentCount || args.length <= 1) {
+      let allScalars = true;
+      for (const arg of args) {
+        if (typeof arg !== 'number' && typeof arg !== 'boolean') {
+          allScalars = false;
+          break;
+        }
+      }
+      if (allScalars) {
+        return new VecImpl(...(args as S[])) as TValue;
+      }
+    }
+
     const values: S[] = Array.from({ length: args.length });
 
     let j = 0;

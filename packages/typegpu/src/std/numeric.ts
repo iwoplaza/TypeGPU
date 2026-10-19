@@ -80,6 +80,7 @@ const variadicUnifySignature = (...args: BaseData[]) => {
 };
 
 export const unifyRestrictedSignature =
+  /*#__NO_SIDE_EFFECTS__*/
   (restrict: BaseData[]) =>
   (...args: BaseData[]) => {
     const uargs = unify(args, restrict);

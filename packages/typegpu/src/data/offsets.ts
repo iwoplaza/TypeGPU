@@ -1,4 +1,4 @@
-import { Measurer } from 'typed-binary';
+import { Measurer } from './binaryIO.ts';
 import { roundUp } from '../mathUtils.ts';
 import alignIO from './alignIO.ts';
 import { alignmentOf, customAlignmentOf } from './alignmentOf.ts';

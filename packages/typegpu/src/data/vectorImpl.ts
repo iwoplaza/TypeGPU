@@ -7,6 +7,13 @@ import { WORKAROUND_getSchema, type BaseData, type VecKind } from './wgslTypes.t
 
 type ElementSchema<S> = BaseData & ((v?: S) => S);
 
+// Shared between all instances, so that casting elements doesn't allocate
+const boolInternal = { elementSchema: bool };
+const f16Internal = { elementSchema: f16 };
+const f32Internal = { elementSchema: f32 };
+const i32Internal = { elementSchema: i32 };
+const u32Internal = { elementSchema: u32 };
+
 const XYZW = ['x', 'y', 'z', 'w'];
 const RGBA = ['r', 'g', 'b', 'a'];
 
@@ -121,8 +128,9 @@ abstract class Vec2<S> extends VecBase<S> implements Tuple2<S> {
 
   constructor(x?: S, y?: S) {
     super(2);
-    this.e0 = this.castElement()(x);
-    this.e1 = this.castElement()(y ?? x);
+    const cast = this.castElement();
+    this.e0 = cast(x);
+    this.e1 = cast(y ?? x);
   }
 
   get 0() {
@@ -142,35 +150,35 @@ abstract class Vec2<S> extends VecBase<S> implements Tuple2<S> {
   }
 
   get x() {
-    return this[0];
+    return this.e0;
   }
 
   get y() {
-    return this[1];
+    return this.e1;
   }
 
   set x(value: S) {
-    this[0] = this.castElement()(value);
+    this[0] = value;
   }
 
   set y(value: S) {
-    this[1] = this.castElement()(value);
+    this[1] = value;
   }
 
   get r() {
-    return this[0];
+    return this.e0;
   }
 
   get g() {
-    return this[1];
+    return this.e1;
   }
 
   set r(value: S) {
-    this[0] = this.castElement()(value);
+    this[0] = value;
   }
 
   set g(value: S) {
-    this[1] = this.castElement()(value);
+    this[1] = value;
   }
 }
 
@@ -183,9 +191,10 @@ abstract class Vec3<S> extends VecBase<S> implements Tuple3<S> {
 
   constructor(x?: S, y?: S, z?: S) {
     super(3);
-    this.e0 = this.castElement()(x);
-    this.e1 = this.castElement()(y ?? x);
-    this.e2 = this.castElement()(z ?? x);
+    const cast = this.castElement();
+    this.e0 = cast(x);
+    this.e1 = cast(y ?? x);
+    this.e2 = cast(z ?? x);
   }
 
   get 0() {
@@ -213,51 +222,51 @@ abstract class Vec3<S> extends VecBase<S> implements Tuple3<S> {
   }
 
   get x() {
-    return this[0];
+    return this.e0;
   }
 
   get y() {
-    return this[1];
+    return this.e1;
   }
 
   get z() {
-    return this[2];
+    return this.e2;
   }
 
   set x(value: S) {
-    this[0] = this.castElement()(value);
+    this[0] = value;
   }
 
   set y(value: S) {
-    this[1] = this.castElement()(value);
+    this[1] = value;
   }
 
   set z(value: S) {
-    this[2] = this.castElement()(value);
+    this[2] = value;
   }
 
   get r() {
-    return this[0];
+    return this.e0;
   }
 
   get g() {
-    return this[1];
+    return this.e1;
   }
 
   get b() {
-    return this[2];
+    return this.e2;
   }
 
   set r(value: S) {
-    this[0] = this.castElement()(value);
+    this[0] = value;
   }
 
   set g(value: S) {
-    this[1] = this.castElement()(value);
+    this[1] = value;
   }
 
   set b(value: S) {
-    this[2] = this.castElement()(value);
+    this[2] = value;
   }
 }
 
@@ -271,10 +280,11 @@ abstract class Vec4<S> extends VecBase<S> implements Tuple4<S> {
 
   constructor(x?: S, y?: S, z?: S, w?: S) {
     super(4);
-    this.e0 = this.castElement()(x);
-    this.e1 = this.castElement()(y ?? x);
-    this.e2 = this.castElement()(z ?? x);
-    this.e3 = this.castElement()(w ?? x);
+    const cast = this.castElement();
+    this.e0 = cast(x);
+    this.e1 = cast(y ?? x);
+    this.e2 = cast(z ?? x);
+    this.e3 = cast(w ?? x);
   }
 
   get 0() {
@@ -310,19 +320,19 @@ abstract class Vec4<S> extends VecBase<S> implements Tuple4<S> {
   }
 
   get x() {
-    return this[0];
+    return this.e0;
   }
 
   get y() {
-    return this[1];
+    return this.e1;
   }
 
   get z() {
-    return this[2];
+    return this.e2;
   }
 
   get w() {
-    return this[3];
+    return this.e3;
   }
 
   set x(value: S) {
@@ -342,19 +352,19 @@ abstract class Vec4<S> extends VecBase<S> implements Tuple4<S> {
   }
 
   get r() {
-    return this[0];
+    return this.e0;
   }
 
   get g() {
-    return this[1];
+    return this.e1;
   }
 
   get b() {
-    return this[2];
+    return this.e2;
   }
 
   get a() {
-    return this[3];
+    return this.e3;
   }
 
   set r(value: S) {
@@ -376,9 +386,7 @@ abstract class Vec4<S> extends VecBase<S> implements Tuple4<S> {
 
 export class Vec2fImpl extends Vec2<number> {
   get [$internal]() {
-    return {
-      elementSchema: f32,
-    };
+    return f32Internal;
   }
 
   get kind() {
@@ -398,9 +406,7 @@ export class Vec2fImpl extends Vec2<number> {
 
 export class Vec2hImpl extends Vec2<number> {
   get [$internal]() {
-    return {
-      elementSchema: f16,
-    };
+    return f16Internal;
   }
 
   get kind() {
@@ -420,9 +426,7 @@ export class Vec2hImpl extends Vec2<number> {
 
 export class Vec2iImpl extends Vec2<number> {
   get [$internal]() {
-    return {
-      elementSchema: i32,
-    };
+    return i32Internal;
   }
 
   get kind() {
@@ -442,9 +446,7 @@ export class Vec2iImpl extends Vec2<number> {
 
 export class Vec2uImpl extends Vec2<number> {
   get [$internal]() {
-    return {
-      elementSchema: u32,
-    };
+    return u32Internal;
   }
 
   get kind() {
@@ -464,9 +466,7 @@ export class Vec2uImpl extends Vec2<number> {
 
 export class Vec2bImpl extends Vec2<boolean> {
   get [$internal]() {
-    return {
-      elementSchema: bool,
-    };
+    return boolInternal;
   }
 
   get kind() {
@@ -486,9 +486,7 @@ export class Vec2bImpl extends Vec2<boolean> {
 
 export class Vec3fImpl extends Vec3<number> {
   get [$internal]() {
-    return {
-      elementSchema: f32,
-    };
+    return f32Internal;
   }
 
   get kind() {
@@ -508,9 +506,7 @@ export class Vec3fImpl extends Vec3<number> {
 
 export class Vec3hImpl extends Vec3<number> {
   get [$internal]() {
-    return {
-      elementSchema: f16,
-    };
+    return f16Internal;
   }
 
   get kind() {
@@ -530,9 +526,7 @@ export class Vec3hImpl extends Vec3<number> {
 
 export class Vec3iImpl extends Vec3<number> {
   get [$internal]() {
-    return {
-      elementSchema: i32,
-    };
+    return i32Internal;
   }
 
   get kind() {
@@ -552,9 +546,7 @@ export class Vec3iImpl extends Vec3<number> {
 
 export class Vec3uImpl extends Vec3<number> {
   get [$internal]() {
-    return {
-      elementSchema: u32,
-    };
+    return u32Internal;
   }
 
   get kind() {
@@ -574,9 +566,7 @@ export class Vec3uImpl extends Vec3<number> {
 
 export class Vec3bImpl extends Vec3<boolean> {
   get [$internal]() {
-    return {
-      elementSchema: bool,
-    };
+    return boolInternal;
   }
 
   get kind() {
@@ -596,9 +586,7 @@ export class Vec3bImpl extends Vec3<boolean> {
 
 export class Vec4fImpl extends Vec4<number> {
   get [$internal]() {
-    return {
-      elementSchema: f32,
-    };
+    return f32Internal;
   }
 
   get kind() {
@@ -618,9 +606,7 @@ export class Vec4fImpl extends Vec4<number> {
 
 export class Vec4hImpl extends Vec4<number> {
   get [$internal]() {
-    return {
-      elementSchema: f16,
-    };
+    return f16Internal;
   }
 
   get kind() {
@@ -640,9 +626,7 @@ export class Vec4hImpl extends Vec4<number> {
 
 export class Vec4iImpl extends Vec4<number> {
   get [$internal]() {
-    return {
-      elementSchema: i32,
-    };
+    return i32Internal;
   }
 
   get kind() {
@@ -662,9 +646,7 @@ export class Vec4iImpl extends Vec4<number> {
 
 export class Vec4uImpl extends Vec4<number> {
   get [$internal]() {
-    return {
-      elementSchema: u32,
-    };
+    return u32Internal;
   }
 
   get kind() {
@@ -684,9 +666,7 @@ export class Vec4uImpl extends Vec4<number> {
 
 export class Vec4bImpl extends Vec4<boolean> {
   get [$internal]() {
-    return {
-      elementSchema: bool,
-    };
+    return boolInternal;
   }
 
   get kind() {

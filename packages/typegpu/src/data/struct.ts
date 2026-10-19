@@ -19,12 +19,14 @@ import type { AnyWgslData, BaseData, WgslStruct } from './wgslTypes.ts';
  * @param props Record with `string` keys and `TgpuData` values,
  * each entry describing one struct member.
  */
+/*#__NO_SIDE_EFFECTS__*/
 export function struct<TProps extends Record<string, AnyWgslData>>(
   props: TProps,
 ): WgslStruct<TProps> {
   return INTERNAL_createStruct(props, false);
 }
 
+/*#__NO_SIDE_EFFECTS__*/
 export function abstruct<TProps extends Record<string, AnyWgslData>>(
   props: TProps,
 ): WgslStruct<TProps> {

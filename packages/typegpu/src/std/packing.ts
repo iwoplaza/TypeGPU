@@ -1,4 +1,3 @@
-import * as TB from 'typed-binary';
 import { dualImpl } from '../core/function/dualImpl.ts';
 import { stitch } from '../core/resolve/stitch.ts';
 import { u32 } from '../data/numeric.ts';
@@ -6,20 +5,21 @@ import { clampScalar } from '../data/numberOps.ts';
 import { vec2f, vec4f, vec4i, vec4u } from '../data/vector.ts';
 import type { v2f, v4f, v4i, v4u } from '../data/wgslTypes.ts';
 import { readFloat16, writeFloat16 } from '../data/float16Conversion.ts';
+import { BufferReader, BufferWriter } from '../data/binaryIO.ts';
 
 const littleEndian = { endianness: 'little' } as const;
 const packedBuffer = new ArrayBuffer(4);
-const packedWriter = new TB.BufferWriter(packedBuffer, littleEndian);
-const packedReader = new TB.BufferReader(packedBuffer, littleEndian);
+const packedWriter = new BufferWriter(packedBuffer, littleEndian);
+const packedReader = new BufferReader(packedBuffer, littleEndian);
 
-function readPacked(value: number): TB.BufferReader {
+function readPacked(value: number): BufferReader {
   packedWriter.seekTo(0);
   packedWriter.writeUint32(value);
   packedReader.seekTo(0);
   return packedReader;
 }
 
-function writePacked(write: (writer: TB.BufferWriter) => void): number {
+function writePacked(write: (writer: BufferWriter) => void): number {
   packedWriter.seekTo(0);
   write(packedWriter);
   packedReader.seekTo(0);

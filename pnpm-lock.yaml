@@ -164,6 +164,37 @@ importers:
         specifier: ^3.1.0
         version: 3.1.1
 
+  apps/pregen-benchmark:
+    dependencies:
+      '@typegpu/noise':
+        specifier: workspace:*
+        version: link:../../packages/typegpu-noise
+      '@typegpu/sdf':
+        specifier: workspace:*
+        version: link:../../packages/typegpu-sdf
+      typegpu:
+        specifier: workspace:*
+        version: link:../../packages/typegpu
+      wgpu-matrix:
+        specifier: catalog:example
+        version: 3.4.0
+    devDependencies:
+      '@webgpu/types':
+        specifier: catalog:types
+        version: 0.1.71
+      playwright-core:
+        specifier: ^1.56.0
+        version: 1.64.1
+      typescript:
+        specifier: npm:tsover@^6.0.2
+        version: tsover@6.0.2
+      unplugin-typegpu:
+        specifier: workspace:*
+        version: link:../../packages/unplugin-typegpu
+      vite:
+        specifier: 8.0.5
+        version: 8.0.5(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@24.10.0)(esbuild@0.27.5)(jiti@2.6.1)(terser@5.44.1)(tsx@4.20.6)(yaml@2.8.3)
+
   apps/react-prerendering-test:
     dependencies:
       '@typegpu/color':
@@ -663,9 +694,6 @@ importers:
       tsover-runtime:
         specifier: ^0.0.7
         version: 0.0.7
-      typed-binary:
-        specifier: ^4.3.3
-        version: 4.3.3
     devDependencies:
       '@ark/attest':
         specifier: ^0.56.0
@@ -7983,6 +8011,11 @@ packages:
 
   platform@1.3.6:
     resolution: {integrity: sha512-fnWVljUchTro6RiCFvCXBbNhJc2NijN7oIQxbwsyL0buWJPG85v81ehlHI9fXrJsMNgTofEoWIQeClKpgxFLrg==}
+
+  playwright-core@1.64.1:
+    resolution: {integrity: sha512-BC4s8y6SEVA6Q1rSxZTto8hI1KUI3xXlHGZgvGqP4IqPdI/a6FX9H29IDNz7vKo9l21b6LfYosScPL6M3xxyDQ==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   pngjs@7.0.0:
     resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
@@ -17570,6 +17603,8 @@ snapshots:
       pathe: 2.0.3
 
   platform@1.3.6: {}
+
+  playwright-core@1.64.1: {}
 
   pngjs@7.0.0: {}
 

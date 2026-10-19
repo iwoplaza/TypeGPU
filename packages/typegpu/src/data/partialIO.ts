@@ -1,4 +1,4 @@
-import { BufferWriter, getSystemEndianness } from 'typed-binary';
+import { BufferWriter, getSystemEndianness } from './binaryIO.ts';
 import { roundUp } from '../mathUtils.ts';
 import { alignmentOf } from './alignmentOf.ts';
 import { getCompiledWriter } from './compiledIO.ts';

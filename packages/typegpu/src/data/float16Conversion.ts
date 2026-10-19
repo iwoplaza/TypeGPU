@@ -1,5 +1,4 @@
-import type { ISerialInput } from 'typed-binary';
-import type { ISerialOutput } from 'typed-binary';
+import type { ISerialInput, ISerialOutput } from './binaryIO.ts';
 import { fromHalfBits, toHalfBits } from './numeric.ts';
 
 export function writeFloat16(output: ISerialOutput, value: number): void {

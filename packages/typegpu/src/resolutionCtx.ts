@@ -66,7 +66,13 @@ import { isTgpuFn } from './core/function/tgpuFn.ts';
 import type { IOData } from './core/function/fnTypes.ts';
 import { AutoStruct } from './data/autoStruct.ts';
 import { EntryInputRouter } from './core/function/entryInputRouter.ts';
-import { validateIdentifier, sanitizePrimer, bannedTokens } from './nameUtils.ts';
+import {
+  validateIdentifier,
+  sanitizePrimer,
+  bannedTokens,
+  builtins,
+  templateEnumerants,
+} from './nameUtils.ts';
 import { minify } from './minify.ts';
 
 /**
@@ -491,6 +497,9 @@ export class ResolutionCtxImpl implements ResolutionCtx {
 
   isIdentifierTaken(name: string, scope: 'global' | 'block'): boolean {
     return (
+      bannedTokens.has(name) ||
+      builtins.has(name) ||
+      templateEnumerants.has(name) ||
       this.#namespaceInternal.takenGlobalIdentifiers.has(name) ||
       (scope === 'block'
         ? this._itemStateStack.isIdentifierTakenLocally(name)

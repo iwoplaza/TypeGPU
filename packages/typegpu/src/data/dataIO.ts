@@ -4,7 +4,7 @@ import {
   getSystemEndianness,
   type ISerialInput,
   type ISerialOutput,
-} from 'typed-binary';
+} from './binaryIO.ts';
 import type { Infer, InferInput, InferRecord } from '../shared/repr.ts';
 import alignIO from './alignIO.ts';
 import { alignmentOf, customAlignmentOf } from './alignmentOf.ts';
