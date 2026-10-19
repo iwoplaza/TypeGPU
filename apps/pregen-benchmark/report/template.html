@@ -1,0 +1,395 @@
+<title>TypeGPU Runtime vs Pregenerated WGSL</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column (~68ch) with full-bleed-within-column charts and tables; summary figures in a wrapping grid. */
+:root {
+  --bg: #f7f8f9;
+  --surface: #ffffff;
+  --fg: #14171a;
+  --fg-2: #4a5159;
+  --fg-3: #6b737c;
+  --rule: #dfe3e7;
+  --grid: #e9ecef;
+  --accent: #2a5bd7;
+  --code-bg: #eef1f4;
+  --good: #1a7f37;
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121416; --surface: #1a1d20; --fg: #eceff1; --fg-2: #b9c0c7; --fg-3: #8c949c;
+    --rule: #2c3136; --grid: #262a2e; --accent: #7aa2ff; --code-bg: #20252a; --good: #4cc26b;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121416; --surface: #1a1d20; --fg: #eceff1; --fg-2: #b9c0c7; --fg-3: #8c949c;
+  --rule: #2c3136; --grid: #262a2e; --accent: #7aa2ff; --code-bg: #20252a; --good: #4cc26b;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font: 16px/1.6 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 80px;
+}
+main { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px; }
+section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(30px, 6vw, 42px); letter-spacing: -0.01em; }
+h2 { font-size: 26px; padding-top: 8px; border-top: 1px solid var(--rule); }
+h3 { font-size: 19px; margin-top: 8px; }
+p, ul, ol { margin: 0; max-width: 68ch; }
+ul, ol { padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font: 500 12px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); }
+.lede { font-size: 18px; color: var(--fg-2); }
+.meta { font: 13px/1.5 var(--font-mono); color: var(--fg-3); }
+code { font: 0.88em var(--font-mono); background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.figure { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.figure .label { font-size: 13px; color: var(--fg-2); }
+.figure .value { font: 600 30px/1.1 var(--font-body); }
+.figure .note { font-size: 13px; color: var(--fg-3); }
+
+.chart { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; position: relative; }
+.chart-title { font-weight: 600; font-size: 15px; }
+.chart-sub { font-size: 13px; color: var(--fg-3); margin-top: -6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--fg-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart svg text { font: 12px var(--font-body); fill: var(--fg-2); font-variant-numeric: tabular-nums; }
+.chart svg .cat { font-weight: 600; fill: var(--fg); }
+.chart svg .tick { fill: var(--fg-3); font-size: 11px; }
+.chart svg .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart svg .bar { cursor: default; }
+.chart svg .bar:hover, .chart svg .bar:focus { filter: brightness(1.15); outline: none; }
+.tooltip { position: absolute; pointer-events: none; background: var(--fg); color: var(--bg); font-size: 13px; padding: 6px 9px; border-radius: 6px; white-space: nowrap; z-index: 2; }
+.tooltip b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tooltip[hidden] { display: none !important; }
+
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-weight: 600; color: var(--fg-2); background: var(--code-bg); position: sticky; top: 0; }
+tbody tr.group td { font-weight: 600; background: color-mix(in srgb, var(--code-bg) 50%, transparent); }
+td.delta-good { color: var(--good); }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { font: 500 13px var(--font-body); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--surface); color: var(--fg-2); cursor: pointer; }
+.tabs button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; color: var(--fg-2); }
+.opt { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+.opt:last-child { border-bottom: 0; }
+.opt .what { font-weight: 600; }
+.opt .effect { font: 13px var(--font-mono); color: var(--good); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <header style="display:flex;flex-direction:column;gap:12px">
+    <div class="eyebrow">Benchmark report · TypeGPU 0.12.7</div>
+    <h1>TypeGPU at runtime vs. WGSL pregenerated with <code style="font-size:0.8em">tgpu.resolve</code></h1>
+    <p class="lede" id="lede"></p>
+    <p class="meta" id="meta"></p>
+  </header>
+
+  <section id="summary">
+    <h2>Summary</h2>
+    <div class="figures" id="figures"></div>
+    <div id="summary-text"></div>
+  </section>
+
+  <section>
+    <h2>What was compared</h2>
+    <p>Four examples from the TypeGPU docs were extracted into standalone Vite apps, each in two variants:</p>
+    <ul>
+      <li><strong>Runtime</strong>: the docs example as written, with <code>typegpu</code> (and <code>@typegpu/noise</code> / <code>@typegpu/sdf</code> where used) bundled and shaders generated in the browser. Measured against the published 0.12.7 build and against the optimized build from this work.</li>
+      <li><strong>Pregenerated</strong>: the same shaders, resolved to WGSL at build time with <code>tgpu.resolve</code> (through <code>unplugin-typegpu</code>), and host code written against the raw WebGPU API. No TypeGPU code reaches the browser.</li>
+    </ul>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Example</th><th>What it exercises</th><th>Shader modules</th></tr></thead>
+      <tbody>
+        <tr><td>boids</td><td>1 compute + 1 instanced render pipeline, 1,000 agents</td><td>2</td></tr>
+        <tr><td>stable-fluid</td><td>9 compute passes per frame, textures, pointer input</td><td>12</td></tr>
+        <tr><td>slime-mold-3d</td><td>800k agents, 256³ volume, <code>@typegpu/noise</code>, ray-marched render</td><td>4</td></tr>
+        <tr><td>jelly-slider</td><td>SDF ray marching, TAA, <code>@typegpu/sdf</code> + noise, timestamp queries</td><td>4</td></tr>
+      </tbody>
+    </table></div>
+    <p>Generated WGSL was checked to be equivalent between variants (by hooking <code>createShaderModule</code>); the only differences are identifier names, binding numbers, and explicit bounds checks where the runtime variant used guarded compute pipelines. Both variants share the same controls UI and instrumentation code.</p>
+  </section>
+
+  <section>
+    <h2>JavaScript shipped</h2>
+    <p>Total JS of each production build (Vite 8, default minifier), compressed with gzip level 9. This is what crosses the network.</p>
+    <div class="chart" id="chart-size"></div>
+    <div id="size-text"></div>
+  </section>
+
+  <section>
+    <h2>Loading: first frame and first interaction</h2>
+    <p>Medians of <span class="runs"></span> cold loads each (fresh browser context, cache disabled, one discarded warm-up). The <strong>mobile</strong> profile approximates Lighthouse's: 4× CPU slowdown, 1.6 Mbps down / 150 ms RTT. <strong>Desktop</strong> has no throttling.</p>
+    <div class="tabs" role="group" aria-label="Device profile">
+      <button type="button" id="tab-mobile" aria-pressed="true" data-profile="mobile">Mobile profile</button>
+      <button type="button" id="tab-desktop" aria-pressed="false" data-profile="desktop">Desktop profile</button>
+    </div>
+    <div class="chart" id="chart-interaction"></div>
+    <div class="chart" id="chart-frame"></div>
+    <div class="chart" id="chart-tbt"></div>
+    <div id="load-text"></div>
+  </section>
+
+  <section>
+    <h2>All metrics</h2>
+    <p>Every median, per profile. "First interaction" is when the example's handler received a click that a scripted user sent as soon as the first control was visible; "input delay" is how long that click waited for the main thread.</p>
+    <div class="tabs" role="group" aria-label="Table profile">
+      <button type="button" id="ttab-mobile" aria-pressed="true" data-profile="mobile">Mobile profile</button>
+      <button type="button" id="ttab-desktop" aria-pressed="false" data-profile="desktop">Desktop profile</button>
+    </div>
+    <div class="table-wrap"><table id="metrics-table"></table></div>
+  </section>
+
+  <section id="optimizations">
+    <h2>What changed in TypeGPU</h2>
+    <div id="opt-text"></div>
+  </section>
+
+  <section id="analysis">
+    <h2>Where the remaining cost comes from</h2>
+    <div id="analysis-text"></div>
+  </section>
+
+  <section>
+    <h2>Method and caveats</h2>
+    <ul>
+      <li>Headless Chromium 141 with WebGPU on SwiftShader (Vulkan, CPU-emulated GPU). GPU-side times, especially shader compilation and the frame rate of the heavier scenes, are much slower than on real hardware and identical between variants, since the WGSL is the same. Read the first-frame numbers for their difference, not their absolute value.</li>
+      <li>CPU throttling applies to the page's main thread only, not to the GPU process.</li>
+      <li>The static server serves gzip; brotli sizes are in the table.</li>
+      <li>Frame CPU time is the JS time spent inside the frame callback, sampled after the first 10 frames. On SwiftShader the heavy scenes only render a handful of frames, so treat those numbers as rough.</li>
+      <li>The harness, examples and scripts live in <code>apps/pregen-benchmark</code>; <code>node scripts/build.ts</code> then <code>node scripts/bench.ts</code> reproduces the results.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+const DATA = /*__DATA__*/null;
+const EXAMPLES = ['boids', 'stable-fluid', 'slime-mold-3d', 'jelly-slider'];
+const SERIES = [
+  { key: 'base', name: 'Runtime · typegpu 0.12.7', color: 'var(--s1)' },
+  { key: 'opt', name: 'Runtime · optimized typegpu', color: 'var(--s2)' },
+  { key: 'pregen', name: 'Pregenerated WGSL', color: 'var(--s3)' },
+];
+
+function get(series, example, path) {
+  const src = series === 'opt' ? DATA.optimized : DATA.baseline;
+  const variant = series === 'pregen' ? 'pregen' : 'runtime';
+  let v = src[`${example}/${variant}`];
+  for (const p of path) v = v?.[p];
+  return v;
+}
+const fmtKB = (b) => `${(b / 1024).toFixed(1)} kB`;
+const fmtMs = (ms) => (ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${Math.round(ms)} ms`);
+
+function niceMax(v) {
+  const p = 10 ** Math.floor(Math.log10(v || 1));
+  for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p;
+  return v;
+}
+
+function barChart(el, { title, sub, valueOf, fmt, ticksFmt }) {
+  el.replaceChildren();
+  const t = document.createElement('div'); t.className = 'chart-title'; t.textContent = title; el.append(t);
+  if (sub) { const s = document.createElement('div'); s.className = 'chart-sub'; s.textContent = sub; el.append(s); }
+  const legend = document.createElement('div'); legend.className = 'legend';
+  for (const s of SERIES) {
+    const span = document.createElement('span'); const i = document.createElement('i'); i.style.background = s.color;
+    span.append(i, document.createTextNode(s.name)); legend.append(span);
+  }
+  el.append(legend);
+
+  const W = 700, labelW = 110, valueW = 64, barH = 14, gap = 2, groupGap = 18;
+  const groupH = SERIES.length * (barH + gap) - gap;
+  const H = 20 + EXAMPLES.length * (groupH + groupGap);
+  const plotW = W - labelW - valueW;
+  const values = EXAMPLES.flatMap((e) => SERIES.map((s) => valueOf(s.key, e))).filter((v) => Number.isFinite(v));
+  const max = niceMax(Math.max(...values));
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', title);
+  const mk = (tag, attrs) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+
+  for (let i = 0; i <= 4; i++) {
+    const x = labelW + (plotW * i) / 4;
+    svg.append(mk('line', { x1: x, x2: x, y1: 14, y2: H, class: 'gridline' }));
+    const tx = mk('text', { x, y: 10, 'text-anchor': i === 0 ? 'start' : 'middle', class: 'tick' });
+    tx.textContent = (ticksFmt ?? fmt)((max * i) / 4); svg.append(tx);
+  }
+
+  const tip = document.createElement('div'); tip.className = 'tooltip'; tip.hidden = true;
+  EXAMPLES.forEach((e, gi) => {
+    const y0 = 20 + gi * (groupH + groupGap);
+    const cat = mk('text', { x: 0, y: y0 + groupH / 2 + 4, class: 'cat' }); cat.textContent = e; svg.append(cat);
+    SERIES.forEach((s, si) => {
+      const v = valueOf(s.key, e);
+      if (!Number.isFinite(v)) return;
+      const y = y0 + si * (barH + gap);
+      const w = Math.max(2, (plotW * v) / max);
+      const r = Math.min(4, w / 2);
+      const path = `M${labelW},${y} h${w - r} a${r},${r} 0 0 1 ${r},${r} v${barH - 2 * r} a${r},${r} 0 0 1 -${r},${r} h-${w - r} z`;
+      const bar = mk('path', { d: path, fill: s.color, class: 'bar', tabindex: '0' });
+      bar.setAttribute('aria-label', `${e}, ${s.name}: ${fmt(v)}`);
+      const show = (ev) => {
+        tip.replaceChildren();
+        const b = document.createElement('b'); b.textContent = fmt(v);
+        tip.append(b, document.createTextNode(` · ${s.name} · ${e}`));
+        tip.hidden = false;
+        const box = el.getBoundingClientRect();
+        const bb = bar.getBoundingClientRect();
+        const left = Math.min(bb.right - box.left + 8, box.width - tip.offsetWidth - 8);
+        tip.style.left = `${Math.max(8, left)}px`;
+        tip.style.top = `${bb.top - box.top - 6}px`;
+      };
+      bar.addEventListener('pointerenter', show); bar.addEventListener('focus', show);
+      bar.addEventListener('pointerleave', () => (tip.hidden = true)); bar.addEventListener('blur', () => (tip.hidden = true));
+      svg.append(bar);
+      const lbl = mk('text', { x: labelW + w + 6, y: y + barH - 3 }); lbl.textContent = fmt(v); svg.append(lbl);
+    });
+  });
+  el.append(svg, tip);
+}
+
+function renderSizes() {
+  barChart(document.getElementById('chart-size'), {
+    title: 'JS transferred, gzip',
+    sub: 'All JavaScript of the page, including example code and wgpu-matrix where used',
+    valueOf: (s, e) => get(s, e, ['sizes', 'gzip']),
+    fmt: fmtKB,
+  });
+}
+
+let loadProfile = 'mobile';
+function renderLoad() {
+  const p = loadProfile;
+  barChart(document.getElementById('chart-interaction'), {
+    title: 'Time to first handled interaction',
+    sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · from navigation start, lower is better`,
+    valueOf: (s, e) => get(s, e, [p, 'firstInteractionHandled']), fmt: fmtMs,
+  });
+  barChart(document.getElementById('chart-frame'), {
+    title: 'Time to first frame submitted',
+    sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · first queue.submit of the first frame; excludes GPU execution`,
+    valueOf: (s, e) => get(s, e, [p, 'firstSubmit']), fmt: fmtMs,
+  });
+  barChart(document.getElementById('chart-tbt'), {
+    title: 'Total blocking time until first frame',
+    sub: `${p === 'mobile' ? 'Mobile' : 'Desktop'} profile · sum of long-task time above 50 ms`,
+    valueOf: (s, e) => get(s, e, [p, 'totalBlockingTimeMs']), fmt: fmtMs,
+  });
+}
+
+const METRICS = [
+  ['JS raw', (s, e) => get(s, e, ['sizes', 'raw']), fmtKB],
+  ['JS gzip', (s, e) => get(s, e, ['sizes', 'gzip']), fmtKB],
+  ['JS brotli', (s, e) => get(s, e, ['sizes', 'brotli']), fmtKB],
+  ['App code starts', (s, e, p) => get(s, e, [p, 'appStart']), fmtMs],
+  ['UI interactive', (s, e, p) => get(s, e, [p, 'interactive']), fmtMs],
+  ['First frame submitted', (s, e, p) => get(s, e, [p, 'firstSubmit']), fmtMs],
+  ['First frame on GPU done', (s, e, p) => get(s, e, [p, 'firstFrame']), fmtMs],
+  ['First interaction handled', (s, e, p) => get(s, e, [p, 'firstInteractionHandled']), fmtMs],
+  ['Input delay', (s, e, p) => get(s, e, [p, 'firstInteractionDelay']), fmtMs],
+  ['Total blocking time', (s, e, p) => get(s, e, [p, 'totalBlockingTimeMs']), fmtMs],
+  ['Longest task', (s, e, p) => get(s, e, [p, 'longestTaskMs']), fmtMs],
+  ['Script evaluation', (s, e, p) => get(s, e, [p, 'scriptEvalMs']), fmtMs],
+  ['JS heap', (s, e, p) => get(s, e, [p, 'jsHeapUsedMB']), (v) => `${v.toFixed(1)} MB`],
+  ['Frame CPU, median', (s, e, p) => get(s, e, [p, 'frameCpuMedianMs']), (v) => `${v.toFixed(2)} ms`],
+];
+
+let tableProfile = 'mobile';
+function renderTable() {
+  const table = document.getElementById('metrics-table');
+  table.replaceChildren();
+  const thead = document.createElement('thead'); const hr = document.createElement('tr');
+  for (const h of ['Metric', ...SERIES.map((s) => s.name), 'Optimized vs 0.12.7']) {
+    const th = document.createElement('th'); th.textContent = h; hr.append(th);
+  }
+  thead.append(hr); table.append(thead);
+  const tbody = document.createElement('tbody');
+  for (const e of EXAMPLES) {
+    const gr = document.createElement('tr'); gr.className = 'group';
+    const gtd = document.createElement('td'); gtd.colSpan = SERIES.length + 2; gtd.textContent = e; gr.append(gtd); tbody.append(gr);
+    for (const [name, fn, fmt] of METRICS) {
+      const tr = document.createElement('tr');
+      const td0 = document.createElement('td'); td0.textContent = name; tr.append(td0);
+      const vals = SERIES.map((s) => fn(s.key, e, tableProfile));
+      for (const v of vals) { const td = document.createElement('td'); td.textContent = Number.isFinite(v) ? fmt(v) : '–'; tr.append(td); }
+      const td = document.createElement('td');
+      const [b, o] = vals;
+      if (Number.isFinite(b) && Number.isFinite(o) && b > 0) {
+        const pct = ((o - b) / b) * 100;
+        td.textContent = `${pct > 0 ? '+' : ''}${pct.toFixed(0)}%`;
+        if (pct <= -5) td.className = 'delta-good';
+      } else td.textContent = '–';
+      tr.append(td); tbody.append(tr);
+    }
+  }
+  table.append(tbody);
+}
+
+function wireTabs(prefix, set) {
+  for (const id of ['mobile', 'desktop']) {
+    document.getElementById(`${prefix}-${id}`).addEventListener('click', () => {
+      for (const o of ['mobile', 'desktop']) document.getElementById(`${prefix}-${o}`).setAttribute('aria-pressed', String(o === id));
+      set(id);
+    });
+  }
+}
+
+function figure(label, value, note) {
+  const d = document.createElement('div'); d.className = 'figure';
+  const l = document.createElement('div'); l.className = 'label'; l.textContent = label;
+  const v = document.createElement('div'); v.className = 'value'; v.textContent = value;
+  const n = document.createElement('div'); n.className = 'note'; n.textContent = note;
+  d.append(l, v, n); return d;
+}
+
+function avg(xs) { return xs.reduce((a, b) => a + b, 0) / xs.length; }
+function renderFigures() {
+  const ratio = avg(EXAMPLES.map((e) => get('base', e, ['sizes', 'gzip']) - get('pregen', e, ['sizes', 'gzip'])));
+  const sizeCut = avg(EXAMPLES.map((e) => 1 - get('opt', e, ['sizes', 'gzip']) / get('base', e, ['sizes', 'gzip'])));
+  const tti = avg(EXAMPLES.map((e) => get('base', e, ['mobile', 'firstInteractionHandled']) - get('pregen', e, ['mobile', 'firstInteractionHandled'])));
+  const ttiOpt = avg(EXAMPLES.map((e) => get('base', e, ['mobile', 'firstInteractionHandled']) - get('opt', e, ['mobile', 'firstInteractionHandled'])));
+  const f = document.getElementById('figures');
+  f.append(
+    figure('Extra JS for runtime TypeGPU', `+${fmtKB(ratio)}`, 'gzip, average over the four examples'),
+    figure('Later first interaction (mobile)', `+${fmtMs(tti)}`, 'runtime 0.12.7 vs. pregenerated, average'),
+    figure('Smaller runtime bundle', `−${(sizeCut * 100).toFixed(1)}%`, 'optimized vs. 0.12.7, gzip, average'),
+    figure('Earlier first interaction (mobile)', `−${fmtMs(ttiOpt)}`, 'optimized vs. 0.12.7, average'),
+  );
+}
+
+document.querySelectorAll('.runs').forEach((n) => (n.textContent = String(DATA.runs)));
+document.getElementById('meta').textContent = `Measured ${new Date(DATA.date).toISOString().slice(0, 10)} · headless Chromium 141, WebGPU on SwiftShader · ${DATA.runs} runs per cell`;
+renderFigures();
+renderSizes();
+renderLoad();
+renderTable();
+wireTabs('tab', (p) => { loadProfile = p; renderLoad(); });
+wireTabs('ttab', (p) => { tableProfile = p; renderTable(); });
+</script>

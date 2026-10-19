@@ -1,0 +1,25 @@
+{
+  "name": "pregen-benchmark",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Compares shipping TypeGPU at runtime vs. shipping WGSL pregenerated at build time",
+  "type": "module",
+  "scripts": {
+    "pregen": "node scripts/pregen.ts",
+    "build": "node scripts/build.ts",
+    "bench": "node scripts/bench.ts"
+  },
+  "dependencies": {
+    "@typegpu/noise": "workspace:*",
+    "@typegpu/sdf": "workspace:*",
+    "typegpu": "workspace:*",
+    "wgpu-matrix": "catalog:example"
+  },
+  "devDependencies": {
+    "@webgpu/types": "catalog:types",
+    "playwright-core": "^1.56.0",
+    "typescript": "catalog:types",
+    "unplugin-typegpu": "workspace:*",
+    "vite": "^8.0.5"
+  }
+}
