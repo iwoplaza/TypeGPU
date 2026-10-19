@@ -28,6 +28,21 @@ const u32Internal = { elementSchema: u32, cast: castToU32 };
 const XYZW = ['x', 'y', 'z', 'w'];
 const RGBA = ['r', 'g', 'b', 'a'];
 
+/**
+ * The components of a vector as a plain array, read by name, which is much faster than
+ * reading them by index (see the note on swizzles in `VecBase`).
+ */
+export function vecComponents<S>(v: VecBase<S>): S[] {
+  const named = v as unknown as { x: S; y: S; z: S; w: S };
+  if (v.length === 2) {
+    return [named.x, named.y];
+  }
+  if (v.length === 3) {
+    return [named.x, named.y, named.z];
+  }
+  return [named.x, named.y, named.z, named.w];
+}
+
 export abstract class VecBase<S> extends Array implements SelfResolvable {
   abstract readonly [$internal]: {
     elementSchema: ElementSchema<S>;
@@ -41,63 +56,40 @@ export abstract class VecBase<S> extends Array implements SelfResolvable {
   abstract get _Vec4(): new (x: S, y: S, z: S, w: S) => Vec4<S>;
 
   static {
-    // Defining 4-length swizzles
+    // Swizzles read components by name (`this.x`), since reading a vector by index (`this[0]`)
+    // goes through the index accessors defined on the subclasses, which engines handle on a
+    // much slower path.
+    type Named = VecBase<unknown> & Record<string, unknown>;
+
+    const defineSwizzle = (indices: number[]) => {
+      const names = indices.map((i) => XYZW[i] as string);
+      const [a, b, c, d] = names as [string, string, string, string];
+      const get =
+        indices.length === 2
+          ? function (this: Named) {
+              return new this._Vec2(this[a], this[b]);
+            }
+          : indices.length === 3
+            ? function (this: Named) {
+                return new this._Vec3(this[a], this[b], this[c]);
+              }
+            : function (this: Named) {
+                return new this._Vec4(this[a], this[b], this[c], this[d]);
+              };
+
+      Object.defineProperty(VecBase.prototype, names.join(''), { get });
+      Object.defineProperty(VecBase.prototype, indices.map((i) => RGBA[i]).join(''), { get });
+    };
+
     for (let e0 = 0; e0 < 4; e0++) {
       for (let e1 = 0; e1 < 4; e1++) {
+        defineSwizzle([e0, e1]);
         for (let e2 = 0; e2 < 4; e2++) {
+          defineSwizzle([e0, e1, e2]);
           for (let e3 = 0; e3 < 4; e3++) {
-            const xyzwProp = `${XYZW[e0]}${XYZW[e1]}${XYZW[e2]}${XYZW[e3]}`;
-            const rgbaProp = `${RGBA[e0]}${RGBA[e1]}${RGBA[e2]}${RGBA[e3]}`;
-            Object.defineProperty(VecBase.prototype, xyzwProp, {
-              get(this: VecBase<unknown>) {
-                return new this._Vec4(this[e0], this[e1], this[e2], this[e3]);
-              },
-            });
-            Object.defineProperty(VecBase.prototype, rgbaProp, {
-              get(this: VecBase<unknown>) {
-                return new this._Vec4(this[e0], this[e1], this[e2], this[e3]);
-              },
-            });
+            defineSwizzle([e0, e1, e2, e3]);
           }
         }
-      }
-    }
-
-    // Defining 3-length swizzles
-    for (let e0 = 0; e0 < 4; e0++) {
-      for (let e1 = 0; e1 < 4; e1++) {
-        for (let e2 = 0; e2 < 4; e2++) {
-          const xyzwProp = `${XYZW[e0]}${XYZW[e1]}${XYZW[e2]}`;
-          const rgbaProp = `${RGBA[e0]}${RGBA[e1]}${RGBA[e2]}`;
-          Object.defineProperty(VecBase.prototype, xyzwProp, {
-            get(this: VecBase<unknown>) {
-              return new this._Vec3(this[e0], this[e1], this[e2]);
-            },
-          });
-          Object.defineProperty(VecBase.prototype, rgbaProp, {
-            get(this: VecBase<unknown>) {
-              return new this._Vec3(this[e0], this[e1], this[e2]);
-            },
-          });
-        }
-      }
-    }
-
-    // Defining 2-length swizzles
-    for (let e0 = 0; e0 < 4; e0++) {
-      for (let e1 = 0; e1 < 4; e1++) {
-        const xyzwProp = `${XYZW[e0]}${XYZW[e1]}`;
-        const rgbaProp = `${RGBA[e0]}${RGBA[e1]}`;
-        Object.defineProperty(VecBase.prototype, xyzwProp, {
-          get(this: VecBase<unknown>) {
-            return new this._Vec2(this[e0], this[e1]);
-          },
-        });
-        Object.defineProperty(VecBase.prototype, rgbaProp, {
-          get(this: VecBase<unknown>) {
-            return new this._Vec2(this[e0], this[e1]);
-          },
-        });
       }
     }
   }
@@ -109,18 +101,21 @@ export abstract class VecBase<S> extends Array implements SelfResolvable {
   [$resolve](ctx: ResolutionCtx): ResolvedSnippet {
     // oxlint-disable-next-line typescript-eslint(no-explicit-any)
     const vecSchema = WORKAROUND_getSchema(this as any);
+    // Boolean components also go through numericLiteralToSnippet
+    const components = vecComponents(this) as number[];
+    const first = components[0] as number;
 
-    if (this.every((e) => !e)) {
+    if (components.every((e) => !e)) {
       return ctx.gen.typeInstantiation(vecSchema, []);
     }
 
-    if (this.every((e) => this[0] === e)) {
-      return ctx.gen.typeInstantiation(vecSchema, [numericLiteralToSnippet(this[0])]);
+    if (components.every((e) => first === e)) {
+      return ctx.gen.typeInstantiation(vecSchema, [numericLiteralToSnippet(first)]);
     }
 
     return ctx.gen.typeInstantiation(
       vecSchema,
-      this.map((e) => numericLiteralToSnippet(e)),
+      components.map((e) => numericLiteralToSnippet(e)),
     );
   }
 

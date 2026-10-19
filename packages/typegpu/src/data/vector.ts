@@ -279,7 +279,7 @@ type VecSchemaBase<TValue> = {
 };
 
 function makeVecSchema<TValue, S extends number | boolean>(
-  VecImpl: new (...args: S[]) => VecBase<S>,
+  VecImpl: new (...args: (S | undefined)[]) => VecBase<S>,
   primitive: F32 | F16 | I32 | U32 | Bool,
 ): VecSchemaBase<TValue> & ((...args: (S | AnyVecInstance)[]) => TValue) {
   const { kind: type, length } = new VecImpl();
@@ -296,7 +296,8 @@ function makeVecSchema<TValue, S extends number | boolean>(
         }
       }
       if (allScalars) {
-        return new VecImpl(...(args as S[])) as TValue;
+        const [x, y, z, w] = args as (S | undefined)[];
+        return new VecImpl(x, y, z, w) as TValue;
       }
     }
 
