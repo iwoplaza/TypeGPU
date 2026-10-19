@@ -42,5 +42,8 @@ const template = readFileSync(
   fileURLToPath(new URL('../report/template.html', import.meta.url)),
   'utf8',
 );
-writeFileSync(out, template.replace(/\/\*__DATA__\*\/\s*null/, () => JSON.stringify(data)));
+writeFileSync(
+  out,
+  template.replace(/\/\*__DATA__\*\/\s*null/, () => JSON.stringify(data)),
+);
 console.log(`Wrote ${out}`);
