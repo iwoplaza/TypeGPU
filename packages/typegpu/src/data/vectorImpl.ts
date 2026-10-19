@@ -1,18 +1,29 @@
 import { $internal, $resolve } from '../shared/symbols.ts';
 import { numericLiteralToSnippet } from '../tgsl/generationHelpers.ts';
 import type { ResolutionCtx, SelfResolvable } from '../types.ts';
-import { bool, f16, f32, i32, u32 } from './numeric.ts';
+import {
+  bool,
+  castToBool,
+  castToF16,
+  castToF32,
+  castToI32,
+  castToU32,
+  f16,
+  f32,
+  i32,
+  u32,
+} from './numeric.ts';
 import { type ResolvedSnippet } from './snippet.ts';
 import { WORKAROUND_getSchema, type BaseData, type VecKind } from './wgslTypes.ts';
 
 type ElementSchema<S> = BaseData & ((v?: S) => S);
 
 // Shared between all instances, so that casting elements doesn't allocate
-const boolInternal = { elementSchema: bool };
-const f16Internal = { elementSchema: f16 };
-const f32Internal = { elementSchema: f32 };
-const i32Internal = { elementSchema: i32 };
-const u32Internal = { elementSchema: u32 };
+const boolInternal = { elementSchema: bool, cast: castToBool };
+const f16Internal = { elementSchema: f16, cast: castToF16 };
+const f32Internal = { elementSchema: f32, cast: castToF32 };
+const i32Internal = { elementSchema: i32, cast: castToI32 };
+const u32Internal = { elementSchema: u32, cast: castToU32 };
 
 const XYZW = ['x', 'y', 'z', 'w'];
 const RGBA = ['r', 'g', 'b', 'a'];
@@ -20,6 +31,8 @@ const RGBA = ['r', 'g', 'b', 'a'];
 export abstract class VecBase<S> extends Array implements SelfResolvable {
   abstract readonly [$internal]: {
     elementSchema: ElementSchema<S>;
+    /** Casts a value to the element type, without going through the schema's callable wrapper */
+    cast: (v?: S) => S;
   };
   abstract get kind(): VecKind;
 
@@ -90,7 +103,7 @@ export abstract class VecBase<S> extends Array implements SelfResolvable {
   }
 
   castElement(): (v?: S) => S {
-    return this[$internal].elementSchema;
+    return this[$internal].cast;
   }
 
   [$resolve](ctx: ResolutionCtx): ResolvedSnippet {

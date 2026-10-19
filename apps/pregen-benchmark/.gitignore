@@ -1,3 +1,4 @@
 dist
 results/*.cpuprofile
 .scratch
+dist-baseline

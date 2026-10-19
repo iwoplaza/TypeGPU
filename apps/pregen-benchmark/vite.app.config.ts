@@ -11,7 +11,9 @@ if (!app) {
   throw new Error('Specify the app to build with APP=<example>/<variant>');
 }
 
-const typegpuDist = fileURLToPath(new URL('../../packages/typegpu/dist/', import.meta.url));
+// TYPEGPU_DIST points at another build of the package, e.g. to compare against a baseline
+const typegpuDist =
+  process.env.TYPEGPU_DIST ?? fileURLToPath(new URL('../../packages/typegpu/dist/', import.meta.url));
 
 export default defineConfig({
   root: fileURLToPath(new URL(`./examples/${app}/`, import.meta.url)),

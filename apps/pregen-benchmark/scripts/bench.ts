@@ -24,7 +24,7 @@ const only = args.only;
 const profileNames = (args.profiles ?? 'desktop,mobile').split(',');
 const variants = (args.variants ?? 'runtime,pregen').split(',');
 
-const distDir = fileURLToPath(new URL('../dist/', import.meta.url));
+const distDir = fileURLToPath(new URL(`../${process.env.OUT_DIR ?? 'dist'}/`, import.meta.url));
 const resultsDir = fileURLToPath(new URL('../results/', import.meta.url));
 const port = Number(process.env.PORT ?? 4173);
 
