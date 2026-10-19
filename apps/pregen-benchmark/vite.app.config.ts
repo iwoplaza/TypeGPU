@@ -28,9 +28,9 @@ export default defineConfig({
         ],
   },
   build: {
-    outDir: fileURLToPath(new URL(`./${process.env.OUT_DIR ?? "dist"}/${app}/`, import.meta.url)),
+    outDir: fileURLToPath(new URL(`./${process.env.OUT_DIR ?? 'dist'}/${app}/`, import.meta.url)),
     emptyOutDir: true,
     reportCompressedSize: false,
-    minify: process.env.MINIFY !== "0",
+    minify: process.env.MINIFY !== '0',
   },
 });

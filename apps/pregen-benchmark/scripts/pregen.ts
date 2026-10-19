@@ -47,7 +47,9 @@ try {
       output += `\nexport const ${name} = ${JSON.stringify(code)};\n`;
     }
     writeFileSync(`${examplesDir}${example}/pregen/generated.ts`, output);
-    console.log(`Pregenerated ${Object.keys(shaderModules).length} shader module(s) for ${example}`);
+    console.log(
+      `Pregenerated ${Object.keys(shaderModules).length} shader module(s) for ${example}`,
+    );
   }
 } finally {
   await server.close();

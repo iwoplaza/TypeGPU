@@ -181,7 +181,8 @@ const updateAgents = tgpu.computeFn({
   );
 
   const newPos =
-    agent.position + direction * computeLayout.$.params.moveSpeed * computeLayout.$.params.deltaTime;
+    agent.position +
+    direction * computeLayout.$.params.moveSpeed * computeLayout.$.params.deltaTime;
 
   const center = dimsf / 2;
 

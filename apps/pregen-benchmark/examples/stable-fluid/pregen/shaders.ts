@@ -13,7 +13,6 @@ export const FORCE_SCALE = 1;
 export const RADIUS = SIM_N / 16;
 export const INK_AMOUNT = 0.02;
 
-
 export const BrushParams = d.struct({
   pos: d.vec2i,
   delta: d.vec2f,

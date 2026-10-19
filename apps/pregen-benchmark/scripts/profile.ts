@@ -28,7 +28,9 @@ try {
   await cdp.send('Profiler.setSamplingInterval', { interval: 100 });
   await cdp.send('Profiler.start');
   await page.goto(`http://localhost:${port}/${app}/`);
-  await page.waitForFunction(() => window.__bench?.firstFrame !== undefined, null, { timeout: 120_000 });
+  await page.waitForFunction(() => window.__bench?.firstFrame !== undefined, null, {
+    timeout: 120_000,
+  });
   const marks = await page.evaluate(() =>
     performance.getEntriesByType('mark').map((m) => `${m.name}=${m.startTime.toFixed(1)}`),
   );
@@ -39,8 +41,11 @@ try {
   }
 
   const dt = new Map<number, number>();
-  for (let i = 0; i < profile.samples!.length; i++) {
-    dt.set(profile.samples![i], (dt.get(profile.samples![i]) ?? 0) + profile.timeDeltas![i] / 1000);
+  const samples = profile.samples ?? [];
+  const timeDeltas = profile.timeDeltas ?? [];
+  for (let i = 0; i < samples.length; i++) {
+    const id = samples[i] as number;
+    dt.set(id, (dt.get(id) ?? 0) + (timeDeltas[i] ?? 0) / 1000);
   }
   const byFn = new Map<string, number>();
   const byFile = new Map<string, number>();
@@ -55,7 +60,7 @@ try {
   const top = Number(opts.top ?? 40);
   const print = (m: Map<string, number>) =>
     [...m]
-      .sort((a, b) => b[1] - a[1])
+      .toSorted((a, b) => b[1] - a[1])
       .slice(0, top)
       .forEach(([k, v]) => console.log(v.toFixed(1).padStart(9), k));
   console.log('--- self time by file (ms)');

@@ -2,7 +2,12 @@
  * Stable fluid, with shaders pregenerated at build time (see ./shaders.ts and scripts/pregen.ts).
  * Host code uses the raw WebGPU API, so TypeGPU is not shipped to the browser.
  */
-import { markAppStart, markFirstSubmit, markInteractive, measureFrame } from '../../../shared/bench.ts';
+import {
+  markAppStart,
+  markFirstSubmit,
+  markInteractive,
+  measureFrame,
+} from '../../../shared/bench.ts';
 import { defineControls, mountControls } from '../../../shared/controls.ts';
 import plumsUrl from '../plums.jpg';
 import {
@@ -133,12 +138,20 @@ const plums = await response.blob();
 const backgroundTexture = device.createTexture({
   size: [N, N],
   format: 'rgba8unorm',
-  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
+  usage:
+    GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
 });
 {
-  const bitmap = await createImageBitmap(plums, { resizeWidth: N, resizeHeight: N, resizeQuality: 'high' });
+  const bitmap = await createImageBitmap(plums, {
+    resizeWidth: N,
+    resizeHeight: N,
+    resizeQuality: 'high',
+  });
   try {
-    device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: backgroundTexture }, [N, N]);
+    device.queue.copyExternalImageToTexture({ source: bitmap }, { texture: backgroundTexture }, [
+      N,
+      N,
+    ]);
   } finally {
     bitmap.close();
   }
@@ -244,12 +257,20 @@ const dispatchX = Math.ceil(SIM_N / WORKGROUP_SIZE_X);
 const dispatchY = Math.ceil(SIM_N / WORKGROUP_SIZE_Y);
 
 // Create bind groups
-function createBindGroup(layout: GPUBindGroupLayout, resources: (GPUTexture | GPUBuffer | GPUSampler)[]) {
+function createBindGroup(
+  layout: GPUBindGroupLayout,
+  resources: (GPUTexture | GPUBuffer | GPUSampler)[],
+) {
   return device.createBindGroup({
     layout,
     entries: resources.map((resource, binding) => ({
       binding,
-      resource: resource instanceof GPUTexture ? resource.createView() : resource instanceof GPUBuffer ? { buffer: resource } : resource,
+      resource:
+        resource instanceof GPUTexture
+          ? resource.createView()
+          : resource instanceof GPUBuffer
+            ? { buffer: resource }
+            : resource,
     })),
   });
 }
@@ -265,13 +286,23 @@ const addInkBindGroups = [0, 1].map((i) => {
 const addForceBindGroups = [0, 1].map((i) => {
   const srcIdx = i;
   const dstIdx = 1 - i;
-  return createBindGroup(addForcesLayout, [velTex[srcIdx], velTex[dstIdx], forceTex, simParamBuffer]);
+  return createBindGroup(addForcesLayout, [
+    velTex[srcIdx],
+    velTex[dstIdx],
+    forceTex,
+    simParamBuffer,
+  ]);
 });
 
 const advectBindGroups = [0, 1].map((i) => {
   const srcIdx = 1 - i;
   const dstIdx = i;
-  return createBindGroup(advectLayout, [velTex[srcIdx], velTex[dstIdx], simParamBuffer, linSampler]);
+  return createBindGroup(advectLayout, [
+    velTex[srcIdx],
+    velTex[dstIdx],
+    simParamBuffer,
+    linSampler,
+  ]);
 });
 
 const diffusionBindGroups = [0, 1].map((i) => {
@@ -296,7 +327,11 @@ const projectBindGroups = [0, 1].map((velIdx) =>
     const srcVelIdx = velIdx;
     const dstVelIdx = 1 - velIdx;
     const srcPIdx = pIdx;
-    return createBindGroup(projectLayout, [velTex[srcVelIdx], pressureTex[srcPIdx], velTex[dstVelIdx]]);
+    return createBindGroup(projectLayout, [
+      velTex[srcVelIdx],
+      pressureTex[srcPIdx],
+      velTex[dstVelIdx],
+    ]);
   }),
 );
 

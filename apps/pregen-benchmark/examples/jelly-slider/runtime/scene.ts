@@ -759,11 +759,10 @@ export async function setupScene(root: TgpuRoot, context: GPUCanvasContext) {
     bindGroups = createBindGroups();
   }
 
-  let animationFrameHandle: number;
   function render(timestamp: number) {
     measureFrame(() => renderBody(timestamp));
     markFirstSubmit(root.device);
-    animationFrameHandle = requestAnimationFrame(render);
+    requestAnimationFrame(render);
   }
 
   function renderBody(timestamp: number) {
@@ -805,7 +804,7 @@ export async function setupScene(root: TgpuRoot, context: GPUCanvasContext) {
       .draw(3);
   }
 
-  animationFrameHandle = requestAnimationFrame(render);
+  requestAnimationFrame(render);
 
   return {
     rayMarchPipeline,

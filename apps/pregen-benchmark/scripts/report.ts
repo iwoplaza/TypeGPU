@@ -11,7 +11,9 @@ if (!out) {
   throw new Error('Usage: node scripts/report.ts <out.html>');
 }
 const read = (label: string) =>
-  JSON.parse(readFileSync(fileURLToPath(new URL(`../results/${label}.json`, import.meta.url)), 'utf8'));
+  JSON.parse(
+    readFileSync(fileURLToPath(new URL(`../results/${label}.json`, import.meta.url)), 'utf8'),
+  );
 
 const baseline = read(baselineLabel);
 const optimized = read(optimizedLabel);
@@ -36,6 +38,9 @@ const data = {
   optimized: slim(optimized.results),
 };
 
-const template = readFileSync(fileURLToPath(new URL('../report/template.html', import.meta.url)), 'utf8');
+const template = readFileSync(
+  fileURLToPath(new URL('../report/template.html', import.meta.url)),
+  'utf8',
+);
 writeFileSync(out, template.replace('/*__DATA__*/null', JSON.stringify(data)));
 console.log(`Wrote ${out}`);

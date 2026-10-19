@@ -351,10 +351,10 @@ export class Slider {
       const Bx = pos[(i + 1) * 2];
       const By = pos[(i + 1) * 2 + 1];
 
-      const nAx = normals[i * 2];
-      const nAy = normals[i * 2 + 1];
-      const nBx = normals[(i + 1) * 2];
-      const nBy = normals[(i + 1) * 2 + 1];
+      const nAx = normals[i * 2] as number;
+      const nAy = normals[i * 2 + 1] as number;
+      const nBx = normals[(i + 1) * 2] as number;
+      const nBy = normals[(i + 1) * 2 + 1] as number;
 
       if (i === 0 || i === this.n - 2) {
         cps[i * 2] = (Ax + Bx) * 0.5;

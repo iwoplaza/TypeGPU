@@ -2,7 +2,12 @@
  * Boids, with shaders pregenerated at build time (see ./shaders.ts and scripts/pregen.ts).
  * Host code uses the raw WebGPU API, so TypeGPU is not shipped to the browser.
  */
-import { markAppStart, markFirstSubmit, markInteractive, measureFrame } from '../../../shared/bench.ts';
+import {
+  markAppStart,
+  markFirstSubmit,
+  markInteractive,
+  measureFrame,
+} from '../../../shared/bench.ts';
 import { defineControls, mountControls } from '../../../shared/controls.ts';
 import { renderWgsl, simulateWgsl } from './generated.ts';
 
@@ -63,7 +68,14 @@ const triangleVertexBuffer = device.createBuffer({
 device.queue.writeBuffer(
   triangleVertexBuffer,
   0,
-  new Float32Array([0.0, triangleSize, -triangleSize / 2, -triangleSize / 2, triangleSize / 2, -triangleSize / 2]),
+  new Float32Array([
+    0.0,
+    triangleSize,
+    -triangleSize / 2,
+    -triangleSize / 2,
+    triangleSize / 2,
+    -triangleSize / 2,
+  ]),
 );
 
 // TriangleData: { position: vec2f, velocity: vec2f } = 16 bytes
@@ -71,7 +83,10 @@ const trianglePosBuffers = Array.from({ length: 2 }, () =>
   device.createBuffer({
     size: triangleAmount * 16,
     usage:
-      GPUBufferUsage.STORAGE | GPUBufferUsage.UNIFORM | GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      GPUBufferUsage.STORAGE |
+      GPUBufferUsage.UNIFORM |
+      GPUBufferUsage.VERTEX |
+      GPUBufferUsage.COPY_DST,
   }),
 );
 

@@ -3,7 +3,12 @@
  * Host code uses the raw WebGPU API, so TypeGPU is not shipped to the browser.
  */
 import * as m from 'wgpu-matrix';
-import { markAppStart, markFirstSubmit, markInteractive, measureFrame } from '../../../shared/bench.ts';
+import {
+  markAppStart,
+  markFirstSubmit,
+  markInteractive,
+  measureFrame,
+} from '../../../shared/bench.ts';
 import { defineControls, mountControls } from '../../../shared/controls.ts';
 import { blurWgsl, initWgsl, renderWgsl, updateAgentsWgsl } from './generated.ts';
 

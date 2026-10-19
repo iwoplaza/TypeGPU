@@ -29,7 +29,16 @@ export function defineControls<T extends Record<string, Control>>(controls: T): 
   return controls;
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}) {
+function toHex(n: number) {
+  return Math.round(Math.min(Math.max(n, 0), 1) * 255)
+    .toString(16)
+    .padStart(2, '0');
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  props: Partial<HTMLElementTagNameMap[K]> = {},
+) {
   return Object.assign(document.createElement(tag), props);
 }
 
@@ -106,10 +115,6 @@ export function mountControls(controls: Record<string, Control>) {
     } else if ('onColorChange' in control) {
       const onChange = control.onColorChange as (v: Vec) => void;
       const value = control.initial as unknown as number[];
-      const toHex = (n: number) =>
-        Math.round(Math.min(Math.max(n, 0), 1) * 255)
-          .toString(16)
-          .padStart(2, '0');
       const input = el('input', {
         type: 'color',
         value: `#${toHex(value[0])}${toHex(value[1])}${toHex(value[2])}`,

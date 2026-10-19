@@ -292,7 +292,11 @@ export async function setupScene(
       device.queue.writeBuffer(sceneParamsBuffer, JELLY_COLOR_OFFSET, new Float32Array(v));
     },
     set blurEnabled(v: boolean) {
-      device.queue.writeBuffer(sceneParamsBuffer, BLUR_ENABLED_OFFSET, new Uint32Array([v ? 1 : 0]));
+      device.queue.writeBuffer(
+        sceneParamsBuffer,
+        BLUR_ENABLED_OFFSET,
+        new Uint32Array([v ? 1 : 0]),
+      );
     },
     async computeOptimalQuality() {
       if (!hasTimestampQuery) {

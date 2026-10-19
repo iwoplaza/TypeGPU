@@ -104,18 +104,37 @@ async function measure(page: Page, cdp: CDPSession, url: string): Promise<RunMet
     const x = box.x + box.width / 2;
     const y = box.y + Math.min(box.height / 2, 8);
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
-    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x,
+      y,
+      button: 'left',
+      clickCount: 1,
+    });
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x,
+      y,
+      button: 'left',
+      clickCount: 1,
+    });
   }
 
-  await page.waitForFunction(() => window.__bench?.firstFrame !== undefined && window.__bench?.firstInteraction, null, {
-    timeout: 120_000,
-    polling: 50,
-  });
+  await page.waitForFunction(
+    () => window.__bench?.firstFrame !== undefined && window.__bench?.firstInteraction,
+    null,
+    {
+      timeout: 120_000,
+      polling: 50,
+    },
+  );
   // Letting the example run for a while, to sample steady-state frame costs
   // (at least 30 frames, or 15 seconds for scenes that are very slow on SwiftShader)
   await page
-    .waitForFunction(() => window.__bench.frameCpuTimes.length >= 40, null, { timeout: 15_000, polling: 100 })
+    .waitForFunction(() => window.__bench.frameCpuTimes.length >= 40, null, {
+      timeout: 15_000,
+      polling: 100,
+    })
     .catch(() => {});
 
   const perf = await cdp.send('Performance.getMetrics');
@@ -126,9 +145,14 @@ async function measure(page: Page, cdp: CDPSession, url: string): Promise<RunMet
     const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
     const scripts = performance
       .getEntriesByType('resource')
-      .filter((e) => (e as PerformanceResourceTiming).initiatorType === 'script' || e.name.endsWith('.js'));
-    const longTasks = (window as unknown as { __longTasks: { start: number; duration: number }[] }).__longTasks;
+      .filter(
+        (e) =>
+          (e as PerformanceResourceTiming).initiatorType === 'script' || e.name.endsWith('.js'),
+      );
+    const longTasks = (window as unknown as { __longTasks: { start: number; duration: number }[] })
+      .__longTasks;
     const untilFirstFrame = longTasks.filter((t) => t.start <= (b.firstFrame ?? 0));
+    // oxlint-disable-next-line eslint-plugin-unicorn(consistent-function-scoping) -- runs inside the page, so it cannot be hoisted
     const mark = (name: string) => performance.getEntriesByName(name)[0]?.startTime ?? NaN;
     return {
       errors: b.errors,
@@ -137,10 +161,18 @@ async function measure(page: Page, cdp: CDPSession, url: string): Promise<RunMet
       firstSubmit: b.firstSubmit ?? NaN,
       firstFrame: b.firstFrame ?? NaN,
       firstInteractionHandled: b.firstInteraction?.handledAt ?? NaN,
-      firstInteractionDelay: b.firstInteraction ? b.firstInteraction.handledAt - b.firstInteraction.eventTimeStamp : NaN,
+      firstInteractionDelay: b.firstInteraction
+        ? b.firstInteraction.handledAt - b.firstInteraction.eventTimeStamp
+        : NaN,
       domContentLoaded: nav.domContentLoadedEventEnd,
-      jsTransferBytes: scripts.reduce((acc, e) => acc + (e as PerformanceResourceTiming).transferSize, 0),
-      totalBlockingTimeMs: untilFirstFrame.reduce((acc, t) => acc + Math.max(0, t.duration - 50), 0),
+      jsTransferBytes: scripts.reduce(
+        (acc, e) => acc + (e as PerformanceResourceTiming).transferSize,
+        0,
+      ),
+      totalBlockingTimeMs: untilFirstFrame.reduce(
+        (acc, t) => acc + Math.max(0, t.duration - 50),
+        0,
+      ),
       longestTaskMs: Math.max(0, ...untilFirstFrame.map((t) => t.duration)),
       frameTimes: b.frameCpuTimes.slice(10),
     };
@@ -150,7 +182,7 @@ async function measure(page: Page, cdp: CDPSession, url: string): Promise<RunMet
     throw new Error(`Errors on ${url}: ${page_.errors.join('; ')}`);
   }
 
-  const sorted = [...page_.frameTimes].sort((a, b) => a - b);
+  const sorted = [...page_.frameTimes].toSorted((a, b) => a - b);
   const { errors: _, frameTimes: __, ...rest } = page_;
   return {
     ...rest,
@@ -162,7 +194,7 @@ async function measure(page: Page, cdp: CDPSession, url: string): Promise<RunMet
 }
 
 function median(values: number[]) {
-  const sorted = values.filter((v) => !Number.isNaN(v)).sort((a, b) => a - b);
+  const sorted = values.filter((v) => !Number.isNaN(v)).toSorted((a, b) => a - b);
   if (sorted.length === 0) {
     return NaN;
   }
@@ -199,7 +231,10 @@ try {
           await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
           await cdp.send('Emulation.setCPUThrottlingRate', { rate: profile.cpuThrottling });
           if (profile.network) {
-            await cdp.send('Network.emulateNetworkConditions', { offline: false, ...profile.network });
+            await cdp.send('Network.emulateNetworkConditions', {
+              offline: false,
+              ...profile.network,
+            });
           }
           const sample = await measure(page, cdp, `http://localhost:${port}/${key}/`);
           if (i > 0) {
@@ -208,10 +243,16 @@ try {
           await context.close();
         }
         const medians = Object.fromEntries(
-          Object.keys(samples[0]).map((k) => [k, median(samples.map((s) => s[k as keyof RunMetrics]))]),
+          Object.keys(samples[0]).map((k) => [
+            k,
+            median(samples.map((s) => s[k as keyof RunMetrics])),
+          ]),
         );
         entry[profileName] = { medians, samples };
-        console.log(`${key} [${profileName}]`, JSON.stringify(medians, (_, v) => (typeof v === 'number' ? Math.round(v * 10) / 10 : v)));
+        console.log(
+          `${key} [${profileName}]`,
+          JSON.stringify(medians, (_, v) => (typeof v === 'number' ? Math.round(v * 10) / 10 : v)),
+        );
       }
       results[key] = entry;
     }
@@ -222,5 +263,8 @@ try {
 }
 
 mkdirSync(resultsDir, { recursive: true });
-writeFileSync(`${resultsDir}${label}.json`, JSON.stringify({ label, date: new Date().toISOString(), runs, results }, null, 2));
+writeFileSync(
+  `${resultsDir}${label}.json`,
+  JSON.stringify({ label, date: new Date().toISOString(), runs, results }, null, 2),
+);
 console.log(`Saved results/${label}.json`);

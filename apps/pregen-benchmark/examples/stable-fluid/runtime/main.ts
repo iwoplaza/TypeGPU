@@ -11,7 +11,12 @@ import { fragmentImageFn, fragmentInkFn, fragmentVelFn, renderFn, renderLayout }
 import * as c from './simulation.ts';
 import type { BrushState } from './types.ts';
 import { defineControls, mountControls } from '../../../shared/controls.ts';
-import { markAppStart, markFirstSubmit, markInteractive, measureFrame } from '../../../shared/bench.ts';
+import {
+  markAppStart,
+  markFirstSubmit,
+  markInteractive,
+  measureFrame,
+} from '../../../shared/bench.ts';
 import plumsUrl from '../plums.jpg';
 
 markAppStart();

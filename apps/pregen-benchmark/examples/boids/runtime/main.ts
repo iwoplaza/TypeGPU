@@ -1,5 +1,10 @@
 import { tgpu, d, std } from 'typegpu';
-import { markAppStart, markFirstSubmit, markInteractive, measureFrame } from '../../../shared/bench.ts';
+import {
+  markAppStart,
+  markFirstSubmit,
+  markInteractive,
+  measureFrame,
+} from '../../../shared/bench.ts';
 import { defineControls, mountControls } from '../../../shared/controls.ts';
 
 markAppStart();
@@ -225,12 +230,11 @@ const computeBindGroups = [0, 1].map((idx) =>
 );
 
 let even = false;
-let animationFrameId: number;
 
 function frame() {
   measureFrame(frameBody);
   markFirstSubmit(root.device);
-  animationFrameId = requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }
 
 function frameBody() {
@@ -247,7 +251,7 @@ function frameBody() {
     .draw(3, triangleAmount);
 }
 
-animationFrameId = requestAnimationFrame(frame);
+requestAnimationFrame(frame);
 
 // #region Example controls and cleanup
 

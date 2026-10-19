@@ -1,7 +1,12 @@
 import { randf } from '@typegpu/noise';
 import { tgpu, common, d, std } from 'typegpu';
 import * as m from 'wgpu-matrix';
-import { markAppStart, markFirstSubmit, markInteractive, measureFrame } from '../../../shared/bench.ts';
+import {
+  markAppStart,
+  markFirstSubmit,
+  markInteractive,
+  measureFrame,
+} from '../../../shared/bench.ts';
 import { defineControls, mountControls } from '../../../shared/controls.ts';
 
 markAppStart();
