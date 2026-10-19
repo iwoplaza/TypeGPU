@@ -161,6 +161,7 @@ class ItemStateStackImpl implements ItemStateStack {
       argAccess,
       returnType,
       externalMap,
+      externalSnippets: new Map(),
       reportedReturnTypes: new Set(),
       placeholderForVariable: new Map(),
       modifiedVariables: new Set(),
@@ -226,12 +227,18 @@ class ItemStateStackImpl implements ItemStateStack {
           return access();
         }
 
+        const cached = layer.externalSnippets.get(id);
+        if (cached) {
+          return cached;
+        }
         if (Object.hasOwn(layer.externalMap, id)) {
           const external = layer.externalMap[id];
           if (isNamable(external) && getName(external) === undefined) {
             setName(external, id.replaceAll('.', '_'));
           }
-          return coerceToSnippet(external);
+          const snippet = coerceToSnippet(external);
+          layer.externalSnippets.set(id, snippet);
+          return snippet;
         }
 
         return undefined;
