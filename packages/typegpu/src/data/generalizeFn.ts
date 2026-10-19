@@ -101,9 +101,9 @@ function applyArgs(
           ? (i: number) => fn(a[i] as never, b[i] as never, c[i] as never)
           : (i: number) => fn(...(iterableArgs.map((arg) => arg[i]) as never[]));
 
-  const constructorArgs = new Array(length);
+  const constructorArgs: (number | boolean)[] = [];
   for (let i = 0; i < length; i++) {
-    constructorArgs[i] = component(i);
+    constructorArgs.push(component(i));
   }
   return constructor(...(constructorArgs as unknown as [boolean, boolean]));
 }
