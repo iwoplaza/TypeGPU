@@ -79,10 +79,9 @@ const variadicUnifySignature = (...args: BaseData[]) => {
   };
 };
 
-export const unifyRestrictedSignature =
-  /*#__NO_SIDE_EFFECTS__*/
-  (restrict: BaseData[]) =>
-  (...args: BaseData[]) => {
+/*#__NO_SIDE_EFFECTS__*/
+export function unifyRestrictedSignature(restrict: BaseData[]) {
+  return (...args: BaseData[]) => {
     const uargs = unify(args, restrict);
     if (!uargs) {
       throw new SignatureNotSupportedError(args, restrict);
@@ -92,6 +91,7 @@ export const unifyRestrictedSignature =
       returnType: uargs[0] as BaseData,
     };
   };
+}
 
 function variadicReduce<T>(fn: (a: T, b: T) => T) {
   return (fst: T, ...rest: T[]): T => {

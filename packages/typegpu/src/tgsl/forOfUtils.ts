@@ -51,7 +51,10 @@ export function getElementType(elementSnippet: Snippet, iterableSnippet: Snippet
       elementSnippet.origin,
       concretize(elementType as wgsl.AnyWgslData) as wgsl.StorableData,
     );
-    invariant(ptrType !== undefined, `Creating pointer type from origin ${elementSnippet.origin}`);
+    invariant(
+      ptrType !== undefined,
+      () => `Creating pointer type from origin ${elementSnippet.origin}`,
+    );
     elementType = ptrType;
   }
 

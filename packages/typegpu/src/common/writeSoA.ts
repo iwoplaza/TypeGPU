@@ -142,9 +142,9 @@ function scatterSoA(
       continue;
     }
     const srcArray = soaData[key];
-    invariant(srcArray !== undefined, `Missing SoA data for field '${key}'`);
+    invariant(srcArray !== undefined, () => `Missing SoA data for field '${key}'`);
     const fieldOffset = offsets[key]?.offset;
-    invariant(fieldOffset !== undefined, `Field ${key} not found in struct schema`);
+    invariant(fieldOffset !== undefined, () => `Field ${key} not found in struct schema`);
     const packedFieldSize = packedSizeOf(fieldSchema);
     const srcBytes = new Uint8Array(srcArray.buffer, srcArray.byteOffset, srcArray.byteLength);
     for (let i = 0; i < elementCount; i++) {

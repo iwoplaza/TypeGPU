@@ -765,7 +765,7 @@ export class WgslGenerator implements ShaderGenerator {
         typeof expression[1] === 'string'
           ? numericLiteralToSnippet(parseNumericString(expression[1]))
           : numericLiteralToSnippet(expression[1]);
-      invariant(type, `Expected ${stringifyNode(expression)} to be valid numeric literal`);
+      invariant(type, () => `Expected ${stringifyNode(expression)} to be valid numeric literal`);
       return type;
     }
 
@@ -1491,7 +1491,7 @@ Try 'return ${typeStr}(${str});' instead.
     // reassignment might happen in a pruned branch, in which case we can generate
     // more optimised code by emitting 'let' or 'const' instead of 'var'.
     const scope = this.ctx.topFunctionScope;
-    invariant(scope, `Expected function scope to be present for ${rawId}`);
+    invariant(scope, () => `Expected function scope to be present for ${rawId}`);
     const emittedVarType = `#VAR_${scope.placeholderForVariable.size}#` as const;
     scope.placeholderForVariable.set(snippet, emittedVarType);
 
@@ -1594,7 +1594,7 @@ Try 'return ${typeStr}(${str});' instead.
     let emittedVarType: 'var' | 'let' | 'const' | `#VAR_${number}#`;
     if (varType === '<deferred>') {
       const scope = this.ctx.topFunctionScope;
-      invariant(scope, `Expected function scope to be present for ${rawId}`);
+      invariant(scope, () => `Expected function scope to be present for ${rawId}`);
       emittedVarType = `#VAR_${scope.placeholderForVariable.size}#`;
       scope.placeholderForVariable.set(snippet, emittedVarType);
     } else {
@@ -1627,7 +1627,7 @@ Try 'return ${typeStr}(${str});' instead.
         eq.origin,
         concretize(definitionDataType as wgsl.BaseData) as wgsl.StorableData,
       );
-      invariant(ptrType !== undefined, `Creating pointer type from origin ${eq.origin}`);
+      invariant(ptrType !== undefined, () => `Creating pointer type from origin ${eq.origin}`);
       definitionDataType = ptrType;
     }
 
