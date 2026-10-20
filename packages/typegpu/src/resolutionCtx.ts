@@ -78,6 +78,7 @@ import { minify } from './minify.ts';
 // Defined in this file rather than imported from shared/env.ts: Rolldown keeps recursive functions
 // that are only reachable through a branch disabled by an imported constant, which would leave
 // most of the console.log code in apps that turn it off.
+declare const __TYPEGPU_NO_CONSOLE_LOG__: boolean | undefined;
 const CONSOLE_LOG_ENABLED =
   typeof __TYPEGPU_NO_CONSOLE_LOG__ === 'undefined' || !__TYPEGPU_NO_CONSOLE_LOG__;
 
