@@ -10,3 +10,14 @@
 export const DEV = process.env.NODE_ENV === 'development';
 
 export const TEST = process.env.NODE_ENV === 'test';
+
+// Opt-out flags (declared in globals.d.ts) for apps that don't use a feature, so that bundlers can
+// drop its code.
+
+/** False when the app declared that it creates no textures or samplers. */
+export const TEXTURES_ENABLED =
+  typeof __TYPEGPU_NO_TEXTURES__ === 'undefined' || !__TYPEGPU_NO_TEXTURES__;
+
+/** False when the app declared that it creates no query sets. */
+export const QUERY_SETS_ENABLED =
+  typeof __TYPEGPU_NO_QUERY_SETS__ === 'undefined' || !__TYPEGPU_NO_QUERY_SETS__;

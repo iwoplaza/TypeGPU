@@ -248,3 +248,9 @@ export class FiniteMathAssumptionError extends Error {
     Object.setPrototypeOf(this, FiniteMathAssumptionError.prototype);
   }
 }
+
+export function featureDisabledError(feature: string, flag: string): Error {
+  return new Error(
+    `${feature} are disabled in this build, because '${flag}' was defined as true. Remove it from the bundler's 'define' option to use them.`,
+  );
+}

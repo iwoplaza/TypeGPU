@@ -266,6 +266,11 @@ export default defineConfig({
               slug: 'advanced/minifying-shaders',
               badge: { text: 'new' },
             },
+            {
+              label: 'Smaller Bundles & Faster Startup',
+              slug: 'advanced/bundle-size',
+              badge: { text: 'new' },
+            },
             DEV && {
               label: 'Naming Convention',
               slug: 'advanced/naming-convention',
