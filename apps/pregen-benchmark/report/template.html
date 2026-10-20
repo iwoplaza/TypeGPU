@@ -665,11 +665,26 @@
             <td>Kept: ~20 lines with a documented invariant</td>
           </tr>
           <tr>
-            <td>Avoid compiling a thunk per shader external on first use</td>
             <td>
-              ~90% of identifier-lookup time when cold (each external's thunk is compiled lazily)
+              Cheaper lookup of shader externals (like <code>std.sin</code>), the largest single
+              cold cost left (~9%): one switch function per <code>use gpu</code> function instead of
+              a thunk per external, or calling the plugin's thunks without the getter object
             </td>
-            <td>Stopped: needs a new plugin metadata format and different laziness rules</td>
+            <td>
+              No gain: jelly-slider 68.5 → 70.6 ms and 70.2 → 71.1 ms (31 interleaved runs each)
+            </td>
+            <td>
+              Stopped: the cost is evaluating each external the first time, which any format must do
+            </td>
+          </tr>
+          <tr>
+            <td>Anything else in shader generation</td>
+            <td>The cold profile is flat: no remaining function above 4.6% of generation time</td>
+            <td>
+              Stopped: removing a cost that size means hand-tuning core generator code (for example
+              replacing the <code>stitch</code> template helper, 1.5%, with manual concatenation),
+              which makes it harder to read for at most a few percent
+            </td>
           </tr>
           <tr>
             <td>Vectors that don't extend Array</td>
