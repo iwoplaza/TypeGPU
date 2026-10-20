@@ -927,6 +927,18 @@ export class ResolutionCtxImpl implements ResolutionCtx {
     return maybeEventual;
   }
 
+  /**
+   * Whether every slot in the map currently has a value equal to the one recorded in it.
+   */
+  private _slotsHaveValues(slotToValueMap: Map<TgpuSlot<unknown>, unknown>): boolean {
+    for (const [slot, expectedValue] of slotToValueMap) {
+      if (!slot.areEqual(this._itemStateStack.readSlot(slot), expectedValue)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   _getOrCompute<T>(lazy: TgpuLazy<T>): T {
     // All memoized versions of `lazy`
     const instances = this.#namespaceInternal.memoizedLazy.get(lazy) ?? [];
@@ -935,13 +947,7 @@ export class ResolutionCtxImpl implements ResolutionCtx {
 
     try {
       for (const instance of instances) {
-        const slotValuePairs = [...instance.slotToValueMap.entries()];
-
-        if (
-          slotValuePairs.every(([slot, expectedValue]) =>
-            slot.areEqual(this._itemStateStack.readSlot(slot), expectedValue),
-          )
-        ) {
+        if (this._slotsHaveValues(instance.slotToValueMap)) {
           return instance.result as T;
         }
       }
@@ -988,13 +994,7 @@ export class ResolutionCtxImpl implements ResolutionCtx {
 
     try {
       for (const instance of instances) {
-        const slotValuePairs = [...instance.slotToValueMap.entries()];
-
-        if (
-          slotValuePairs.every(([slot, expectedValue]) =>
-            slot.areEqual(this._itemStateStack.readSlot(slot), expectedValue),
-          )
-        ) {
+        if (this._slotsHaveValues(instance.slotToValueMap)) {
           return instance.result;
         }
       }
