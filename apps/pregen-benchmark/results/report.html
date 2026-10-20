@@ -747,18 +747,39 @@
           </tr>
           <tr>
             <td>
-              Restructure generation code into fewer, larger functions, so V8 compiles less on first
-              call (upper bound measured with V8's <code>--no-lazy</code>)
+              Fewer function bodies for V8 to compile on first call: the 108 std codegen functions
+              of the form <code>name(args)</code> share one <code>wgslCall</code> body
             </td>
             <td>
-              Lazy compilation is 17 of jelly-slider's 54 ms first generation and 10 of boids' 17
-              ms, but compiling up front moves it to import: totals 255 → 245 ms and 204 → 210 ms
+              First generation: jelly-slider 53.2 → 53.8 ms, boids 16.3 → 16.1 ms, stable-fluid 31.6
+              → 31.5 ms, slime-mold-3d 41.7 → 39.3 ms; −0.4 kB minified
+            </td>
+            <td>Kept for readability (one line per std function), not for speed</td>
+          </tr>
+          <tr>
+            <td>
+              Large dispatch functions instead of many small ones (the generator's
+              <code>_expression</code>/<code>_statement</code> before they were split, measured both
+              ways), with V8's <code>--no-lazy</code> as the upper bound for any such restructuring
             </td>
             <td>
-              Stopped: at best ~10 ms, by merging many small, separately named std and generator
-              functions into large dispatch functions. The bundle compile hint gets this in the
-              browser with no code change (per-file hints have no effect in Node 24)
+              Splitting changed first generation within noise. Lazy compilation is 17 of
+              jelly-slider's 54 ms and 10 of boids' 17 ms, but compiling up front moves it to
+              import: totals 255 → 245 ms and 204 → 210 ms
             </td>
+            <td>
+              Stopped: merging more code into big dispatch functions recovers ~10 ms at most, and
+              the compile hints below get it without touching the code
+            </td>
+          </tr>
+          <tr>
+            <td>Ship V8's compile hint at the top of every file of the built package</td>
+            <td>
+              Unbundled (one module per file, as from a CDN), mobile: first submit 70–75 ms sooner,
+              script evaluation 70–90 ms shorter (jelly-slider, boids; every interleaved pair).
+              Bundled apps: identical output, since bundlers drop the comment. No effect in Node 24
+            </td>
+            <td>Kept: three lines in the build script</td>
           </tr>
           <tr>
             <td>Vectors that don't extend Array</td>
