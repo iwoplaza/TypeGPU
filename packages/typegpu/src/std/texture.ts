@@ -1,4 +1,4 @@
-import { stitch } from '../core/resolve/stitch.ts';
+import { stitch, wgslCall } from '../core/resolve/stitch.ts';
 import {
   isWgslExternalTexture,
   isWgslTexture,
@@ -548,7 +548,7 @@ function textureNumLayersCpu<T extends ArrayTexture>(_texture: T): number {
 export const textureNumLayers = dualImpl({
   name: 'textureNumLayers',
   normalImpl: textureNumLayersCpu,
-  codegenImpl: (_ctx, [texture]) => stitch`textureNumLayers(${texture})`,
+  codegenImpl: wgslCall('textureNumLayers'),
   signature: (texture) => ({ argTypes: [texture], returnType: u32 }),
   sideEffects: false,
 });
@@ -574,7 +574,7 @@ function textureNumLevelsCpu<T extends MipmappedTexture>(_texture: T): number {
 export const textureNumLevels = dualImpl({
   name: 'textureNumLevels',
   normalImpl: textureNumLevelsCpu,
-  codegenImpl: (_ctx, [texture]) => stitch`textureNumLevels(${texture})`,
+  codegenImpl: wgslCall('textureNumLevels'),
   signature: (texture) => ({ argTypes: [texture], returnType: u32 }),
   sideEffects: false,
 });
@@ -590,7 +590,7 @@ function textureNumSamplesCpu<T extends textureMultisampled2d | textureDepthMult
 export const textureNumSamples = dualImpl({
   name: 'textureNumSamples',
   normalImpl: textureNumSamplesCpu,
-  codegenImpl: (_ctx, [texture]) => stitch`textureNumSamples(${texture})`,
+  codegenImpl: wgslCall('textureNumSamples'),
   signature: (texture) => ({ argTypes: [texture], returnType: u32 }),
   sideEffects: false,
 });

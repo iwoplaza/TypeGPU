@@ -1,6 +1,6 @@
 import * as TB from 'typed-binary';
 import { dualImpl } from '../core/function/dualImpl.ts';
-import { stitch } from '../core/resolve/stitch.ts';
+import { wgslCall } from '../core/resolve/stitch.ts';
 import { u32 } from '../data/numeric.ts';
 import { clampScalar } from '../data/numberOps.ts';
 import { vec2f, vec4f, vec4i, vec4u } from '../data/vector.ts';
@@ -37,7 +37,7 @@ export const unpack2x16float = dualImpl({
     return vec2f(readFloat16(reader), readFloat16(reader));
   },
   signature: { argTypes: [u32], returnType: vec2f },
-  codegenImpl: (_ctx, [e]) => stitch`unpack2x16float(${e})`,
+  codegenImpl: wgslCall('unpack2x16float'),
   sideEffects: false,
 });
 
@@ -53,7 +53,7 @@ export const pack2x16float = dualImpl({
       writeFloat16(writer, e.y);
     }),
   signature: { argTypes: [vec2f], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack2x16float(${e})`,
+  codegenImpl: wgslCall('pack2x16float'),
   sideEffects: false,
 });
 
@@ -72,7 +72,7 @@ export const pack2x16snorm = dualImpl({
     });
   },
   signature: { argTypes: [vec2f], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack2x16snorm(${e})`,
+  codegenImpl: wgslCall('pack2x16snorm'),
   sideEffects: false,
 });
 
@@ -91,7 +91,7 @@ export const pack2x16unorm = dualImpl({
     });
   },
   signature: { argTypes: [vec2f], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack2x16unorm(${e})`,
+  codegenImpl: wgslCall('pack2x16unorm'),
   sideEffects: false,
 });
 
@@ -111,7 +111,7 @@ export const unpack4x8unorm = dualImpl({
     );
   },
   signature: { argTypes: [u32], returnType: vec4f },
-  codegenImpl: (_ctx, [e]) => stitch`unpack4x8unorm(${e})`,
+  codegenImpl: wgslCall('unpack4x8unorm'),
   sideEffects: false,
 });
 
@@ -131,7 +131,7 @@ export const unpack4x8snorm = dualImpl({
     );
   },
   signature: { argTypes: [u32], returnType: vec4f },
-  codegenImpl: (_ctx, [e]) => stitch`unpack4x8snorm(${e})`,
+  codegenImpl: wgslCall('unpack4x8snorm'),
   sideEffects: false,
 });
 
@@ -146,7 +146,7 @@ export const unpack4xI8 = dualImpl({
     return vec4i(reader.readInt8(), reader.readInt8(), reader.readInt8(), reader.readInt8());
   },
   signature: { argTypes: [u32], returnType: vec4i },
-  codegenImpl: (_ctx, [e]) => stitch`unpack4xI8(${e})`,
+  codegenImpl: wgslCall('unpack4xI8'),
   sideEffects: false,
 });
 
@@ -161,7 +161,7 @@ export const unpack4xU8 = dualImpl({
     return vec4u(reader.readUint8(), reader.readUint8(), reader.readUint8(), reader.readUint8());
   },
   signature: { argTypes: [u32], returnType: vec4u },
-  codegenImpl: (_ctx, [e]) => stitch`unpack4xU8(${e})`,
+  codegenImpl: wgslCall('unpack4xU8'),
   sideEffects: false,
 });
 
@@ -179,7 +179,7 @@ export const unpack2x16snorm = dualImpl({
     );
   },
   signature: { argTypes: [u32], returnType: vec2f },
-  codegenImpl: (_ctx, [e]) => stitch`unpack2x16snorm(${e})`,
+  codegenImpl: wgslCall('unpack2x16snorm'),
   sideEffects: false,
 });
 
@@ -194,7 +194,7 @@ export const unpack2x16unorm = dualImpl({
     return vec2f(reader.readUint16() / 65535, reader.readUint16() / 65535);
   },
   signature: { argTypes: [u32], returnType: vec2f },
-  codegenImpl: (_ctx, [e]) => stitch`unpack2x16unorm(${e})`,
+  codegenImpl: wgslCall('unpack2x16unorm'),
   sideEffects: false,
 });
 
@@ -212,7 +212,7 @@ export const pack4x8unorm = dualImpl({
       writer.writeUint8(Math.floor(0.5 + 255 * clampScalar(e.w, 0, 1)));
     }),
   signature: { argTypes: [vec4f], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack4x8unorm(${e})`,
+  codegenImpl: wgslCall('pack4x8unorm'),
   sideEffects: false,
 });
 
@@ -230,7 +230,7 @@ export const pack4x8snorm = dualImpl({
       writer.writeInt8(Math.floor(0.5 + 127 * clampScalar(e.w, -1, 1)));
     }),
   signature: { argTypes: [vec4f], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack4x8snorm(${e})`,
+  codegenImpl: wgslCall('pack4x8snorm'),
   sideEffects: false,
 });
 
@@ -248,7 +248,7 @@ export const pack4xI8 = dualImpl({
       writer.writeInt8(e.w);
     }),
   signature: { argTypes: [vec4i], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack4xI8(${e})`,
+  codegenImpl: wgslCall('pack4xI8'),
   sideEffects: false,
 });
 
@@ -266,7 +266,7 @@ export const pack4xU8 = dualImpl({
       writer.writeUint8(e.w);
     }),
   signature: { argTypes: [vec4u], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack4xU8(${e})`,
+  codegenImpl: wgslCall('pack4xU8'),
   sideEffects: false,
 });
 
@@ -284,7 +284,7 @@ export const pack4xI8Clamp = dualImpl({
       writer.writeInt8(clampScalar(e.w, -128, 127));
     }),
   signature: { argTypes: [vec4i], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack4xI8Clamp(${e})`,
+  codegenImpl: wgslCall('pack4xI8Clamp'),
   sideEffects: false,
 });
 
@@ -302,6 +302,6 @@ export const pack4xU8Clamp = dualImpl({
       writer.writeUint8(clampScalar(e.w, 0, 255));
     }),
   signature: { argTypes: [vec4u], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack4xU8Clamp(${e})`,
+  codegenImpl: wgslCall('pack4xU8Clamp'),
   sideEffects: false,
 });

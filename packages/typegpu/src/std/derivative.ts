@@ -1,5 +1,5 @@
 import { dualImpl } from '../core/function/dualImpl.ts';
-import { stitch } from '../core/resolve/stitch.ts';
+import { wgslCall } from '../core/resolve/stitch.ts';
 import { f32 } from '../data/numeric.ts';
 import { vec2f, vec3f, vec4f } from '../data/vector.ts';
 import type { AnyFloat32VecInstance } from '../data/wgslTypes.ts';
@@ -24,7 +24,7 @@ export const dpdxCoarse = dualImpl<DerivativeSignature>({
   name: 'dpdxCoarse',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`dpdxCoarse(${value})`,
+  codegenImpl: wgslCall('dpdxCoarse'),
   sideEffects: false,
 });
 
@@ -32,7 +32,7 @@ export const dpdxFine = dualImpl<DerivativeSignature>({
   name: 'dpdxFine',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`dpdxFine(${value})`,
+  codegenImpl: wgslCall('dpdxFine'),
   sideEffects: false,
 });
 
@@ -48,7 +48,7 @@ export const dpdyCoarse = dualImpl<DerivativeSignature>({
   name: 'dpdyCoarse',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`dpdyCoarse(${value})`,
+  codegenImpl: wgslCall('dpdyCoarse'),
   sideEffects: false,
 });
 
@@ -56,7 +56,7 @@ export const dpdyFine = dualImpl<DerivativeSignature>({
   name: 'dpdyFine',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`dpdyFine(${value})`,
+  codegenImpl: wgslCall('dpdyFine'),
   sideEffects: false,
 });
 
@@ -72,7 +72,7 @@ export const fwidthCoarse = dualImpl<DerivativeSignature>({
   name: 'fwidthCoarse',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`fwidthCoarse(${value})`,
+  codegenImpl: wgslCall('fwidthCoarse'),
   sideEffects: false,
 });
 
@@ -80,6 +80,6 @@ export const fwidthFine = dualImpl<DerivativeSignature>({
   name: 'fwidthFine',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`fwidthFine(${value})`,
+  codegenImpl: wgslCall('fwidthFine'),
   sideEffects: false,
 });

@@ -33,3 +33,11 @@ export function stitch(
   }
   return result;
 }
+
+/**
+ * Generates a call to a WGSL builtin with the arguments it was given, e.g. `codegenImpl: wgslCall('abs')`.
+ * Every function made here shares one compiled body, instead of one per std function.
+ */
+export function wgslCall(name: string) {
+  return (_ctx: unknown, args: readonly Snippet[]) => stitch`${name}(${args})`;
+}
