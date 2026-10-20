@@ -94,6 +94,8 @@ import { allEq } from '../../std/boolean.ts';
 import { getName, setName } from '../../shared/meta.ts';
 import { logger } from '../../tgpuLogger.ts';
 import { safeStringify } from '../../shared/stringify.ts';
+import { QUERY_SETS_ENABLED, TEXTURES_ENABLED } from '../../shared/env.ts';
+import { featureDisabledError } from '../../errors.ts';
 import type { RestoreContext } from '../../serial/types.ts';
 
 /**
@@ -455,6 +457,12 @@ class TgpuRootImpl extends WithBindingImpl implements TgpuRoot, ExperimentalTgpu
     count: number,
     rawQuerySet?: GPUQuerySet,
   ): TgpuQuerySet<T> {
+    if (!QUERY_SETS_ENABLED) {
+      throw featureDisabledError(
+        'Query sets (also used by performance callbacks)',
+        '__TYPEGPU_NO_QUERY_SETS__',
+      );
+    }
     return INTERNAL_createQuerySet(this, type, count, rawQuerySet);
   }
 
@@ -468,7 +476,9 @@ class TgpuRootImpl extends WithBindingImpl implements TgpuRoot, ExperimentalTgpu
   }
 
   destroy() {
-    clearTextureUtilsCache(this.device);
+    if (TEXTURES_ENABLED) {
+      clearTextureUtilsCache(this.device);
+    }
 
     if (this.#ownDevice) {
       this.device.destroy();
@@ -500,16 +510,25 @@ class TgpuRootImpl extends WithBindingImpl implements TgpuRoot, ExperimentalTgpu
   ): TgpuTexture<
     CreateTextureResult<TSize, TFormat, TMipLevelCount, TSampleCount, TViewFormats, TDimension>
   > {
+    if (!TEXTURES_ENABLED) {
+      throw featureDisabledError('Textures', '__TYPEGPU_NO_TEXTURES__');
+    }
     const texture = INTERNAL_createTexture(props, this);
     // oxlint-disable-next-line typescript/no-explicit-any -- too much type wrangling
     return texture as any;
   }
 
   createSampler(props: WgslSamplerProps): TgpuFixedSampler {
+    if (!TEXTURES_ENABLED) {
+      throw featureDisabledError('Samplers', '__TYPEGPU_NO_TEXTURES__');
+    }
     return INTERNAL_createSampler(props, this);
   }
 
   createComparisonSampler(props: WgslComparisonSamplerProps): TgpuFixedComparisonSampler {
+    if (!TEXTURES_ENABLED) {
+      throw featureDisabledError('Samplers', '__TYPEGPU_NO_TEXTURES__');
+    }
     return INTERNAL_createComparisonSampler(props, this);
   }
 
@@ -569,7 +588,7 @@ class TgpuRootImpl extends WithBindingImpl implements TgpuRoot, ExperimentalTgpu
       return resource.buffer.buffer;
     }
 
-    if (isTextureView(resource)) {
+    if (TEXTURES_ENABLED && isTextureView(resource)) {
       if (!resource[$internal].unwrap) {
         throw new Error('Cannot unwrap laid-out texture view as it has no underlying resource.');
       }
@@ -585,7 +604,7 @@ class TgpuRootImpl extends WithBindingImpl implements TgpuRoot, ExperimentalTgpu
       return internals.materialize() as UnwrapResult;
     }
 
-    if (isSampler(resource) || isComparisonSampler(resource)) {
+    if (TEXTURES_ENABLED && (isSampler(resource) || isComparisonSampler(resource))) {
       throw new Error('Cannot unwrap laid-out sampler.');
     }
 

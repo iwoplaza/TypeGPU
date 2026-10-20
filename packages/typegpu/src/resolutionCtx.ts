@@ -69,6 +69,13 @@ import { EntryInputRouter } from './core/function/entryInputRouter.ts';
 import { validateIdentifier, sanitizePrimer, bannedTokens } from './nameUtils.ts';
 import { minify } from './minify.ts';
 
+// Defined in this file rather than imported from shared/env.ts: Rolldown keeps recursive functions
+// that are only reachable through a branch disabled by an imported constant, which would leave
+// most of the console.log code in apps that turn it off.
+declare const __TYPEGPU_NO_CONSOLE_LOG__: boolean | undefined;
+const CONSOLE_LOG_ENABLED =
+  typeof __TYPEGPU_NO_CONSOLE_LOG__ === 'undefined' || !__TYPEGPU_NO_CONSOLE_LOG__;
+
 /**
  * Inserted into bind group entry definitions that belong
  * to the automatically generated catch-all bind group.
@@ -464,7 +471,10 @@ export class ResolutionCtxImpl implements ResolutionCtx {
 
   constructor(opts: ResolutionCtxImplOptions) {
     this.enableExtensions = opts.enableExtensions;
-    this.#logGenerator = opts.root ? new LogGeneratorImpl(opts.root) : new LogGeneratorNullImpl();
+    this.#logGenerator =
+      opts.root && CONSOLE_LOG_ENABLED
+        ? new LogGeneratorImpl(opts.root)
+        : new LogGeneratorNullImpl();
     this.#namespaceInternal = opts.namespace[$internal];
     this.gen = opts.shaderGenerator ?? new WgslGenerator();
     this.gen.initGenerator(this);

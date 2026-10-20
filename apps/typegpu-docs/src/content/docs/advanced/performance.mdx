@@ -1,0 +1,55 @@
+---
+title: Performance Tips
+description: Options that make apps using TypeGPU ship less JavaScript and show their first frame sooner.
+---
+
+## Leaving out features your app doesn't use
+
+Methods of the root object, like `root.createTexture()`, can't be removed by bundlers even when an app never calls them,
+so every app ships the code behind them. If your app doesn't use a feature, you can tell the bundler with its `define` option,
+and the code behind that feature will be left out of the bundle.
+
+| Flag | Leaves out | Then throws |
+| --- | --- | --- |
+| `__TYPEGPU_NO_TEXTURES__` | Textures, texture views and samplers created through the root | `root.createTexture()`, `root.createSampler()`, `root.createComparisonSampler()` |
+| `__TYPEGPU_NO_QUERY_SETS__` | Query sets, also used by `.withPerformanceCallback()` | `root.createQuerySet()` |
+| `__TYPEGPU_NO_CONSOLE_LOG__` | Support for `console.log` inside shaders (calls compile to nothing) | - |
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import typegpu from 'unplugin-typegpu/vite';
+
+export default defineConfig({
+  plugins: [typegpu()],
+  define: {
+    __TYPEGPU_NO_TEXTURES__: 'true',
+    __TYPEGPU_NO_QUERY_SETS__: 'true',
+    __TYPEGPU_NO_CONSOLE_LOG__: 'true',
+  },
+});
+```
+
+In an app that renders particles with one compute and one render pipeline, the three flags together shrink the bundle by 38 kB minified (10 kB gzipped).
+Apps that don't define the flags behave exactly as before.
+
+## Compiling the bundle eagerly
+
+Shader code generation runs during the first frame, on code the JavaScript engine has never seen, so the engine spends part of that time compiling functions on their first call.
+Chromium-based browsers (since version 136) accept a hint that compiles every function in a file up front. In Vite, add it to the start of each output file:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+  build: {
+    rolldownOptions: {
+      output: {
+        // Added after minification, which would otherwise strip the comment
+        postBanner: '//# allFunctionsCalledOnLoad',
+      },
+    },
+  },
+});
+```
+
+On a throttled mobile profile, this got the first frame of our examples on screen 60 to 90 ms sooner.

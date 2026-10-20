@@ -266,6 +266,11 @@ export default defineConfig({
               slug: 'advanced/minifying-shaders',
               badge: { text: 'new' },
             },
+            {
+              label: 'Performance Tips',
+              slug: 'advanced/performance',
+              badge: { text: 'new' },
+            },
             DEV && {
               label: 'Naming Convention',
               slug: 'advanced/naming-convention',
