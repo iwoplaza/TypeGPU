@@ -22,7 +22,7 @@ await rm('dist', { recursive: true, force: true, maxRetries: 3 });
 consola.start('Building with tsc...');
 await $`tsc --p tsconfig.build.json`;
 
-consola.start('Inlining package version...');
+consola.start('Inlining package version and adding compile hints...');
 const { version } = await Bun.file('package.json').json();
 // Targets imports of the form: import { version } from 'typegpu/package.json';
 const versionImport = /import\s*\{\s*version\s*\}\s*from\s*['"]typegpu\/package\.json['"];?\n?/g;
@@ -32,16 +32,23 @@ const jsonImport = /from\s*['"]\S*\.json['"]/g;
 for await (const path of new Bun.Glob('dist/**/*.js').scan('.')) {
   const file = Bun.file(path);
   const content = await file.text();
-  const replaced = content.replace(versionImport, `const version = ${JSON.stringify(version)};\n`);
+  const versionInlined = content.replace(
+    versionImport,
+    `const version = ${JSON.stringify(version)};\n`,
+  );
+  // Asks V8 (Chromium 136+) to compile the whole file up front instead of on first call, which
+  // gets the first shader generated sooner when the files are loaded unbundled, e.g. from a CDN.
+  // Bundlers drop the comment, so bundled apps aren't affected.
+  const replaced = `//# allFunctionsCalledOnLoad\n${versionInlined}`;
 
   if (jsonImport.test(replaced)) {
     throw new Error(`Not all JSON imports have been resolved: ${path}`);
   }
 
-  if (replaced !== content) {
+  if (versionInlined !== content) {
     consola.log(` - ${path}`);
-    await Bun.write(path, replaced);
   }
+  await Bun.write(path, replaced);
 }
 
 consola.start('Copying bin.mjs...');
