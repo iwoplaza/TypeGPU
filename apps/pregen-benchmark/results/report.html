@@ -672,6 +672,30 @@
           </tr>
           <tr>
             <td>
+              Fill <code>var</code>/<code>let</code> placeholders with one fixed regex instead of
+              building one per function; check memoized slot values without copying them into an
+              array
+            </td>
+            <td>Warm generation 4–5% faster (jelly-slider 15.8 → 15.2 ms); first within noise</td>
+            <td>Kept: shorter code, and a duplicated check became one method</td>
+          </tr>
+          <tr>
+            <td>
+              Ask V8 to compile the app bundle eagerly with the
+              <code>//# allFunctionsCalledOnLoad</code> compile hint (one line of build config:
+              Rolldown's <code>output.postBanner</code>)
+            </td>
+            <td>
+              Mobile: first submit 71–137 ms sooner, first frame 59–92 ms sooner (boids,
+              stable-fluid, jelly-slider; every interleaved pair)
+            </td>
+            <td>
+              Recommended to apps: the package can't ship it, since bundlers drop the comment, and a
+              plugin option would need its own hook in each of the 8 supported bundlers
+            </td>
+          </tr>
+          <tr>
+            <td>
               Hand-tune the 39 one-argument std codegen functions (build the string directly instead
               of using stitch)
             </td>
@@ -685,7 +709,9 @@
             </td>
             <td>No gain: jelly-slider 68.5 → 70.6 ms and 70.2 → 71.1 ms</td>
             <td>
-              Stopped: the cost is evaluating each external the first time, which any format must do
+              Stopped: the cost is evaluating each external the first time, which any format must
+              do. A new format is also a contract between two packages: typegpu still decodes the
+              pre-0.9 format next to the current one, so a third would be kept indefinitely
             </td>
           </tr>
           <tr>

@@ -24,6 +24,9 @@ node scripts/bench.ts --label=mine [--runs=7] [--only=boids] [--profiles=desktop
 node scripts/report.ts report.html baseline mine   # HTML report comparing two result files
 ```
 
+Set `COMPILE_HINT=1` when building to prepend V8's `//# allFunctionsCalledOnLoad`
+compile hint to each bundle.
+
 `scripts/profile.ts` records a CPU profile of a single load, and `scripts/quick.ts`
 prints load marks for fast iteration on TypeGPU itself.
 

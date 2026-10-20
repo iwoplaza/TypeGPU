@@ -35,5 +35,11 @@ export default defineConfig({
     emptyOutDir: true,
     reportCompressedSize: false,
     minify: process.env.MINIFY !== '0',
+    rolldownOptions: {
+      output: {
+        // V8 compiles every function in the file eagerly, instead of on first call. See the report.
+        postBanner: process.env.COMPILE_HINT ? '//# allFunctionsCalledOnLoad' : undefined,
+      },
+    },
   },
 });
