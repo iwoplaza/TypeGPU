@@ -730,16 +730,34 @@
           </tr>
           <tr>
             <td>
-              Cheaper lookup of shader externals like <code>std.sin</code> (one switch per
-              <code>'use gpu'</code> function, or calling the plugin's thunks directly)
+              New plugin metadata format: one <code>switch</code> per <code>'use gpu'</code>
+              function instead of a function per external, called directly during generation
+              (prototyped end to end in the plugin and typegpu)
             </td>
-            <td>No gain: jelly-slider 68.5 → 70.6 ms and 70.2 → 71.1 ms</td>
             <td>
-              Stopped: the cost is evaluating each external the first time, which any format must
-              do. A new format would also need changes in 4 places (two emitters in the plugin, the
-              plugin's parser for already-built dependencies, typegpu's decoder), and each reader
-              would handle two shapes for as long as published libraries like typegpu-noise carry
-              the current one
+              Identical WGSL for all 22 shaders; first generation jelly-slider 53.3 → 52.5 ms, boids
+              16.2 → 16.1 ms, stable-fluid 32.1 → 32.2 ms (A/A noise ~2%). Calling the current
+              format's per-external functions directly: 70.2 → 71.1 ms
+            </td>
+            <td>
+              Stopped: no gain, for 5 files changed (+57/−14) plus a format version that both
+              packages, and libraries already published with the current format, would carry from
+              then on
+            </td>
+          </tr>
+          <tr>
+            <td>
+              Restructure generation code into fewer, larger functions, so V8 compiles less on first
+              call (upper bound measured with V8's <code>--no-lazy</code>)
+            </td>
+            <td>
+              Lazy compilation is 17 of jelly-slider's 54 ms first generation and 10 of boids' 17
+              ms, but compiling up front moves it to import: totals 255 → 245 ms and 204 → 210 ms
+            </td>
+            <td>
+              Stopped: at best ~10 ms, by merging many small, separately named std and generator
+              functions into large dispatch functions. The bundle compile hint gets this in the
+              browser with no code change (per-file hints have no effect in Node 24)
             </td>
           </tr>
           <tr>
@@ -780,7 +798,8 @@
             </td>
             <td>
               Mobile JS per frame: stable-fluid 2.7 → 2.1 ms (slowest 10% of frames 8.7 → 5.3 ms),
-              jelly-slider 10.1 → 8.4 ms; desktop unchanged
+              jelly-slider 10.1 → 8.4 ms; desktop unchanged. First frame: stable-fluid ~180 ms
+              sooner on desktop and mobile, boids and jelly-slider unchanged
             </td>
             <td>
               Kept as opt-in: one small module, 23 call sites through <code>getQueue()</code> or a
@@ -901,8 +920,9 @@
       <li>The static server serves gzip; brotli sizes are in the table.</li>
       <li>
         Frame CPU time is the JS time spent inside the frame callback and the microtasks it queues,
-        sampled after the first 10 frames. On SwiftShader the heavy scenes only render a handful of
-        frames, so treat those numbers as rough.
+        sampled after the first 10 frames. The first frame is marked once the GPU finishes the work
+        submitted in the first frame, including submits deferred to a microtask. On SwiftShader the
+        heavy scenes only render a handful of frames, so treat those numbers as rough.
       </li>
       <li>
         The harness, examples and scripts live in <code>apps/pregen-benchmark</code>;

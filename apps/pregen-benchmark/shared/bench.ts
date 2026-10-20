@@ -38,9 +38,12 @@ export function markFirstSubmit(device: GPUDevice) {
   }
   state.firstSubmit = performance.now();
   performance.mark('first-submit');
-  void device.queue.onSubmittedWorkDone().then(() => {
-    state.firstFrame = performance.now();
-    performance.mark('first-frame');
+  // After the microtasks already queued, so that submits deferred by the frame are included
+  queueMicrotask(() => {
+    void device.queue.onSubmittedWorkDone().then(() => {
+      state.firstFrame = performance.now();
+      performance.mark('first-frame');
+    });
   });
 }
 
