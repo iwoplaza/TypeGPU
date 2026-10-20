@@ -1,5 +1,5 @@
 import { dualImpl } from '../core/function/dualImpl.ts';
-import { stitch } from '../core/resolve/stitch.ts';
+import { stitch, wgslCall } from '../core/resolve/stitch.ts';
 import { bool, f16, f32, i32, u32 } from '../data/numeric.ts';
 import { isSnippetNumeric, snip } from '../data/snippet.ts';
 import {
@@ -299,7 +299,7 @@ export const all = dualImpl({
   name: 'all',
   signature: (...argTypes) => ({ argTypes, returnType: bool }),
   normalImpl: cpuAll,
-  codegenImpl: (_ctx, [value]) => stitch`all(${value})`,
+  codegenImpl: wgslCall('all'),
   sideEffects: false,
 });
 
@@ -313,7 +313,7 @@ export const any = dualImpl({
   name: 'any',
   signature: (...argTypes) => ({ argTypes, returnType: bool }),
   normalImpl: (value: AnyBooleanVecInstance) => !cpuAll(cpuNot(value)),
-  codegenImpl: (_ctx, [arg]) => stitch`any(${arg})`,
+  codegenImpl: wgslCall('any'),
   sideEffects: false,
 });
 
