@@ -332,6 +332,12 @@
     padding: 12px 0;
     border-bottom: 1px solid var(--rule);
   }
+  table.text-table td,
+  table.text-table th {
+    white-space: normal;
+    text-align: left;
+    min-width: 140px;
+  }
   .opt:last-child {
     border-bottom: 0;
   }
@@ -381,11 +387,11 @@
           show almost none.
         </li>
         <li>
-          <strong>The optimized TypeGPU ships 6.5% less gzipped JS</strong> (5.8–6.7 kB per app). On
-          mobile it reaches the first frame 50–100 ms sooner in three of the four examples and
-          blocks the main thread 30–80 ms less; slime-mold-3d is unchanged within noise. CPU-side
-          vector math and buffer writes got several times faster: jelly-slider spends under a third
-          of the JS time per frame it used to (42.5 → 12.2 ms on mobile).
+          <strong>The optimized TypeGPU ships 6.4% less gzipped JS</strong> (5.8–6.6 kB per app). On
+          mobile it reaches the first frame 34–190 ms sooner in all four examples and blocks the
+          main thread up to 85 ms less (slime-mold-3d unchanged). CPU-side vector math and buffer
+          writes got several times faster: jelly-slider spends a quarter of the JS time per frame it
+          used to (42.5 → 10.4 ms on mobile).
         </li>
         <li>
           <strong>What's left is structural.</strong> The shader generator and the root object's
@@ -589,10 +595,10 @@
           component through the callable <code>d.f32</code> schema, behind a getter that allocated a
           fresh object. Callable schemas and std functions forwarded calls through rest/spread
           wrappers, and the generic component-wise helper allocated arrays per component. A scalar
-          fast path, direct cast functions, bound functions instead of wrappers, and plain loops
-          remove all of that.
+          fast path, casting in each vector class's own constructor, bound functions instead of
+          wrappers, and plain loops remove all of that.
         </p>
-        <div class="effect">d.vec2f(x, y): ~630 → ~95 ns · std.sin(x): 155 → 71 ns</div>
+        <div class="effect">d.vec2f(x, y): ~630 → ~60 ns · std.sin(x): 155 → 71 ns</div>
       </div>
       <div class="opt">
         <div class="what">No uniform-alignment analysis when its warning is off</div>
@@ -616,6 +622,79 @@
           Warm resolve −20–25% (stable-fluid 10.5 → 7.8 ms); cold first resolve −3–9%
         </div>
       </div>
+    </div>
+  </section>
+
+  <section id="experiments">
+    <h2>What we tried, and where we stopped</h2>
+    <p>
+      Each of these was prototyped and measured. The ones that paid off are in the list above; the
+      rest stopped where the gain no longer justified the cost in code clarity, API or behavior.
+    </p>
+    <div class="table-wrap">
+      <table class="text-table">
+        <thead>
+          <tr>
+            <th>Idea</th>
+            <th>Measured effect</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cast vector components in each class's constructor (15 short constructors)</td>
+            <td>d.vec2f 82 → 60 ns</td>
+            <td>Kept: uniform, tested pattern</td>
+          </tr>
+          <tr>
+            <td>Cache external snippets per function during generation</td>
+            <td>Warm resolve −10%, cold up to −6%</td>
+            <td>Kept: one map on the function scope</td>
+          </tr>
+          <tr>
+            <td>Vectors that don't extend Array</td>
+            <td>At most ~20 of the remaining 60 ns</td>
+            <td>Stopped: breaks Array.isArray and array methods on vectors</td>
+          </tr>
+          <tr>
+            <td>Share generated helpers across a root's pipelines</td>
+            <td>jelly-slider 69.3 → 69.9 ms, stable-fluid 41.1 → 41.6 ms</td>
+            <td>Stopped: no gain; the cold cost is JIT warm-up, not duplicate work</td>
+          </tr>
+          <tr>
+            <td>Load console.log decoding lazily with import()</td>
+            <td>Total JS 273 → 278 kB (the bundler split out a shared chunk)</td>
+            <td>Stopped: makes things worse</td>
+          </tr>
+          <tr>
+            <td>Ship 'use gpu' ASTs as JSON strings parsed on first use</td>
+            <td>jelly-slider load −4 ms, JS +11 kB</td>
+            <td>Stopped: trades size for little time</td>
+          </tr>
+          <tr>
+            <td>Table-driven vertex-format readers and writers</td>
+            <td>&lt; 1 kB gzip</td>
+            <td>Stopped: would need special cases for existing rounding quirks</td>
+          </tr>
+          <tr>
+            <td>Define swizzles with one defineProperties call</td>
+            <td>No change</td>
+            <td>Stopped</td>
+          </tr>
+          <tr>
+            <td>Batch draws and dispatches into one submit by default</td>
+            <td>Fewer submits per frame</td>
+            <td>
+              Stopped: reorders them relative to buffer.write(); explicit batching already exists
+            </td>
+          </tr>
+          <tr>
+            <td>Opt-in entry points for textures, samplers, query sets and shader logging</td>
+            <td>Up to 36 kB minified (14%) for apps that use none of them</td>
+            <td>Stopped: a breaking API change for every app</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </section>
 

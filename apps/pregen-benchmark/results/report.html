@@ -332,6 +332,12 @@
     padding: 12px 0;
     border-bottom: 1px solid var(--rule);
   }
+  table.text-table td,
+  table.text-table th {
+    white-space: normal;
+    text-align: left;
+    min-width: 140px;
+  }
   .opt:last-child {
     border-bottom: 0;
   }
@@ -381,11 +387,11 @@
           show almost none.
         </li>
         <li>
-          <strong>The optimized TypeGPU ships 6.5% less gzipped JS</strong> (5.8–6.7 kB per app). On
-          mobile it reaches the first frame 50–100 ms sooner in three of the four examples and
-          blocks the main thread 30–80 ms less; slime-mold-3d is unchanged within noise. CPU-side
-          vector math and buffer writes got several times faster: jelly-slider spends under a third
-          of the JS time per frame it used to (42.5 → 12.2 ms on mobile).
+          <strong>The optimized TypeGPU ships 6.4% less gzipped JS</strong> (5.8–6.6 kB per app). On
+          mobile it reaches the first frame 34–190 ms sooner in all four examples and blocks the
+          main thread up to 85 ms less (slime-mold-3d unchanged). CPU-side vector math and buffer
+          writes got several times faster: jelly-slider spends a quarter of the JS time per frame it
+          used to (42.5 → 10.4 ms on mobile).
         </li>
         <li>
           <strong>What's left is structural.</strong> The shader generator and the root object's
@@ -589,10 +595,10 @@
           component through the callable <code>d.f32</code> schema, behind a getter that allocated a
           fresh object. Callable schemas and std functions forwarded calls through rest/spread
           wrappers, and the generic component-wise helper allocated arrays per component. A scalar
-          fast path, direct cast functions, bound functions instead of wrappers, and plain loops
-          remove all of that.
+          fast path, casting in each vector class's own constructor, bound functions instead of
+          wrappers, and plain loops remove all of that.
         </p>
-        <div class="effect">d.vec2f(x, y): ~630 → ~95 ns · std.sin(x): 155 → 71 ns</div>
+        <div class="effect">d.vec2f(x, y): ~630 → ~60 ns · std.sin(x): 155 → 71 ns</div>
       </div>
       <div class="opt">
         <div class="what">No uniform-alignment analysis when its warning is off</div>
@@ -616,6 +622,79 @@
           Warm resolve −20–25% (stable-fluid 10.5 → 7.8 ms); cold first resolve −3–9%
         </div>
       </div>
+    </div>
+  </section>
+
+  <section id="experiments">
+    <h2>What we tried, and where we stopped</h2>
+    <p>
+      Each of these was prototyped and measured. The ones that paid off are in the list above; the
+      rest stopped where the gain no longer justified the cost in code clarity, API or behavior.
+    </p>
+    <div class="table-wrap">
+      <table class="text-table">
+        <thead>
+          <tr>
+            <th>Idea</th>
+            <th>Measured effect</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Cast vector components in each class's constructor (15 short constructors)</td>
+            <td>d.vec2f 82 → 60 ns</td>
+            <td>Kept: uniform, tested pattern</td>
+          </tr>
+          <tr>
+            <td>Cache external snippets per function during generation</td>
+            <td>Warm resolve −10%, cold up to −6%</td>
+            <td>Kept: one map on the function scope</td>
+          </tr>
+          <tr>
+            <td>Vectors that don't extend Array</td>
+            <td>At most ~20 of the remaining 60 ns</td>
+            <td>Stopped: breaks Array.isArray and array methods on vectors</td>
+          </tr>
+          <tr>
+            <td>Share generated helpers across a root's pipelines</td>
+            <td>jelly-slider 69.3 → 69.9 ms, stable-fluid 41.1 → 41.6 ms</td>
+            <td>Stopped: no gain; the cold cost is JIT warm-up, not duplicate work</td>
+          </tr>
+          <tr>
+            <td>Load console.log decoding lazily with import()</td>
+            <td>Total JS 273 → 278 kB (the bundler split out a shared chunk)</td>
+            <td>Stopped: makes things worse</td>
+          </tr>
+          <tr>
+            <td>Ship 'use gpu' ASTs as JSON strings parsed on first use</td>
+            <td>jelly-slider load −4 ms, JS +11 kB</td>
+            <td>Stopped: trades size for little time</td>
+          </tr>
+          <tr>
+            <td>Table-driven vertex-format readers and writers</td>
+            <td>&lt; 1 kB gzip</td>
+            <td>Stopped: would need special cases for existing rounding quirks</td>
+          </tr>
+          <tr>
+            <td>Define swizzles with one defineProperties call</td>
+            <td>No change</td>
+            <td>Stopped</td>
+          </tr>
+          <tr>
+            <td>Batch draws and dispatches into one submit by default</td>
+            <td>Fewer submits per frame</td>
+            <td>
+              Stopped: reorders them relative to buffer.write(); explicit batching already exists
+            </td>
+          </tr>
+          <tr>
+            <td>Opt-in entry points for textures, samplers, query sets and shader logging</td>
+            <td>Up to 36 kB minified (14%) for apps that use none of them</td>
+            <td>Stopped: a breaking API change for every app</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </section>
 
@@ -994,143 +1073,143 @@
     },
     optimized: {
       'boids/runtime': {
-        sizes: { raw: 273216, gzip: 77577, brotli: 65898 },
+        sizes: { raw: 273953, gzip: 77711, brotli: 65938 },
         desktop: {
-          appStart: 57.5,
-          interactive: 92,
-          firstSubmit: 124.40000000037253,
-          firstFrame: 263.79999999981374,
-          firstInteractionHandled: 177.5,
-          firstInteractionDelay: 0.900000000372529,
-          domContentLoaded: 74.70000000018626,
-          jsTransferBytes: 77877,
+          appStart: 56.90000000037253,
+          interactive: 98.40000000037253,
+          firstSubmit: 123.40000000037253,
+          firstFrame: 246.90000000037253,
+          firstInteractionHandled: 247,
+          firstInteractionDelay: 0.8999999985098839,
+          domContentLoaded: 74.60000000149012,
+          jsTransferBytes: 78011,
           totalBlockingTimeMs: 0,
           longestTaskMs: 0,
-          scriptEvalMs: 98.32499999999999,
-          jsHeapUsedMB: 4.656089782714844,
+          scriptEvalMs: 109.518,
+          jsHeapUsedMB: 4.639244079589844,
           frameCpuMedianMs: 0.5,
-          frameCpuP90Ms: 3.800000000745058,
+          frameCpuP90Ms: 4.599999999627471,
         },
         mobile: {
-          appStart: 782.7000000001863,
-          interactive: 934.8000000007451,
-          firstSubmit: 1057.5,
-          firstFrame: 1231.2999999998137,
-          firstInteractionHandled: 1290,
-          firstInteractionDelay: 5.099999999627471,
-          domContentLoaded: 866.8000000007451,
-          jsTransferBytes: 77877,
-          totalBlockingTimeMs: 194,
-          longestTaskMs: 160,
-          scriptEvalMs: 408.61199999999997,
-          jsHeapUsedMB: 4.657436370849609,
-          frameCpuMedianMs: 2.5,
-          frameCpuP90Ms: 5,
+          appStart: 775.0999999996275,
+          interactive: 919,
+          firstSubmit: 1053.300000000745,
+          firstFrame: 1218.800000000745,
+          firstInteractionHandled: 1327.9000000003725,
+          firstInteractionDelay: 3.800000000745058,
+          domContentLoaded: 856.1999999992549,
+          jsTransferBytes: 78011,
+          totalBlockingTimeMs: 209,
+          longestTaskMs: 187,
+          scriptEvalMs: 384.778,
+          jsHeapUsedMB: 4.6804656982421875,
+          frameCpuMedianMs: 2.200000001117587,
+          frameCpuP90Ms: 3.599999999627471,
         },
       },
       'jelly-slider/runtime': {
-        sizes: { raw: 422019, gzip: 110865, brotli: 93006 },
+        sizes: { raw: 422756, gzip: 110993, brotli: 93149 },
         desktop: {
-          appStart: 71.3999999994412,
-          interactive: 279.20000000018626,
-          firstSubmit: 290.20000000018626,
-          firstFrame: 1747.3999999994412,
-          firstInteractionHandled: 377.20000000018626,
-          firstInteractionDelay: 7.800000000745058,
-          domContentLoaded: 95.70000000018626,
-          jsTransferBytes: 111165,
+          appStart: 90.79999999888241,
+          interactive: 280,
+          firstSubmit: 291.09999999962747,
+          firstFrame: 1784.9000000003725,
+          firstInteractionHandled: 389.90000000037253,
+          firstInteractionDelay: 5.200000001117587,
+          domContentLoaded: 115.5,
+          jsTransferBytes: 111293,
           totalBlockingTimeMs: 0,
           longestTaskMs: 0,
-          scriptEvalMs: 265.916,
-          jsHeapUsedMB: 6.93927001953125,
-          frameCpuMedianMs: 2.8999999994412065,
+          scriptEvalMs: 247.836,
+          jsHeapUsedMB: 6.109222412109375,
+          frameCpuMedianMs: 2.900000000372529,
           frameCpuP90Ms: 7.400000000372529,
         },
         mobile: {
-          appStart: 999.8999999994412,
-          interactive: 2190.899999999441,
-          firstSubmit: 2255.2000000001863,
-          firstFrame: 3963.7000000001863,
-          firstInteractionHandled: 3946.2999999998137,
-          firstInteractionDelay: 41.39999999944121,
-          domContentLoaded: 1133.199999999255,
-          jsTransferBytes: 111165,
-          totalBlockingTimeMs: 229,
-          longestTaskMs: 228,
-          scriptEvalMs: 834.372,
-          jsHeapUsedMB: 6.824779510498047,
-          frameCpuMedianMs: 12.200000000186265,
-          frameCpuP90Ms: 19.5,
+          appStart: 1003.6999999992549,
+          interactive: 2061.10000000149,
+          firstSubmit: 2117.800000000745,
+          firstFrame: 3845.5999999996275,
+          firstInteractionHandled: 3803.7999999988824,
+          firstInteractionDelay: 59.40000000037253,
+          domContentLoaded: 1129.199999999255,
+          jsTransferBytes: 111293,
+          totalBlockingTimeMs: 227,
+          longestTaskMs: 218,
+          scriptEvalMs: 859.349,
+          jsHeapUsedMB: 6.3065338134765625,
+          frameCpuMedianMs: 10.400000000372529,
+          frameCpuP90Ms: 18.299999998882413,
         },
       },
       'slime-mold-3d/runtime': {
-        sizes: { raw: 356711, gzip: 95514, brotli: 80217 },
+        sizes: { raw: 357448, gzip: 95645, brotli: 80456 },
         desktop: {
-          appStart: 71.70000000018626,
-          interactive: 129.40000000037253,
-          firstSubmit: 167.80000000074506,
-          firstFrame: 2417.800000000745,
-          firstInteractionHandled: 317.20000000018626,
-          firstInteractionDelay: 1,
-          domContentLoaded: 93.90000000037253,
-          jsTransferBytes: 95814,
+          appStart: 69.59999999962747,
+          interactive: 129.19999999925494,
+          firstSubmit: 168.09999999962747,
+          firstFrame: 2416.89999999851,
+          firstInteractionHandled: 314.19999999925494,
+          firstInteractionDelay: 0.900000000372529,
+          domContentLoaded: 91.09999999962747,
+          jsTransferBytes: 95945,
           totalBlockingTimeMs: 0,
           longestTaskMs: 0,
-          scriptEvalMs: 91.492,
-          jsHeapUsedMB: 5.636478424072266,
-          frameCpuMedianMs: 0.6000000005587935,
-          frameCpuP90Ms: 3.6000000005587935,
+          scriptEvalMs: 91.777,
+          jsHeapUsedMB: 5.618080139160156,
+          frameCpuMedianMs: 0.5,
+          frameCpuP90Ms: 0.8000000007450581,
         },
         mobile: {
-          appStart: 914.6999999992549,
-          interactive: 1220.8999999994412,
-          firstSubmit: 1354.699999999255,
-          firstFrame: 3878.2000000001863,
-          firstInteractionHandled: 3881.7000000011176,
-          firstInteractionDelay: 4.700000001117587,
-          domContentLoaded: 1025.699999999255,
-          jsTransferBytes: 95814,
-          totalBlockingTimeMs: 250,
-          longestTaskMs: 208,
-          scriptEvalMs: 408.068,
-          jsHeapUsedMB: 5.6793060302734375,
-          frameCpuMedianMs: 6.099999999627471,
-          frameCpuP90Ms: 6.099999999627471,
+          appStart: 893.0999999996275,
+          interactive: 1193.199999999255,
+          firstSubmit: 1315.5,
+          firstFrame: 3894.7999999988824,
+          firstInteractionHandled: 3009.89999999851,
+          firstInteractionDelay: 7,
+          domContentLoaded: 1007.1999999992549,
+          jsTransferBytes: 95945,
+          totalBlockingTimeMs: 237,
+          longestTaskMs: 189,
+          scriptEvalMs: 374.96000000000004,
+          jsHeapUsedMB: 5.665184020996094,
+          frameCpuMedianMs: 4.599999999627471,
+          frameCpuP90Ms: 4.599999999627471,
         },
       },
       'stable-fluid/runtime': {
-        sizes: { raw: 294665, gzip: 80718, brotli: 68557 },
+        sizes: { raw: 295402, gzip: 80844, brotli: 68604 },
         desktop: {
-          appStart: 72.89999999850988,
-          interactive: 320.7999999988824,
-          firstSubmit: 318.5,
-          firstFrame: 1243.199999999255,
-          firstInteractionHandled: 370.8999999985099,
-          firstInteractionDelay: 0.8000000007450581,
-          domContentLoaded: 91.19999999925494,
-          jsTransferBytes: 81018,
+          appStart: 60.90000000037253,
+          interactive: 311.2999999988824,
+          firstSubmit: 309.19999999925494,
+          firstFrame: 1231.4000000003725,
+          firstInteractionHandled: 364.90000000037253,
+          firstInteractionDelay: 1.099999999627471,
+          domContentLoaded: 79.19999999925494,
+          jsTransferBytes: 81144,
           totalBlockingTimeMs: 0,
           longestTaskMs: 0,
-          scriptEvalMs: 99.235,
-          jsHeapUsedMB: 5.974765777587891,
-          frameCpuMedianMs: 0.7000000011175871,
-          frameCpuP90Ms: 2.700000001117587,
+          scriptEvalMs: 88.76299999999999,
+          jsHeapUsedMB: 5.975246429443359,
+          frameCpuMedianMs: 0.7999999988824129,
+          frameCpuP90Ms: 2.400000000372529,
         },
         mobile: {
-          appStart: 812.5999999996275,
-          interactive: 3147.4000000003725,
-          firstSubmit: 3136.5999999996275,
-          firstFrame: 4240.200000001118,
-          firstInteractionHandled: 4343.700000001118,
-          firstInteractionDelay: 7,
-          domContentLoaded: 901.8000000007451,
-          jsTransferBytes: 81018,
-          totalBlockingTimeMs: 103,
-          longestTaskMs: 153,
-          scriptEvalMs: 375.231,
-          jsHeapUsedMB: 5.2253875732421875,
-          frameCpuMedianMs: 2.900000000372529,
-          frameCpuP90Ms: 11.099999999627471,
+          appStart: 823,
+          interactive: 3131,
+          firstSubmit: 3126.0999999996275,
+          firstFrame: 4240.199999999255,
+          firstInteractionHandled: 4337.200000001118,
+          firstInteractionDelay: 15,
+          domContentLoaded: 919.8999999985099,
+          jsTransferBytes: 81144,
+          totalBlockingTimeMs: 117,
+          longestTaskMs: 167,
+          scriptEvalMs: 375.484,
+          jsHeapUsedMB: 5.248729705810547,
+          frameCpuMedianMs: 3.300000000745058,
+          frameCpuP90Ms: 9,
         },
       },
     },
