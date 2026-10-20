@@ -619,8 +619,8 @@
           property first.
         </p>
         <div class="effect">
-          First generation vs. 0.12.7: −6 to −15% (boids 23.8 → 20.2 ms, jelly-slider 74.9 → 70.2
-          ms); later generations −9 to −25%
+          First generation vs. 0.12.7: 9–16% faster (boids 24.0 → 20.2 ms, jelly-slider 75.8 → 68.6
+          ms); later generations 16–30% faster
         </div>
       </div>
     </div>
@@ -629,10 +629,11 @@
   <section id="experiments">
     <h2>What we tried, and where we stopped</h2>
     <p>
-      Each of these was prototyped and measured. The ones that paid off are in the list above; the
-      rest stopped where the gain no longer justified the cost in code clarity, API or behavior.
-      Generation gains are per step, against the previous step; cold runs are noisy (±5%), so the
-      end-to-end comparison with 0.12.7 above is the number to trust.
+      Each of these was prototyped and measured. Shader generation timings come from interleaved
+      runs in fresh Node processes (31+ per comparison), with all builds side by side in one
+      directory. An A/A check showed a build's location on disk alone can shift timings by ~10%, and
+      identical builds agree within ~2% in this setup. The hand-tuning row is where readability
+      stops paying: rewriting call sites into lower-level code bought nothing measurable.
     </p>
     <div class="table-wrap">
       <table class="text-table">
@@ -651,39 +652,40 @@
           </tr>
           <tr>
             <td>Cache external snippets per function during generation</td>
-            <td>Warm resolve −10%, cold up to −6%</td>
+            <td>Warm generation ~10% faster</td>
             <td>Kept: one map on the function scope</td>
           </tr>
           <tr>
             <td>Split the generator's largest expression and statement handlers into methods</td>
-            <td>Cold generation 6–7% faster on larger shaders (up to 11% for loop-heavy ones)</td>
+            <td>Warm generation 4–11% faster; first generation within noise</td>
             <td>Kept: easier to read, too</td>
           </tr>
           <tr>
             <td>Cache conversion ranks per pair of schemas</td>
-            <td>Cold generation 4–10% faster (41 interleaved runs)</td>
+            <td>First generation 2–5% faster</td>
             <td>Kept: ~20 lines with a documented invariant</td>
           </tr>
           <tr>
-            <td>
-              Cheaper lookup of shader externals (like <code>std.sin</code>), the largest single
-              cold cost left (~9%): one switch function per <code>use gpu</code> function instead of
-              a thunk per external, or calling the plugin's thunks without the getter object
-            </td>
-            <td>
-              No gain: jelly-slider 68.5 → 70.6 ms and 70.2 → 71.1 ms (31 interleaved runs each)
-            </td>
-            <td>
-              Stopped: the cost is evaluating each external the first time, which any format must do
-            </td>
+            <td>Stitch snippets with plain loops instead of filter/map/join</td>
+            <td>First generation 2–4% faster, warm 2–6%</td>
+            <td>Kept: same readability</td>
           </tr>
           <tr>
-            <td>Anything else in shader generation</td>
-            <td>The cold profile is flat: no remaining function above 4.6% of generation time</td>
             <td>
-              Stopped: removing a cost that size means hand-tuning core generator code (for example
-              replacing the <code>stitch</code> template helper, 1.5%, with manual concatenation),
-              which makes it harder to read for at most a few percent
+              Hand-tune the 39 one-argument std codegen functions (build the string directly instead
+              of using stitch)
+            </td>
+            <td>No gain: within ±1.3 ms on all four examples (31 runs each)</td>
+            <td>Stopped: lower-level code at 39 call sites, for nothing</td>
+          </tr>
+          <tr>
+            <td>
+              Cheaper lookup of shader externals like <code>std.sin</code> (one switch per
+              <code>'use gpu'</code> function, or calling the plugin's thunks directly)
+            </td>
+            <td>No gain: jelly-slider 68.5 → 70.6 ms and 70.2 → 71.1 ms</td>
+            <td>
+              Stopped: the cost is evaluating each external the first time, which any format must do
             </td>
           </tr>
           <tr>
