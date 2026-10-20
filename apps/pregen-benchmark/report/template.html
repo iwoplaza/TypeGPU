@@ -387,11 +387,11 @@
           show almost none.
         </li>
         <li>
-          <strong>The optimized TypeGPU ships 6.4% less gzipped JS</strong> (5.8–6.6 kB per app). On
-          mobile it reaches the first frame 34–190 ms sooner in all four examples and blocks the
-          main thread up to 85 ms less (slime-mold-3d unchanged). CPU-side vector math and buffer
+          <strong>The optimized TypeGPU ships 6.2% less gzipped JS</strong> (5.5–6.3 kB per app). On
+          mobile it reaches the first frame 18–130 ms sooner in all four examples and blocks the
+          main thread up to 70 ms less (slime-mold-3d unchanged). CPU-side vector math and buffer
           writes got several times faster: jelly-slider spends a quarter of the JS time per frame it
-          used to (42.5 → 10.4 ms on mobile).
+          used to (42.5 → 10.5 ms on mobile).
         </li>
         <li>
           <strong>What's left is structural.</strong> The shader generator and the root object's
@@ -619,7 +619,8 @@
           property first.
         </p>
         <div class="effect">
-          Warm resolve −20–25% (stable-fluid 10.5 → 7.8 ms); cold first resolve −3–9%
+          First generation vs. 0.12.7: −6 to −15% (boids 23.8 → 20.2 ms, jelly-slider 74.9 → 70.2
+          ms); later generations −9 to −25%
         </div>
       </div>
     </div>
@@ -630,6 +631,8 @@
     <p>
       Each of these was prototyped and measured. The ones that paid off are in the list above; the
       rest stopped where the gain no longer justified the cost in code clarity, API or behavior.
+      Generation gains are per step, against the previous step; cold runs are noisy (±5%), so the
+      end-to-end comparison with 0.12.7 above is the number to trust.
     </p>
     <div class="table-wrap">
       <table class="text-table">
@@ -650,6 +653,23 @@
             <td>Cache external snippets per function during generation</td>
             <td>Warm resolve −10%, cold up to −6%</td>
             <td>Kept: one map on the function scope</td>
+          </tr>
+          <tr>
+            <td>Split the generator's largest expression and statement handlers into methods</td>
+            <td>Cold generation 6–7% faster on larger shaders (up to 11% for loop-heavy ones)</td>
+            <td>Kept: easier to read, too</td>
+          </tr>
+          <tr>
+            <td>Cache conversion ranks per pair of schemas</td>
+            <td>Cold generation 4–10% faster (41 interleaved runs)</td>
+            <td>Kept: ~20 lines with a documented invariant</td>
+          </tr>
+          <tr>
+            <td>Avoid compiling a thunk per shader external on first use</td>
+            <td>
+              ~90% of identifier-lookup time when cold (each external's thunk is compiled lazily)
+            </td>
+            <td>Stopped: needs a new plugin metadata format and different laziness rules</td>
           </tr>
           <tr>
             <td>Vectors that don't extend Array</td>
