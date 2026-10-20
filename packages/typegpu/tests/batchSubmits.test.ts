@@ -1,4 +1,4 @@
-import { describe, expect } from 'vitest';
+import { describe, expect, vi } from 'vitest';
 import { tgpu, d } from 'typegpu';
 import { it } from 'typegpu-testing-utility';
 
@@ -32,7 +32,7 @@ describe('unstable_batchSubmits', () => {
 
     await flushMicrotasks();
     expect(device.queue.submit).toHaveBeenCalledTimes(1);
-    expect(device.queue.submit.mock.calls[0]?.[0]).toHaveLength(2);
+    expect(vi.mocked(device.queue.submit).mock.calls[0]?.[0]).toHaveLength(2);
   });
 
   it('submits pending work before writing a buffer', ({ device }) => {
@@ -45,8 +45,9 @@ describe('unstable_batchSubmits', () => {
     pipeline.dispatchWorkgroups(1);
     buffer.write(1);
 
-    const submitOrder = device.queue.submit.mock.invocationCallOrder[0] ?? Infinity;
-    const writeOrder = device.queue.writeBuffer.mock.invocationCallOrder.at(-1) ?? -Infinity;
+    const submitOrder = vi.mocked(device.queue.submit).mock.invocationCallOrder[0] ?? Infinity;
+    const writeOrder =
+      vi.mocked(device.queue.writeBuffer).mock.invocationCallOrder.at(-1) ?? -Infinity;
     expect(submitOrder).toBeLessThan(writeOrder);
   });
 
@@ -76,9 +77,8 @@ describe('unstable_batchSubmits', () => {
     pipeline.dispatchWorkgroups(1);
     buffer.destroy();
 
-    expect(device.queue.submit.mock.invocationCallOrder[0]).toBeLessThan(
-      (raw.destroy as unknown as { mock: { invocationCallOrder: number[] } }).mock
-        .invocationCallOrder[0] ?? -Infinity,
+    expect(vi.mocked(device.queue.submit).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(raw.destroy).mock.invocationCallOrder[0] ?? -Infinity,
     );
   });
 });
