@@ -851,7 +851,10 @@
               (prototyped: 26 guards in 4 files, inside type-check chains shared with buffers)
             </td>
             <td>
-              boids: another −3.8 kB minified, −0.5 kB gzip; the sampler module still stays in
+              boids: another −3.8 kB minified, −0.5 kB gzip. The sampler module still stays in: its
+              classes' static blocks look like side effects to bundlers. Also wrapping both sampler
+              classes in IIFEs marked pure removes it: −5.7 kB minified, −0.85 kB gzip (1.2%) in
+              total, for 5 files changed
             </td>
             <td>
               Stopped: the flag would also disable raw <code>GPUTextureView</code> bindings, and
