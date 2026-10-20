@@ -96,6 +96,7 @@ import { logger } from '../../tgpuLogger.ts';
 import { safeStringify } from '../../shared/stringify.ts';
 import { QUERY_SETS_ENABLED, TEXTURES_ENABLED } from '../../shared/env.ts';
 import { featureDisabledError } from '../../errors.ts';
+import { enableSubmitBatching, flushPendingSubmits } from '../queue.ts';
 import type { RestoreContext } from '../../serial/types.ts';
 
 /**
@@ -481,6 +482,7 @@ class TgpuRootImpl extends WithBindingImpl implements TgpuRoot, ExperimentalTgpu
     }
 
     if (this.#ownDevice) {
+      flushPendingSubmits(this.device);
       this.device.destroy();
     }
   }
@@ -643,6 +645,16 @@ export type InitOptions = {
    */
   unstable_shaderGeneratorClass?: WgslGeneratorClass | undefined;
   unstable_logOptions?: LogGeneratorOptions;
+  /**
+   * If set to true, draws and dispatches made without an explicit command encoder are submitted
+   * together once the current task's synchronous code is done, instead of one by one, which takes
+   * less CPU time per frame. TypeGPU's own writes, reads and other operations stay in order with them,
+   * but direct use of `root.device` does not: write through TypeGPU, or record into an encoder from
+   * `root['~unstable'].createCommandEncoder()` instead.
+   *
+   * @default false
+   */
+  unstable_batchSubmits?: boolean | undefined;
 };
 
 /**
@@ -667,6 +679,16 @@ export type InitFromDeviceOptions = {
    */
   unstable_shaderGeneratorClass?: WgslGeneratorClass | undefined;
   unstable_logOptions?: LogGeneratorOptions;
+  /**
+   * If set to true, draws and dispatches made without an explicit command encoder are submitted
+   * together once the current task's synchronous code is done, instead of one by one, which takes
+   * less CPU time per frame. TypeGPU's own writes, reads and other operations stay in order with them,
+   * but direct use of `root.device` does not: write through TypeGPU, or record into an encoder from
+   * `root['~unstable'].createCommandEncoder()` instead.
+   *
+   * @default false
+   */
+  unstable_batchSubmits?: boolean | undefined;
 };
 
 /**
@@ -695,6 +717,7 @@ export async function init(options?: InitOptions): Promise<TgpuRoot> {
     unstable_minify: minify = false,
     unstable_logOptions: logOptions,
     unstable_shaderGeneratorClass: shaderGeneratorClass,
+    unstable_batchSubmits: batchSubmits = false,
   } = options ?? {};
   const { optionalFeatures, ...deviceDescriptor } = deviceOpt ?? {};
 
@@ -731,6 +754,9 @@ export async function init(options?: InitOptions): Promise<TgpuRoot> {
     requiredFeatures: availableFeatures,
   });
 
+  if (batchSubmits) {
+    enableSubmitBatching(device);
+  }
   return new TgpuRootImpl(device, names, minify, true, logOptions ?? {}, shaderGeneratorClass);
 }
 
@@ -750,7 +776,11 @@ export function initFromDevice(options: InitFromDeviceOptions): TgpuRoot {
     unstable_minify: minify = false,
     unstable_logOptions: logOptions,
     unstable_shaderGeneratorClass: shaderGeneratorClass,
+    unstable_batchSubmits: batchSubmits = false,
   } = options ?? {};
 
+  if (batchSubmits) {
+    enableSubmitBatching(device);
+  }
   return new TgpuRootImpl(device, names, minify, false, logOptions ?? {}, shaderGeneratorClass);
 }

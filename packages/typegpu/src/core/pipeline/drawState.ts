@@ -1,3 +1,4 @@
+import { submitOwnEncoder } from '../queue.ts';
 import { MissingBindGroupsError, MissingVertexBuffersError } from '../../errors.ts';
 import type { BaseData } from '../../data/wgslTypes.ts';
 import { $internal } from '../../shared/symbols.ts';
@@ -264,7 +265,7 @@ export function finalizeOwnEncoder(
   }
 
   if (priors.encoder === undefined) {
-    encoder.submit();
+    submitOwnEncoder(encoder);
   }
 }
 

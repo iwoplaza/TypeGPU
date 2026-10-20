@@ -267,8 +267,8 @@ export default defineConfig({
               badge: { text: 'new' },
             },
             {
-              label: 'Smaller Bundles & Faster Startup',
-              slug: 'advanced/bundle-size',
+              label: 'Performance Tips',
+              slug: 'advanced/performance',
               badge: { text: 'new' },
             },
             DEV && {
