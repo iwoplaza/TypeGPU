@@ -1,3 +1,4 @@
+import { flushPendingSubmits, getQueue } from '../queue.ts';
 import { getCompiledWriter } from '../../data/compiledIO.ts';
 import type { AnyData } from '../../data/dataTypes.ts';
 import { convertPartialToPatch, getPatchInstructions } from '../../data/partialIO.ts';
@@ -430,7 +431,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
       writeToArrayBuffer(this.#hostBuffer, this.dataType, data, options);
     }
 
-    this[$soul].device.queue.writeBuffer(
+    getQueue(this[$soul].device).writeBuffer(
       gpuBuffer,
       startOffset,
       this.#hostBuffer,
@@ -482,12 +483,12 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
       );
       for (const { data, gpuOffset, uploadSize } of instructions) {
         if (uploadSize === data.byteLength) {
-          this[$soul].device.queue.writeBuffer(gpuBuffer, gpuOffset, data);
+          getQueue(this[$soul].device).writeBuffer(gpuBuffer, gpuOffset, data);
         } else {
           // Extending the write into the trailing padding (see physicalSizeOf)
           const padded = new Uint8Array(uploadSize);
           padded.set(data);
-          this[$soul].device.queue.writeBuffer(gpuBuffer, gpuOffset, padded);
+          getQueue(this[$soul].device).writeBuffer(gpuBuffer, gpuOffset, padded);
         }
       }
     }
@@ -508,7 +509,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
 
     const rawEncoder = this[$soul].device.createCommandEncoder();
     rawEncoder.clearBuffer(gpuBuffer);
-    this[$soul].device.queue.submit([rawEncoder.finish()]);
+    getQueue(this[$soul].device).submit([rawEncoder.finish()]);
   }
 
   copyFrom(srcBuffer: TgpuBuffer<MemIdentity<TData>>, encoder?: TgpuCommandEncoder): void {
@@ -525,7 +526,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
 
     const rawEncoder = this[$soul].device.createCommandEncoder();
     rawEncoder.copyBufferToBuffer(srcBuffer.buffer, 0, this.buffer, 0, size);
-    this[$soul].device.queue.submit([rawEncoder.finish()]);
+    getQueue(this[$soul].device).submit([rawEncoder.finish()]);
   }
 
   async read(): Promise<Infer<TData>> {
@@ -536,6 +537,8 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
     }
 
     if (gpuBuffer.usage & GPUBufferUsage.MAP_READ) {
+      // Work that writes to the buffer has to be submitted before mapping it
+      flushPendingSubmits(this[$soul].device);
       await gpuBuffer.mapAsync(GPUMapMode.READ);
       const res = readFromArrayBuffer(this.#getMappedRange(), this.dataType);
       this.#unmapBuffer();
@@ -551,7 +554,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
     const commandEncoder = this[$soul].device.createCommandEncoder();
     commandEncoder.copyBufferToBuffer(gpuBuffer, 0, stagingBuffer, 0, size);
 
-    this[$soul].device.queue.submit([commandEncoder.finish()]);
+    getQueue(this[$soul].device).submit([commandEncoder.finish()]);
     await stagingBuffer.mapAsync(GPUMapMode.READ, 0, size);
 
     const res = readFromArrayBuffer(stagingBuffer.getMappedRange(), this.dataType);
@@ -573,6 +576,8 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
     this.#destroyed = true;
     this.#mappedRange = undefined;
     if (this.#ownBuffer) {
+      // Pending work may still use it
+      flushPendingSubmits(this[$soul].device);
       this[$soul].raw?.destroy();
     }
   }

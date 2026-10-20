@@ -1,3 +1,4 @@
+import { getQueue } from '../queue.ts';
 import type { ResolutionResult } from '../../resolutionCtx.ts';
 import { PERF } from '../../shared/meta.ts';
 
@@ -23,7 +24,7 @@ export class PerformanceTrackerImpl implements PerformanceTracker {
   measureCompile(device: GPUDevice): void {
     void (async () => {
       const start = performance.mark('typegpu:compile-start');
-      await device.queue.onSubmittedWorkDone();
+      await getQueue(device).onSubmittedWorkDone();
       const compileMeasure = performance.measure('typegpu:compiled', {
         start: start.name,
       });

@@ -1,0 +1,17 @@
+---
+title: Batching Submissions
+description: Submit the draws and dispatches of a frame together, for less CPU time per frame.
+---
+
+Calling `.draw()` or `.dispatchWorkgroups()` on a pipeline without an explicit command encoder submits its work right away.
+Each submission takes a bit of CPU time, which adds up in apps that run many passes per frame, like fluid simulations.
+With `unstable_batchSubmits`, those submissions wait until the current task's synchronous code is done, and are then submitted together:
+
+```ts
+const root = await tgpu.init({ unstable_batchSubmits: true });
+```
+
+TypeGPU's own operations, like `buffer.write()`, `buffer.read()` or `texture.destroy()`, first submit the work made before them, so the GPU still sees everything in order.
+Using `root.device` directly does not, so in an app that does, prefer TypeGPU's methods, or record the passes into one encoder from `root['~unstable'].createCommandEncoder()`.
+
+In a fluid simulation that runs about 25 compute passes per frame, this cut the median CPU time per frame by about a fifth, and that of the slowest frames by 40%, on a throttled mobile profile.

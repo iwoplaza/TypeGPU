@@ -262,6 +262,11 @@ export default defineConfig({
               slug: 'advanced/timestamp-queries',
             },
             {
+              label: 'Batching Submissions',
+              slug: 'advanced/submit-batching',
+              badge: { text: 'new' },
+            },
+            {
               label: 'Minifying & Obfuscating Shaders',
               slug: 'advanced/minifying-shaders',
               badge: { text: 'new' },

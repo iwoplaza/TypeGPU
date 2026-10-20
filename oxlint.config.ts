@@ -40,6 +40,12 @@ export default defineConfig({
       },
     },
     {
+      files: ['**/packages/typegpu/src/**/*.ts'],
+      rules: {
+        'eslint-plugin-internal/no-raw-queue-access': 'error',
+      },
+    },
+    {
       files: ['**/packages/eslint-plugin/**/*.ts'],
       rules: {
         ...(eslintPlugin.configs.recommended.rules as Record<string, 'error' | 'warn' | 'off'>),

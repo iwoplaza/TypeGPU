@@ -1,3 +1,4 @@
+import { getQueue } from '../queue.ts';
 import { getEffectiveSampleTypes, getTextureFormatInfo } from './textureFormats.ts';
 import { type ImageWrite, sameSize, type TextureChannel } from './textureWrite.ts';
 
@@ -195,7 +196,7 @@ export function generateTextureMipmaps(
     }
   }
 
-  device.queue.submit([encoder.finish()]);
+  getQueue(device).submit([encoder.finish()]);
 }
 
 export function clearTextureWithColor(
@@ -223,7 +224,7 @@ export function clearTextureWithColor(
     }
   }
 
-  device.queue.submit([encoder.finish()]);
+  getQueue(device).submit([encoder.finish()]);
 }
 
 function copyImage(
@@ -233,7 +234,7 @@ function copyImage(
   size: number[],
 ): void {
   const { flipY = false, premultipliedAlpha = false, colorSpace = 'srgb' } = write.options;
-  device.queue.copyExternalImageToTexture(
+  getQueue(device).copyExternalImageToTexture(
     { source: write.source, origin: write.sourceOrigin, flipY },
     { ...destination, premultipliedAlpha, colorSpace },
     size,
@@ -313,7 +314,7 @@ export function writeImages(
       }
     }
 
-    device.queue.submit([encoder.finish()]);
+    getQueue(device).submit([encoder.finish()]);
     staged?.destroy();
   }
 }

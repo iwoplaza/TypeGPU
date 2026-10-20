@@ -1,3 +1,4 @@
+import { flushPendingSubmits, getQueue } from '../queue.ts';
 import { setName, type TgpuNamable } from '../../shared/meta.ts';
 import type { ExperimentalTgpuRoot } from '../root/rootTypes.ts';
 import type { TgpuDeviceOwningSoul } from '../../shared/soul.ts';
@@ -150,7 +151,7 @@ class TgpuQuerySetImpl<T extends GPUQueryType> implements TgpuQuerySet<T> {
 
     const commandEncoder = this[$soul].device.createCommandEncoder();
     commandEncoder.resolveQuerySet(this.querySet, 0, this.count, this[$internal].resolveBuffer, 0);
-    this[$soul].device.queue.submit([commandEncoder.finish()]);
+    getQueue(this[$soul].device).submit([commandEncoder.finish()]);
   }
 
   async read(): Promise<bigint[]> {
@@ -168,7 +169,7 @@ class TgpuQuerySetImpl<T extends GPUQueryType> implements TgpuQuerySet<T> {
         0,
         this.count * BigUint64Array.BYTES_PER_ELEMENT,
       );
-      this[$soul].device.queue.submit([commandEncoder.finish()]);
+      getQueue(this[$soul].device).submit([commandEncoder.finish()]);
 
       const readBuffer = this[$internal].readBuffer;
       await readBuffer.mapAsync(GPUMapMode.READ);
@@ -187,6 +188,8 @@ class TgpuQuerySetImpl<T extends GPUQueryType> implements TgpuQuerySet<T> {
     this.#destroyed = true;
 
     if (this[$soul].raw && this.#ownQuerySet) {
+      // Pending work may still use it
+      flushPendingSubmits(this[$soul].device);
       this[$soul].raw.destroy();
     }
     this.#readBuffer?.destroy();

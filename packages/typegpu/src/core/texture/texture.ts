@@ -1,3 +1,4 @@
+import { flushPendingSubmits, getQueue } from '../queue.ts';
 import {
   isWgslStorageTexture,
   textureDescriptorToSchema,
@@ -450,7 +451,7 @@ class TgpuTextureImpl<TProps extends TextureProps> implements TgpuTexture<TProps
       );
     }
 
-    this[$soul].device.queue.writeTexture(
+    getQueue(this[$soul].device).writeTexture(
       { texture: this[$internal].materialize(), mipLevel: mip },
       new Uint8Array(width * height * depth * texelSize),
       { bytesPerRow: texelSize * width, rowsPerImage: height },
@@ -614,7 +615,7 @@ class TgpuTextureImpl<TProps extends TextureProps> implements TgpuTexture<TProps
       );
     }
 
-    this[$soul].device.queue.writeTexture(
+    getQueue(this[$soul].device).writeTexture(
       {
         texture: this[$internal].materialize(),
         mipLevel,
@@ -666,7 +667,7 @@ class TgpuTextureImpl<TProps extends TextureProps> implements TgpuTexture<TProps
         options?.size?.[2] ?? sourceDepth - sourceOrigin.z,
       ],
     );
-    this[$soul].device.queue.submit([commandEncoder.finish()]);
+    getQueue(this[$soul].device).submit([commandEncoder.finish()]);
   }
 
   toString(): string {
@@ -683,6 +684,8 @@ class TgpuTextureImpl<TProps extends TextureProps> implements TgpuTexture<TProps
     }
     this.#destroyed = true;
     if (this.#ownTexture) {
+      // Pending work may still use it
+      flushPendingSubmits(this[$soul].device);
       this[$soul].raw?.destroy();
     }
   }

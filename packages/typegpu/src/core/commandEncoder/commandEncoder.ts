@@ -1,5 +1,6 @@
 import { $internal } from '../../shared/symbols.ts';
 import { logger } from '../../tgpuLogger.ts';
+import { getQueue } from '../queue.ts';
 import type { ExperimentalTgpuRoot } from '../root/rootTypes.ts';
 import {
   INTERNAL_beginComputePass,
@@ -25,6 +26,10 @@ export interface CommandEncoderInternals {
   readonly beforeFinish: Map<object, (rawEncoder: GPUCommandEncoder) => void>;
   /** Callbacks run once the recorded commands have been submitted, keyed for deduplication */
   readonly afterSubmit: Map<object, () => void>;
+  /** Records the pending commands and finishes the encoder, for submitting along with others */
+  finishForSubmit(): GPUCommandBuffer;
+  /** Runs the callbacks for after the finished commands were submitted */
+  runAfterSubmit(): void;
 }
 
 /**
@@ -98,6 +103,17 @@ class TgpuCommandEncoderImpl implements TgpuCommandEncoder {
       adopted,
       beforeFinish: new Map(),
       afterSubmit: new Map(),
+      finishForSubmit: () => {
+        this.#recordPendingCommands();
+        return rawEncoder.finish();
+      },
+      runAfterSubmit: () => {
+        const { afterSubmit } = this[$internal];
+        for (const hook of afterSubmit.values()) {
+          hook();
+        }
+        afterSubmit.clear();
+      },
     };
   }
 
@@ -119,15 +135,9 @@ class TgpuCommandEncoderImpl implements TgpuCommandEncoder {
   }
 
   submit(): void {
-    const { rawEncoder, root, afterSubmit } = this[$internal];
-    this.#recordPendingCommands();
-
-    root.device.queue.submit([rawEncoder.finish()]);
-
-    for (const hook of afterSubmit.values()) {
-      hook();
-    }
-    afterSubmit.clear();
+    const { root, finishForSubmit, runAfterSubmit } = this[$internal];
+    getQueue(root.device).submit([finishForSubmit()]);
+    runAfterSubmit();
   }
 
   finish(descriptor?: GPUCommandBufferDescriptor): GPUCommandBuffer {
