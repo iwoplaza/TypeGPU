@@ -623,6 +623,19 @@
           ms); later generations 16–30% faster
         </div>
       </div>
+      <div class="opt">
+        <div class="what">Opt-out build flags for unused features</div>
+        <p>
+          Apps that never create textures or query sets, or never log from shaders, can say so with
+          the bundler's <code>define</code> option (<code>__TYPEGPU_NO_TEXTURES__</code>,
+          <code>__TYPEGPU_NO_QUERY_SETS__</code>, <code>__TYPEGPU_NO_CONSOLE_LOG__</code>), and the
+          code behind those features is left out. Nothing changes for apps that don't. Not included
+          in the measurements above, since it needs a line of app config.
+        </p>
+        <div class="effect">
+          boids: 274.7 → 241.6 kB minified, 77.9 → 68.5 kB gzip; mobile start ~40 ms sooner
+        </div>
+      </div>
     </div>
   </section>
 
@@ -745,16 +758,51 @@
             <td>Stopped</td>
           </tr>
           <tr>
-            <td>Batch draws and dispatches into one submit by default</td>
-            <td>Fewer submits per frame</td>
             <td>
-              Stopped: reorders them relative to buffer.write(); explicit batching already exists
+              Batch draws and dispatches into one <code>queue.submit</code> per task, keeping their
+              order by flushing before every other queue operation (prototyped)
+            </td>
+            <td>
+              Mobile JS per frame: stable-fluid 4.2 → 2.9 ms, jelly-slider 10.4 → 9.3 ms, boids 2.4
+              → 2.1 ms; desktop unchanged
+            </td>
+            <td>
+              Stopped: needs a flush at 21 queue operations in 6 files, and a missed flush in future
+              code silently reorders GPU work. Writes an app makes through
+              <code>root.device.queue</code> still jump ahead of earlier draws. Apps can already
+              batch explicitly with one command encoder
+            </td>
+          </tr>
+          <tr>
+            <td>
+              Opt-out build flags (<code>__TYPEGPU_NO_TEXTURES__</code>,
+              <code>__TYPEGPU_NO_QUERY_SETS__</code>, <code>__TYPEGPU_NO_CONSOLE_LOG__</code>) set
+              with the bundler's <code>define</code>
+            </td>
+            <td>
+              boids (all three): −33 kB minified, −9.5 kB gzip (−12%), mobile start ~40 ms sooner;
+              the others (console.log, plus query sets where unused): −2.7 to −4.2 kB gzip; +0.2 kB
+              gzip for apps that set none
+            </td>
+            <td>
+              Kept: 9 guarded lines, documented, tested; no change for apps that don't opt out
+            </td>
+          </tr>
+          <tr>
+            <td>Read all the flags from one shared module</td>
+            <td>
+              The console.log flag removes 2.7 kB instead of 13.5 kB: Rolldown keeps recursive
+              functions behind a branch disabled by an imported constant
+            </td>
+            <td>
+              Not kept: the console.log flag is defined in each of the 2 files that use it, with a
+              comment saying why
             </td>
           </tr>
           <tr>
             <td>Opt-in entry points for textures, samplers, query sets and shader logging</td>
             <td>Up to 36 kB minified (14%) for apps that use none of them</td>
-            <td>Stopped: a breaking API change for every app</td>
+            <td>Stopped: a breaking API change; the opt-out flags get most of it without one</td>
           </tr>
         </tbody>
       </table>
@@ -775,7 +823,8 @@
         query sets, pipelines and command encoders. Bundlers can't drop unused class methods, so an
         app that only calls <code>tgpu.init()</code> and creates one buffer already ships about 320
         kB (80 kB gzip). In practice every app ships the whole library, including texture uploads,
-        mipmap generation, timestamp queries and the shader-side <code>console.log</code> machinery.
+        mipmap generation, timestamp queries and the shader-side <code>console.log</code> machinery,
+        unless it opts out of those with the new build flags (up to 12% of boids' gzip size).
       </p>
       <h3>The shader generator is a third of the bundle and runs cold</h3>
       <p>
@@ -835,9 +884,9 @@
       <li>CPU throttling applies to the page's main thread only, not to the GPU process.</li>
       <li>The static server serves gzip; brotli sizes are in the table.</li>
       <li>
-        Frame CPU time is the JS time spent inside the frame callback, sampled after the first 10
-        frames. On SwiftShader the heavy scenes only render a handful of frames, so treat those
-        numbers as rough.
+        Frame CPU time is the JS time spent inside the frame callback and the microtasks it queues,
+        sampled after the first 10 frames. On SwiftShader the heavy scenes only render a handful of
+        frames, so treat those numbers as rough.
       </li>
       <li>
         The harness, examples and scripts live in <code>apps/pregen-benchmark</code>;

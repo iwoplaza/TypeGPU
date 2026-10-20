@@ -20,6 +20,10 @@ export default defineConfig({
   root: fileURLToPath(new URL(`./examples/${app}/`, import.meta.url)),
   base: './',
   plugins: [typegpu({})],
+  // TYPEGPU_FLAGS=__TYPEGPU_NO_TEXTURES__,... turns off TypeGPU features the app doesn't use
+  define: Object.fromEntries(
+    (process.env.TYPEGPU_FLAGS?.split(',').filter(Boolean) ?? []).map((flag) => [flag, 'true']),
+  ),
   resolve: {
     // Benchmarking against the built package, which is what npm users get
     alias: process.env.TYPEGPU_FROM_SOURCE

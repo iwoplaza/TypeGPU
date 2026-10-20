@@ -11,7 +11,7 @@ import { serveDist } from './serve.ts';
 import { chromiumArgs } from './chromium.ts';
 
 const port = Number(process.env.PORT ?? 4174);
-const distDir = fileURLToPath(new URL('../dist/', import.meta.url));
+const distDir = fileURLToPath(new URL(`../${process.env.OUT_DIR ?? 'dist'}/`, import.meta.url));
 const scratchDir = fileURLToPath(new URL('../.scratch/', import.meta.url));
 mkdirSync(scratchDir, { recursive: true });
 

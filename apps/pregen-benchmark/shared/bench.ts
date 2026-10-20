@@ -54,10 +54,13 @@ export function markInteractive() {
 export function measureFrame(fn: () => void) {
   const start = performance.now();
   fn();
-  const times = state.frameCpuTimes;
-  if (times.length < 1000) {
-    times.push(performance.now() - start);
-  }
+  // Microtasks queued by the frame (e.g. deferred submits) run before this one
+  queueMicrotask(() => {
+    const times = state.frameCpuTimes;
+    if (times.length < 1000) {
+      times.push(performance.now() - start);
+    }
+  });
 }
 
 /** Records the first user interaction that reached an example handler. */
