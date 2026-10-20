@@ -1696,48 +1696,7 @@ Try 'return ${typeStr}(${str});' instead.
     }
 
     if (statement[0] === NODE.if) {
-      const [_, condNode, consNode, altNode] = statement;
-      const condition = this._typedExpression(condNode, bool);
-
-      if (typeof condition.value === 'boolean') {
-        // the condition is known at comptime
-        let node = condition.value ? consNode : altNode;
-        if (node === undefined) {
-          return { code: '', definesInNearestScope: false };
-        }
-        if (!Array.isArray(node)) {
-          node = blockifySingleStatement(node);
-        }
-        if (node[0] === NODE.block && node[1].length === 1 && node[1][0][0] === NODE.if) {
-          // simplify 'if (true) { if (A) {B} } else {C}' to 'if (A) {B}'
-          return this._statement(node[1][0]);
-        }
-        if (node[0] === NODE.if) {
-          // simplify 'if (false) {A} else if (B) {C}' to 'if (B) {C}'
-          return this._statement(node);
-        }
-        // simplify 'if (true) {A} else {B}' to '{A}'
-        return this._blockStatement(blockifySingleStatement(node));
-      }
-
-      const consequent = this._block(blockifySingleStatement(consNode), /* allowInlining */ false);
-      const alternate = !altNode
-        ? undefined
-        : this._block(blockifySingleStatement(altNode), /* allowInlining */ false).code;
-
-      if (!alternate) {
-        return {
-          code: stitch`${this.ctx.pre}if (${condition}) ${consequent.code || '{}'}`,
-          definesInNearestScope: false,
-        };
-      }
-
-      return {
-        code: stitch`\
-${this.ctx.pre}if (${condition}) ${consequent.code || '{}'}
-${this.ctx.pre}else ${alternate}`,
-        definesInNearestScope: false,
-      };
+      return this._ifStatement(statement);
     }
 
     if (statement[0] === NODE.let) {
@@ -1753,305 +1712,19 @@ ${this.ctx.pre}else ${alternate}`,
     }
 
     if (statement[0] === NODE.for) {
-      const [_, init, condition, update, body] = statement;
-      const prevUnrollingChain = this.#unrollingChain;
-      this.#unrollingChain = [];
-
-      try {
-        this.ctx.pushBlockScope();
-        const [initStatement, conditionExpr, updateStatement] = this.ctx.withResetIndentLevel(
-          () => [
-            init ? this._statement(init).code : undefined,
-            condition ? this._typedExpression(condition, bool) : undefined,
-            update ? this._statement(update).code : undefined,
-          ],
-        );
-
-        const initStr = initStatement ? initStatement.slice(0, -1) : '';
-        const updateStr = updateStatement ? updateStatement.slice(0, -1) : '';
-
-        const bodyStr = this._block(blockifySingleStatement(body), /* allowInlining */ false).code;
-        return {
-          code: stitch`${this.ctx.pre}for (${initStr}; ${conditionExpr}; ${updateStr}) ${bodyStr || '{}'}`,
-          definesInNearestScope: false,
-        };
-      } finally {
-        this.#unrollingChain = prevUnrollingChain;
-        this.ctx.popBlockScope();
-      }
+      return this._forStatement(statement);
     }
 
     if (statement[0] === NODE.while) {
-      const prevUnrollingChain = this.#unrollingChain;
-      this.#unrollingChain = [];
-      try {
-        const [_, condition, body] = statement;
-        const condSnippet = this._typedExpression(condition, bool);
-        const conditionStr = this.ctx.resolveSnippet(condSnippet).value;
-
-        const bodyStr = this._block(blockifySingleStatement(body), /* allowInlining */ false).code;
-        return {
-          code: `${this.ctx.pre}while (${conditionStr}) ${bodyStr || '{}'}`,
-          definesInNearestScope: false,
-        };
-      } finally {
-        this.#unrollingChain = prevUnrollingChain;
-      }
+      return this._whileStatement(statement);
     }
 
     if (statement[0] === NODE.forOf) {
-      const [_, loopVar, iterable, body] = statement;
-
-      if (loopVar[0] !== NODE.const) {
-        throw new WgslTypeError('Only `for (const ... of ... )` loops are supported');
-      }
-
-      this.tryMarkModified(iterable); // overly-defensive, but let's not tempt fate
-
-      let ctxIndent = false;
-      const prevUnrollingChain = this.#unrollingChain;
-
-      try {
-        this.ctx.pushBlockScope();
-        const iterableExpr = this._expression(iterable);
-        const shouldUnroll = iterableExpr.value instanceof UnrollableIterable;
-        const iterableSnippet = shouldUnroll ? iterableExpr.value.snippet : iterableExpr;
-        const range = forOfUtils.getRangeSnippets(this.ctx, iterableSnippet, shouldUnroll);
-        const originalLoopVarName = extractId(loopVar[1]);
-        const blockified = blockifySingleStatement(body);
-
-        if (shouldUnroll) {
-          if (!isKnownAtComptime(range.end)) {
-            throw new Error('Cannot unroll loop. Length of iterable is unknown at comptime.');
-          }
-          const { value } = iterableSnippet;
-
-          const elements = isTgpuRange(value)
-            ? value.map((i) => coerceToSnippet(i))
-            : value instanceof ArrayExpression
-              ? value.elements
-              : Array.from({ length: range.end.value as number }, (_, i) =>
-                  forOfUtils.getElementSnippet(iterableSnippet, snip(i, u32, 'constant')),
-                );
-
-          if (elements.length === 0) {
-            return { code: '', definesInNearestScope: false };
-          }
-
-          const firstElement = elements[0] as Snippet;
-          if (
-            !isStoredInMemory(firstElement) &&
-            !wgsl.isNaturallyEphemeral(firstElement.dataType)
-          ) {
-            throw new WgslTypeError(
-              `Cannot unroll '${stringifyNode(iterable)}'. The elements of iterable are constructed in place but are not value types.`,
-            );
-          }
-
-          let blocksCode = '';
-          let endsWithControlFlow: ResolvedStatement['endsWithControlFlow'];
-          let definesInNearestScope = false;
-          for (let i = 0; i < elements.length; i++) {
-            const e = elements[i];
-            this.#unrollingChain = [...prevUnrollingChain, i];
-
-            const resolvedBlock = this._blockStatement(blockified, {
-              [originalLoopVarName]: e,
-            });
-
-            definesInNearestScope ||= resolvedBlock.definesInNearestScope;
-
-            blocksCode += `${this.ctx.pre}// unrolled iteration ${this.#unrollingChain.map((idx) => `#${idx}`).join(' / ')}\n${
-              resolvedBlock.code
-            }\n`;
-
-            if (resolvedBlock.endsWithControlFlow !== undefined) {
-              endsWithControlFlow = resolvedBlock.endsWithControlFlow;
-              break;
-            }
-          }
-
-          return {
-            code: `${blocksCode}${this.ctx.pre}// ---`,
-            endsWithControlFlow,
-            definesInNearestScope,
-          };
-        }
-
-        this.#unrollingChain = [];
-
-        const index = this.ctx.makeUniqueIdentifier('i', 'block');
-
-        const forHeaderStr = stitch`${this.ctx.pre}for (var ${index} = ${range.start}; ${index} ${range.comparison} ${range.end}; ${index} += ${range.step})`;
-
-        let bodyStr = '';
-
-        if (isTgpuRange(iterableSnippet.value)) {
-          bodyStr = this._block(blockified, /* allowInlining */ false, {
-            [originalLoopVarName]: snip(index, range.start.dataType, 'runtime', false), // range.start, .end , .step have the same dataType
-          }).code;
-        } else {
-          this.ctx.indent();
-          ctxIndent = true;
-          const loopVarName = this.ctx.makeUniqueIdentifier(originalLoopVarName, 'block');
-          const elementSnippet = forOfUtils.getElementSnippet(
-            iterableSnippet,
-            snip(index, u32, 'runtime'),
-          );
-          const loopVarKind = forOfUtils.getLoopVarKind(elementSnippet);
-          const elementType = forOfUtils.getElementType(elementSnippet, iterableSnippet);
-          const loopVarDeclStr = stitch`${this.ctx.pre}${loopVarKind} ${loopVarName} = ${tryConvertSnippet(
-            this.ctx,
-            elementSnippet,
-            elementType,
-            false,
-          )};`;
-
-          bodyStr = `{\n${loopVarDeclStr}\n${
-            this._blockStatement(blockified, {
-              [originalLoopVarName]: snip(loopVarName, elementType, elementSnippet.origin, false),
-            }).code
-          }\n`;
-          this.ctx.dedent();
-          bodyStr += `${this.ctx.pre}}`;
-          ctxIndent = false;
-        }
-
-        return {
-          code: stitch`${forHeaderStr} ${bodyStr.trim() || '{}'}`,
-          definesInNearestScope: false,
-        };
-      } finally {
-        if (ctxIndent) {
-          this.ctx.dedent();
-        }
-        this.#unrollingChain = prevUnrollingChain;
-        this.ctx.popBlockScope();
-      }
+      return this._forOfStatement(statement);
     }
 
     if (statement[0] === NODE.switch) {
-      // Switch statement
-      const [_, discriminant, cases] = statement;
-      let discriminantExpr = this._expression(discriminant);
-
-      let caseExprs: [test: Snippet, consequent: readonly tinyest.Statement[]][] = cases.map(
-        ([test, consequent]) => {
-          const testExpr = test === null ? switchDefault : this._expression(test);
-          return [testExpr, consequent];
-        },
-      );
-
-      // comptime folding
-      let matchedCaseWasNotLast = false;
-      if ([discriminantExpr, ...caseExprs.map(([test]) => test)].every(isKnownAtComptime)) {
-        let matchedCaseIndex = caseExprs.findIndex(
-          ([test]) => test !== switchDefault && test.value === discriminantExpr.value,
-        );
-        if (matchedCaseIndex === -1) {
-          matchedCaseIndex = caseExprs.findIndex(([test]) => test === switchDefault);
-        }
-
-        if (matchedCaseIndex === -1) {
-          return { code: '', definesInNearestScope: false };
-        }
-
-        const matchedConsequent = caseExprs
-          .slice(matchedCaseIndex)
-          .find(([, consequent]) => consequent.length !== 0)?.[1];
-
-        if (matchedConsequent === undefined) {
-          return { code: '', definesInNearestScope: false };
-        }
-
-        if (matchedConsequent !== caseExprs.at(-1)?.[1]) {
-          // The JS behavior will be different if this case does not end with control flow.
-          matchedCaseWasNotLast = true;
-        }
-
-        discriminantExpr = snip(0, u32, 'constant', false);
-        caseExprs = [[switchDefault, matchedConsequent]];
-      }
-
-      // type concretization
-      discriminantExpr = tryConvertSnippet(this.ctx, discriminantExpr, [i32, u32]);
-      const switchType = discriminantExpr.dataType;
-      invariant(switchType !== UnknownData);
-      caseExprs = caseExprs.map(([test, consequent]) => {
-        // TODO(#3148): Remove this throw.
-        if (test !== switchDefault && test.dataType === UnknownData) {
-          throw new Error(`Failed to convert one of the switch tests to '${switchType.type}'`);
-        }
-        const convertedTest =
-          test === switchDefault ? test : tryConvertSnippet(this.ctx, test, [switchType]);
-
-        return [convertedTest, consequent];
-      });
-
-      // consequent resolution
-      const resolvedCaseExprs: [test: Snippet, consequent: ResolvedStatement[]][] = caseExprs.map(
-        ([test, consequent]) => {
-          // In WGSL, each case is a different block. This block scope forbids scope leaking.
-          // TODO(#3001): Consider using NODE.block here
-          this.ctx.pushBlockScope();
-          this.ctx.indent();
-          this.ctx.indent();
-          try {
-            const consequentStmts = consequent.map((s) => this._statement(s));
-            return [test, consequentStmts];
-          } finally {
-            this.ctx.dedent();
-            this.ctx.dedent();
-            this.ctx.popBlockScope();
-          }
-        },
-      );
-
-      const groupedCaseExprs: [tests: Snippet[], consequent: ResolvedStatement[]][] = [];
-      let currentGroup = [];
-      for (const [index, [test, consequent]] of resolvedCaseExprs.entries()) {
-        currentGroup.push(test);
-        if (consequent.length > 0 || index === caseExprs.length - 1) {
-          groupedCaseExprs.push([currentGroup, consequent]);
-          currentGroup = [];
-        }
-      }
-
-      // Validation
-      {
-        // Tests should be constant
-        caseExprs.forEach(([testExpr], i) => {
-          if (!isConstant(testExpr)) {
-            const testNode = cases[i]?.[0];
-            invariant(testNode, `Expected node to be not nullish.`);
-            throw new Error(`All of switch tests must be constant.
-Test '${stringifyNode(testNode)}' is not constant, making the following switch statement invalid. 
-This error may be caused by an implicit conversion.
-${stringifyNode(statement)}`);
-          }
-        });
-
-        // Tests should not have duplicates.
-        // We skip this check, because WGSL errors are readable,
-        // and we cannot easily access non-comptime known constants.
-
-        // Tests should not have non-trivial fallthrough
-        resolvedCaseExprs
-          .slice(0, matchedCaseWasNotLast ? undefined : -1)
-          .forEach(([_, consequent]) => {
-            const last = consequent.at(-1);
-            if (last && !last.endsWithControlFlow) {
-              throw new Error(`Switch statement cannot have non-trivial fallthrough.
-The following switch statement is invalid:
-${stringifyNode(statement)}`);
-            }
-          });
-      }
-
-      return {
-        code: this._emitSwitchStatement(discriminantExpr, groupedCaseExprs),
-        definesInNearestScope: false,
-      };
+      return this._switchStatement(statement);
     }
 
     if (statement[0] === NODE.postUpdate) {
@@ -2106,6 +1779,348 @@ ${stringifyNode(statement)}`);
     const resolved =
       expr.value !== undefined && expr.value !== null ? this.ctx.resolveSnippet(expr).value : '';
     return { code: resolved ? `${this.ctx.pre}${resolved};` : '', definesInNearestScope: false };
+  }
+
+  protected _ifStatement(statement: tinyest.If): ResolvedStatement {
+    const [_, condNode, consNode, altNode] = statement;
+    const condition = this._typedExpression(condNode, bool);
+
+    if (typeof condition.value === 'boolean') {
+      // the condition is known at comptime
+      let node = condition.value ? consNode : altNode;
+      if (node === undefined) {
+        return { code: '', definesInNearestScope: false };
+      }
+      if (!Array.isArray(node)) {
+        node = blockifySingleStatement(node);
+      }
+      if (node[0] === NODE.block && node[1].length === 1 && node[1][0][0] === NODE.if) {
+        // simplify 'if (true) { if (A) {B} } else {C}' to 'if (A) {B}'
+        return this._statement(node[1][0]);
+      }
+      if (node[0] === NODE.if) {
+        // simplify 'if (false) {A} else if (B) {C}' to 'if (B) {C}'
+        return this._statement(node);
+      }
+      // simplify 'if (true) {A} else {B}' to '{A}'
+      return this._blockStatement(blockifySingleStatement(node));
+    }
+
+    const consequent = this._block(blockifySingleStatement(consNode), /* allowInlining */ false);
+    const alternate = !altNode
+      ? undefined
+      : this._block(blockifySingleStatement(altNode), /* allowInlining */ false).code;
+
+    if (!alternate) {
+      return {
+        code: stitch`${this.ctx.pre}if (${condition}) ${consequent.code || '{}'}`,
+        definesInNearestScope: false,
+      };
+    }
+
+    return {
+      code: stitch`\
+${this.ctx.pre}if (${condition}) ${consequent.code || '{}'}
+${this.ctx.pre}else ${alternate}`,
+      definesInNearestScope: false,
+    };
+  }
+
+  protected _forStatement(statement: tinyest.For): ResolvedStatement {
+    const [_, init, condition, update, body] = statement;
+    const prevUnrollingChain = this.#unrollingChain;
+    this.#unrollingChain = [];
+
+    try {
+      this.ctx.pushBlockScope();
+      const [initStatement, conditionExpr, updateStatement] = this.ctx.withResetIndentLevel(() => [
+        init ? this._statement(init).code : undefined,
+        condition ? this._typedExpression(condition, bool) : undefined,
+        update ? this._statement(update).code : undefined,
+      ]);
+
+      const initStr = initStatement ? initStatement.slice(0, -1) : '';
+      const updateStr = updateStatement ? updateStatement.slice(0, -1) : '';
+
+      const bodyStr = this._block(blockifySingleStatement(body), /* allowInlining */ false).code;
+      return {
+        code: stitch`${this.ctx.pre}for (${initStr}; ${conditionExpr}; ${updateStr}) ${bodyStr || '{}'}`,
+        definesInNearestScope: false,
+      };
+    } finally {
+      this.#unrollingChain = prevUnrollingChain;
+      this.ctx.popBlockScope();
+    }
+  }
+
+  protected _whileStatement(statement: tinyest.While): ResolvedStatement {
+    const prevUnrollingChain = this.#unrollingChain;
+    this.#unrollingChain = [];
+    try {
+      const [_, condition, body] = statement;
+      const condSnippet = this._typedExpression(condition, bool);
+      const conditionStr = this.ctx.resolveSnippet(condSnippet).value;
+
+      const bodyStr = this._block(blockifySingleStatement(body), /* allowInlining */ false).code;
+      return {
+        code: `${this.ctx.pre}while (${conditionStr}) ${bodyStr || '{}'}`,
+        definesInNearestScope: false,
+      };
+    } finally {
+      this.#unrollingChain = prevUnrollingChain;
+    }
+  }
+
+  protected _forOfStatement(statement: tinyest.ForOf): ResolvedStatement {
+    const [_, loopVar, iterable, body] = statement;
+
+    if (loopVar[0] !== NODE.const) {
+      throw new WgslTypeError('Only `for (const ... of ... )` loops are supported');
+    }
+
+    this.tryMarkModified(iterable); // overly-defensive, but let's not tempt fate
+
+    let ctxIndent = false;
+    const prevUnrollingChain = this.#unrollingChain;
+
+    try {
+      this.ctx.pushBlockScope();
+      const iterableExpr = this._expression(iterable);
+      const shouldUnroll = iterableExpr.value instanceof UnrollableIterable;
+      const iterableSnippet = shouldUnroll ? iterableExpr.value.snippet : iterableExpr;
+      const range = forOfUtils.getRangeSnippets(this.ctx, iterableSnippet, shouldUnroll);
+      const originalLoopVarName = extractId(loopVar[1]);
+      const blockified = blockifySingleStatement(body);
+
+      if (shouldUnroll) {
+        if (!isKnownAtComptime(range.end)) {
+          throw new Error('Cannot unroll loop. Length of iterable is unknown at comptime.');
+        }
+        const { value } = iterableSnippet;
+
+        const elements = isTgpuRange(value)
+          ? value.map((i) => coerceToSnippet(i))
+          : value instanceof ArrayExpression
+            ? value.elements
+            : Array.from({ length: range.end.value as number }, (_, i) =>
+                forOfUtils.getElementSnippet(iterableSnippet, snip(i, u32, 'constant')),
+              );
+
+        if (elements.length === 0) {
+          return { code: '', definesInNearestScope: false };
+        }
+
+        const firstElement = elements[0] as Snippet;
+        if (!isStoredInMemory(firstElement) && !wgsl.isNaturallyEphemeral(firstElement.dataType)) {
+          throw new WgslTypeError(
+            `Cannot unroll '${stringifyNode(iterable)}'. The elements of iterable are constructed in place but are not value types.`,
+          );
+        }
+
+        let blocksCode = '';
+        let endsWithControlFlow: ResolvedStatement['endsWithControlFlow'];
+        let definesInNearestScope = false;
+        for (let i = 0; i < elements.length; i++) {
+          const e = elements[i];
+          this.#unrollingChain = [...prevUnrollingChain, i];
+
+          const resolvedBlock = this._blockStatement(blockified, {
+            [originalLoopVarName]: e,
+          });
+
+          definesInNearestScope ||= resolvedBlock.definesInNearestScope;
+
+          blocksCode += `${this.ctx.pre}// unrolled iteration ${this.#unrollingChain.map((idx) => `#${idx}`).join(' / ')}\n${
+            resolvedBlock.code
+          }\n`;
+
+          if (resolvedBlock.endsWithControlFlow !== undefined) {
+            endsWithControlFlow = resolvedBlock.endsWithControlFlow;
+            break;
+          }
+        }
+
+        return {
+          code: `${blocksCode}${this.ctx.pre}// ---`,
+          endsWithControlFlow,
+          definesInNearestScope,
+        };
+      }
+
+      this.#unrollingChain = [];
+
+      const index = this.ctx.makeUniqueIdentifier('i', 'block');
+
+      const forHeaderStr = stitch`${this.ctx.pre}for (var ${index} = ${range.start}; ${index} ${range.comparison} ${range.end}; ${index} += ${range.step})`;
+
+      let bodyStr = '';
+
+      if (isTgpuRange(iterableSnippet.value)) {
+        bodyStr = this._block(blockified, /* allowInlining */ false, {
+          [originalLoopVarName]: snip(index, range.start.dataType, 'runtime', false), // range.start, .end , .step have the same dataType
+        }).code;
+      } else {
+        this.ctx.indent();
+        ctxIndent = true;
+        const loopVarName = this.ctx.makeUniqueIdentifier(originalLoopVarName, 'block');
+        const elementSnippet = forOfUtils.getElementSnippet(
+          iterableSnippet,
+          snip(index, u32, 'runtime'),
+        );
+        const loopVarKind = forOfUtils.getLoopVarKind(elementSnippet);
+        const elementType = forOfUtils.getElementType(elementSnippet, iterableSnippet);
+        const loopVarDeclStr = stitch`${this.ctx.pre}${loopVarKind} ${loopVarName} = ${tryConvertSnippet(
+          this.ctx,
+          elementSnippet,
+          elementType,
+          false,
+        )};`;
+
+        bodyStr = `{\n${loopVarDeclStr}\n${
+          this._blockStatement(blockified, {
+            [originalLoopVarName]: snip(loopVarName, elementType, elementSnippet.origin, false),
+          }).code
+        }\n`;
+        this.ctx.dedent();
+        bodyStr += `${this.ctx.pre}}`;
+        ctxIndent = false;
+      }
+
+      return {
+        code: stitch`${forHeaderStr} ${bodyStr.trim() || '{}'}`,
+        definesInNearestScope: false,
+      };
+    } finally {
+      if (ctxIndent) {
+        this.ctx.dedent();
+      }
+      this.#unrollingChain = prevUnrollingChain;
+      this.ctx.popBlockScope();
+    }
+  }
+
+  protected _switchStatement(statement: tinyest.Switch): ResolvedStatement {
+    // Switch statement
+    const [_, discriminant, cases] = statement;
+    let discriminantExpr = this._expression(discriminant);
+
+    let caseExprs: [test: Snippet, consequent: readonly tinyest.Statement[]][] = cases.map(
+      ([test, consequent]) => {
+        const testExpr = test === null ? switchDefault : this._expression(test);
+        return [testExpr, consequent];
+      },
+    );
+
+    // comptime folding
+    let matchedCaseWasNotLast = false;
+    if ([discriminantExpr, ...caseExprs.map(([test]) => test)].every(isKnownAtComptime)) {
+      let matchedCaseIndex = caseExprs.findIndex(
+        ([test]) => test !== switchDefault && test.value === discriminantExpr.value,
+      );
+      if (matchedCaseIndex === -1) {
+        matchedCaseIndex = caseExprs.findIndex(([test]) => test === switchDefault);
+      }
+
+      if (matchedCaseIndex === -1) {
+        return { code: '', definesInNearestScope: false };
+      }
+
+      const matchedConsequent = caseExprs
+        .slice(matchedCaseIndex)
+        .find(([, consequent]) => consequent.length !== 0)?.[1];
+
+      if (matchedConsequent === undefined) {
+        return { code: '', definesInNearestScope: false };
+      }
+
+      if (matchedConsequent !== caseExprs.at(-1)?.[1]) {
+        // The JS behavior will be different if this case does not end with control flow.
+        matchedCaseWasNotLast = true;
+      }
+
+      discriminantExpr = snip(0, u32, 'constant', false);
+      caseExprs = [[switchDefault, matchedConsequent]];
+    }
+
+    // type concretization
+    discriminantExpr = tryConvertSnippet(this.ctx, discriminantExpr, [i32, u32]);
+    const switchType = discriminantExpr.dataType;
+    invariant(switchType !== UnknownData);
+    caseExprs = caseExprs.map(([test, consequent]) => {
+      // TODO(#3148): Remove this throw.
+      if (test !== switchDefault && test.dataType === UnknownData) {
+        throw new Error(`Failed to convert one of the switch tests to '${switchType.type}'`);
+      }
+      const convertedTest =
+        test === switchDefault ? test : tryConvertSnippet(this.ctx, test, [switchType]);
+
+      return [convertedTest, consequent];
+    });
+
+    // consequent resolution
+    const resolvedCaseExprs: [test: Snippet, consequent: ResolvedStatement[]][] = caseExprs.map(
+      ([test, consequent]) => {
+        // In WGSL, each case is a different block. This block scope forbids scope leaking.
+        // TODO(#3001): Consider using NODE.block here
+        this.ctx.pushBlockScope();
+        this.ctx.indent();
+        this.ctx.indent();
+        try {
+          const consequentStmts = consequent.map((s) => this._statement(s));
+          return [test, consequentStmts];
+        } finally {
+          this.ctx.dedent();
+          this.ctx.dedent();
+          this.ctx.popBlockScope();
+        }
+      },
+    );
+
+    const groupedCaseExprs: [tests: Snippet[], consequent: ResolvedStatement[]][] = [];
+    let currentGroup = [];
+    for (const [index, [test, consequent]] of resolvedCaseExprs.entries()) {
+      currentGroup.push(test);
+      if (consequent.length > 0 || index === caseExprs.length - 1) {
+        groupedCaseExprs.push([currentGroup, consequent]);
+        currentGroup = [];
+      }
+    }
+
+    // Validation
+    {
+      // Tests should be constant
+      caseExprs.forEach(([testExpr], i) => {
+        if (!isConstant(testExpr)) {
+          const testNode = cases[i]?.[0];
+          invariant(testNode, `Expected node to be not nullish.`);
+          throw new Error(`All of switch tests must be constant.
+Test '${stringifyNode(testNode)}' is not constant, making the following switch statement invalid. 
+This error may be caused by an implicit conversion.
+${stringifyNode(statement)}`);
+        }
+      });
+
+      // Tests should not have duplicates.
+      // We skip this check, because WGSL errors are readable,
+      // and we cannot easily access non-comptime known constants.
+
+      // Tests should not have non-trivial fallthrough
+      resolvedCaseExprs
+        .slice(0, matchedCaseWasNotLast ? undefined : -1)
+        .forEach(([_, consequent]) => {
+          const last = consequent.at(-1);
+          if (last && !last.endsWithControlFlow) {
+            throw new Error(`Switch statement cannot have non-trivial fallthrough.
+The following switch statement is invalid:
+${stringifyNode(statement)}`);
+          }
+        });
+    }
+
+    return {
+      code: this._emitSwitchStatement(discriminantExpr, groupedCaseExprs),
+      definesInNearestScope: false,
+    };
   }
 
   /**
