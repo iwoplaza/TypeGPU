@@ -636,6 +636,19 @@
           boids: 274.7 → 241.6 kB minified, 77.9 → 68.5 kB gzip; mobile start ~40 ms sooner
         </div>
       </div>
+      <div class="opt">
+        <div class="what">Opt-in batching of pipeline submissions</div>
+        <p>
+          With <code>tgpu.init({ unstable_batchSubmits: true })</code>, draws and dispatches made
+          without an explicit encoder are submitted together once the frame's synchronous code is
+          done. TypeGPU's own writes, reads and destroys submit the pending work first, so ordering
+          is kept; a lint rule keeps future queue use going through that path. Not included in the
+          measurements above, since it's opt-in.
+        </p>
+        <div class="effect">
+          Mobile JS per frame: stable-fluid 2.7 → 2.1 ms, jelly-slider 10.1 → 8.4 ms
+        </div>
+      </div>
     </div>
   </section>
 
@@ -723,8 +736,10 @@
             <td>No gain: jelly-slider 68.5 → 70.6 ms and 70.2 → 71.1 ms</td>
             <td>
               Stopped: the cost is evaluating each external the first time, which any format must
-              do. A new format is also a contract between two packages: typegpu still decodes the
-              pre-0.9 format next to the current one, so a third would be kept indefinitely
+              do. A new format would also need changes in 4 places (two emitters in the plugin, the
+              plugin's parser for already-built dependencies, typegpu's decoder), and each reader
+              would handle two shapes for as long as published libraries like typegpu-noise carry
+              the current one
             </td>
           </tr>
           <tr>
@@ -759,18 +774,19 @@
           </tr>
           <tr>
             <td>
-              Batch draws and dispatches into one <code>queue.submit</code> per task, keeping their
-              order by flushing before every other queue operation (prototyped)
+              Opt-in <code>unstable_batchSubmits</code>: draws and dispatches without an encoder are
+              submitted together in a microtask; every other queue use, buffer mapping and destroy
+              submits the pending work first
             </td>
             <td>
-              Mobile JS per frame: stable-fluid 4.2 → 2.9 ms, jelly-slider 10.4 → 9.3 ms, boids 2.4
-              → 2.1 ms; desktop unchanged
+              Mobile JS per frame: stable-fluid 2.7 → 2.1 ms (slowest 10% of frames 8.7 → 5.3 ms),
+              jelly-slider 10.1 → 8.4 ms; desktop unchanged
             </td>
             <td>
-              Stopped: needs a flush at 21 queue operations in 6 files, and a missed flush in future
-              code silently reorders GPU work. Writes an app makes through
-              <code>root.device.queue</code> still jump ahead of earlier draws. Apps can already
-              batch explicitly with one command encoder
+              Kept as opt-in: one small module, 23 call sites through <code>getQueue()</code> or a
+              flush, and a new lint rule that rejects direct <code>device.queue</code> use. Not the
+              default, since an app's own <code>root.device.queue</code> calls would run ahead of
+              earlier draws
             </td>
           </tr>
           <tr>
