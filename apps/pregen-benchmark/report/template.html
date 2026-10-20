@@ -758,14 +758,15 @@
           </tr>
           <tr>
             <td>
-              Large dispatch functions instead of many small ones (the generator's
-              <code>_expression</code>/<code>_statement</code> before they were split, measured both
-              ways), with V8's <code>--no-lazy</code> as the upper bound for any such restructuring
+              Large dispatch functions instead of many small ones: the generator with its split
+              reverted on today's code (a 695-line <code>_expression</code> and a 433-line
+              <code>_statement</code>), with V8's <code>--no-lazy</code> as the upper bound for any
+              such restructuring
             </td>
             <td>
-              Splitting changed first generation within noise. Lazy compilation is 17 of
-              jelly-slider's 54 ms and 10 of boids' 17 ms, but compiling up front moves it to
-              import: totals 255 → 245 ms and 204 → 210 ms
+              Merged: first generation −5.6% to +5% across the examples (noise), later generations
+              3–9% slower. Lazy compilation is 17 of jelly-slider's 54 ms and 10 of boids' 17 ms,
+              but compiling up front moves it to import: totals 255 → 245 ms and 204 → 210 ms
             </td>
             <td>
               Stopped: merging more code into big dispatch functions recovers ~10 ms at most, and
@@ -842,6 +843,20 @@
             </td>
             <td>
               Kept: 9 guarded lines, documented, tested; no change for apps that don't opt out
+            </td>
+          </tr>
+          <tr>
+            <td>
+              Extend the textures flag past the root into bind groups, resolution and render passes
+              (prototyped: 26 guards in 4 files, inside type-check chains shared with buffers)
+            </td>
+            <td>
+              boids: another −3.8 kB minified, −0.5 kB gzip; the sampler module still stays in
+            </td>
+            <td>
+              Stopped: the flag would also disable raw <code>GPUTextureView</code> bindings, and
+              every new resource branch would need a guard. The remaining candidates, timestamp
+              helpers (2.3 kB) and immediates (1.7 kB minified), are each under 1 kB gzip
             </td>
           </tr>
           <tr>
