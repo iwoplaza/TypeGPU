@@ -14,7 +14,9 @@
     "directory": "packages/typegpu-react"
   },
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/react-native/index.*"
+  ],
   "types": "./src/browser/index.ts",
   "exports": {
     ".": {
