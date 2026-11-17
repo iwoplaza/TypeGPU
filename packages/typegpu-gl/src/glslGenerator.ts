@@ -955,6 +955,11 @@ export class GlslGenerator extends WgslGenerator {
     return `${this.ctx.pre}${glslTypeName} ${name}${resolveArraySizeSuffix(this.ctx, dataType)} = ${rhsStr};`;
   }
 
+  override _emitPhonyAssignment(value: Snippet): string {
+    // GLSL allows discarding the value of any expression statement
+    return `${this.ctx.pre}${this.ctx.resolveSnippet(value).value};`;
+  }
+
   override _emitSwitchStatement(
     discriminantExpr: Snippet,
     groupedCaseExprs: [tests: Snippet[], consequent: ResolvedStatement[]][],

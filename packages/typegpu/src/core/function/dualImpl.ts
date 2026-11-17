@@ -1,6 +1,10 @@
 import { type MapValueToSnippet, snip } from '../../data/snippet.ts';
 import { setName } from '../../shared/meta.ts';
-import { $gpuCallable, $gpuCallableStrictSignature } from '../../shared/symbols.ts';
+import {
+  $gpuCallable,
+  $gpuCallableMustUse,
+  $gpuCallableStrictSignature,
+} from '../../shared/symbols.ts';
 import { tryConvertSnippet } from '../../tgsl/conversion.ts';
 import { concretize } from '../../tgsl/generationHelpers.ts';
 import { asComptime, type DualFn, NormalState, type ResolutionCtx } from '../../types.ts';
@@ -46,6 +50,13 @@ interface DualImplOptions<T extends AnyFn> {
    * only has `possibleSideEffects: true` if at least one argument does.
    */
   readonly sideEffects: boolean;
+  /**
+   * Whether the returned value has to be used, like with `@must_use` functions in WGSL.
+   * Pass `false` for builtins that return a value, but can be called just for their effect
+   * (e.g. `atomicAdd`).
+   * @default true
+   */
+  readonly mustUse?: boolean | undefined;
 }
 
 export class MissingCpuImplError extends Error {
@@ -68,6 +79,9 @@ export function dualImpl<T extends AnyFn>(options: DualImplOptions<T>): DualFn<T
     setName(impl, options.name);
   }
   impl.toString = () => options.name ?? '<unknown>';
+  if (options.mustUse === false) {
+    impl[$gpuCallableMustUse] = false;
+  }
   Object.defineProperty(impl, $gpuCallableStrictSignature, {
     get() {
       return typeof options.signature !== 'function' ? options.signature : undefined;

@@ -38,6 +38,7 @@ import {
   $cast,
   $comptimeValueOf,
   $gpuCallable,
+  $gpuCallableMustUse,
   $gpuCallableStrictSignature,
   $gpuValueOf,
   $internal,
@@ -489,6 +490,7 @@ export type GPUCallableStrictSignature = {
 export interface GPUCallable<TArgs extends unknown[] = unknown[]> {
   [$gpuCallable](ctx: ResolutionCtx, args: MapValueToSnippet<TArgs>): Snippet;
   [$gpuCallableStrictSignature]?: GPUCallableStrictSignature | undefined;
+  [$gpuCallableMustUse]?: boolean | undefined;
 }
 
 export function isGPUCallable(value: unknown): value is GPUCallable {

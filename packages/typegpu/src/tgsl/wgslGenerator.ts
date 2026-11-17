@@ -23,6 +23,7 @@ import {
 import { getName } from '../shared/meta.ts';
 import {
   $gpuCallable,
+  $gpuCallableMustUse,
   $gpuCallableStrictSignature,
   $internal,
   $providing,
@@ -63,7 +64,7 @@ import { createPtrFromOrigin, implicitFrom, ptrFn } from '../data/ptr.ts';
 import { _ref, RefOperator } from '../data/ref.ts';
 import { constant } from '../core/constant/tgpuConstant.ts';
 import { unroll, UnrollableIterable } from '../core/unroll/tgpuUnroll.ts';
-import { isGenericFn } from '../core/function/tgpuFn.ts';
+import { isGenericFn, isTgpuFn } from '../core/function/tgpuFn.ts';
 import type { AnyFn } from '../core/function/fnTypes.ts';
 import { AutoStruct } from '../data/autoStruct.ts';
 import { mathToStd, supportedLogOps } from './jsPolyfills.ts';
@@ -235,6 +236,36 @@ const usageToVarTemplateMap: Record<VariableScope | BindableBufferUsage | 'immed
  */
 const functionInitialBlockDepth = 2;
 
+/**
+ * Whether `type` is an atomic, a runtime-sized array, or a composite containing either.
+ */
+function containsNonConstructible(type: unknown): boolean {
+  if (wgsl.isAtomic(type)) {
+    return true;
+  }
+  if (wgsl.isWgslArray(type)) {
+    return type.elementCount === 0 || containsNonConstructible(type.elementType);
+  }
+  if (wgsl.isWgslStruct(type)) {
+    return Object.values(type.propTypes).some(containsNonConstructible);
+  }
+  return false;
+}
+
+/**
+ * Whether a call to `callee` can be the entirety of a function call statement,
+ * even if it returns a value.
+ */
+function isCallableAsStatement(callee: unknown): boolean {
+  return (
+    (isGPUCallable(callee) && callee[$gpuCallableMustUse] === false) ||
+    // User-defined functions are never emitted as `@must_use`
+    isTgpuFn(callee) ||
+    isGenericFn(callee) ||
+    (typeof callee === 'function' && !isGPUCallable(callee) && !isMarkedInternal(callee))
+  );
+}
+
 // Used for switch case.
 const switchDefault = snip('default', UnknownData, 'constant');
 
@@ -381,6 +412,25 @@ export class WgslGenerator implements ShaderGenerator {
     rhsStr: string,
   ): string {
     return `${this.ctx.pre}${keyword} ${name} = ${rhsStr};`;
+  }
+
+  /**
+   * Creates a statement that evaluates `value`, and discards the result.
+   */
+  protected _emitPhonyAssignment(value: Snippet): string {
+    // Phony assignments only accept constructible types, pointers, textures and samplers
+    let rhs = value;
+    if (rhs.dataType !== UnknownData && containsNonConstructible(rhs.dataType)) {
+      const ptrType = createPtrFromOrigin(
+        rhs.origin,
+        concretize(rhs.dataType) as wgsl.StorableData,
+      );
+      if (ptrType) {
+        rhs = tryConvertSnippet(this.ctx, rhs, ptrType, false);
+      }
+    }
+
+    return stitch`${this.ctx.pre}_ = ${rhs};`;
   }
 
   protected _identifier(id: string): Snippet {
@@ -767,38 +817,7 @@ export class WgslGenerator implements ShaderGenerator {
     }
 
     if (expression[0] === NODE.call) {
-      // Function Call
-      const [_, calleeNode, argNodes] = expression;
-      const _callee = this._expression(calleeNode);
-      const callee = mathToStd.get(_callee.value as AnyFn) ?? (_callee.value as AnyFn);
-
-      if ((callee === _ref || callee === unroll) && argNodes[0]) {
-        this.tryMarkModified(argNodes[0]);
-      }
-
-      let args: readonly Snippet[];
-
-      if (isGPUCallable(callee) && callee[$gpuCallableStrictSignature]) {
-        const strictSignature = callee[$gpuCallableStrictSignature];
-
-        // The function's signature does not depend on the context, so it can be used to
-        // give a hint to the argument expressions that a specific type is expected.
-        args = argNodes.map((arg, i) => {
-          const argType = strictSignature.argTypes[i];
-          if (!argType) {
-            const length = strictSignature.argTypes.length;
-            throw new WgslTypeError(
-              `Call '${stringifyNode(expression)}' is invalid, the function expected at most ${length} argument${length === 1 ? '' : 's'}`,
-            );
-          }
-          // It's only a suggestion, the conversion happens later on
-          return this._expressionWithTypeSuggestion(arg, argType);
-        });
-      } else {
-        args = argNodes.map((arg) => this._expression(arg));
-      }
-
-      return this.call(callee, args, _callee);
+      return this._callExpression(expression, this._expression(expression[1]));
     }
 
     if (expression[0] === NODE.objectExpr) {
@@ -1203,6 +1222,39 @@ The generated shader will evaluate them in declaration order.`,
       return `${name}<${resolvedTemplateParams}>(${resolvedArgs})`;
     }
     return `${name}(${resolvedArgs})`;
+  }
+
+  protected _callExpression(expression: tinyest.Call, calleeSnippet: Snippet): Snippet {
+    const [_, _calleeNode, argNodes] = expression;
+    const callee = mathToStd.get(calleeSnippet.value as AnyFn) ?? (calleeSnippet.value as AnyFn);
+
+    if ((callee === _ref || callee === unroll) && argNodes[0]) {
+      this.tryMarkModified(argNodes[0]);
+    }
+
+    let args: readonly Snippet[];
+
+    if (isGPUCallable(callee) && callee[$gpuCallableStrictSignature]) {
+      const strictSignature = callee[$gpuCallableStrictSignature];
+
+      // The function's signature does not depend on the context, so it can be used to
+      // give a hint to the argument expressions that a specific type is expected.
+      args = argNodes.map((arg, i) => {
+        const argType = strictSignature.argTypes[i];
+        if (!argType) {
+          const length = strictSignature.argTypes.length;
+          throw new WgslTypeError(
+            `Call '${stringifyNode(expression)}' is invalid, the function expected at most ${length} argument${length === 1 ? '' : 's'}`,
+          );
+        }
+        // It's only a suggestion, the conversion happens later on
+        return this._expressionWithTypeSuggestion(arg, argType);
+      });
+    } else {
+      args = argNodes.map((arg) => this._expression(arg));
+    }
+
+    return this.call(callee, args, calleeSnippet);
   }
 
   protected _binaryOrAssignmentExpression(
@@ -2104,23 +2156,59 @@ ${stringifyNode(statement)}`);
     }
 
     if (
-      statement[0] === NODE.numericLiteral ||
-      statement[0] === NODE.binaryExpr ||
-      statement[0] === NODE.unaryExpr ||
-      statement[0] === NODE.logicalExpr ||
-      statement[0] === NODE.arrayExpr ||
-      statement[0] === NODE.objectExpr ||
-      statement[0] === NODE.nullLiteral
+      statement[0] === NODE.call ||
+      statement[0] === NODE.memberAccess ||
+      statement[0] === NODE.indexAccess ||
+      statement[0] === NODE.conditionalExpr ||
+      // Forbidden by our injection prevention when resolved
+      statement[0] === NODE.stringLiteral
     ) {
-      // `memberAccess` is allowed for raw code snippets, `indexAccess` is allowed for consistency.
-      // `stringLiteral` is forbidden by our injection prevention anyway.
-      throw new WgslForbiddenStatementError(statement);
+      return { code: this._expressionStatement(statement), definesInNearestScope: false };
     }
 
-    const expr = this._expression(statement);
-    const resolved =
-      expr.value !== undefined && expr.value !== null ? this.ctx.resolveSnippet(expr).value : '';
-    return { code: resolved ? `${this.ctx.pre}${resolved};` : '', definesInNearestScope: false };
+    throw new WgslForbiddenStatementError(statement);
+  }
+
+  /**
+   * Handles expressions whose value (if any) is discarded.
+   */
+  protected _expressionStatement(
+    statement:
+      | tinyest.Call
+      | tinyest.MemberAccess
+      | tinyest.IndexAccess
+      | tinyest.ConditionalExpression
+      | tinyest.Str,
+  ): string {
+    let expr: Snippet;
+    // Whether the expression can be emitted as written, even if it produces a value
+    let standalone: boolean;
+
+    if (statement[0] === NODE.call) {
+      const calleeSnippet = this._expression(statement[1]);
+      expr = setSourceNode(this._callExpression(statement, calleeSnippet), statement);
+      standalone = isCallableAsStatement(
+        mathToStd.get(calleeSnippet.value as AnyFn) ?? calleeSnippet.value,
+      );
+    } else {
+      expr = this._expression(statement);
+      // Raw code snippets and accessors of functions (`foo.$`)
+      standalone =
+        statement[0] === NODE.memberAccess &&
+        extractId(statement[2]) === '$' &&
+        expr.possibleSideEffects;
+    }
+
+    if (expr.value === undefined || expr.value === null) {
+      return '';
+    }
+
+    if (standalone || wgsl.isVoid(expr.dataType) || expr.dataType === UnknownData) {
+      const resolved = this.ctx.resolveSnippet(expr).value;
+      return resolved ? `${this.ctx.pre}${resolved};` : '';
+    }
+
+    return this._emitPhonyAssignment(expr);
   }
 
   /**

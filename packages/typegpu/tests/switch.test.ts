@@ -241,7 +241,7 @@ describe(`switch statement in 'use gpu' functions`, () => {
 
     expect(code).toMatchInlineSnapshot(`
       "fn fn_1() {
-        array<i32, 1>()[0i];
+        _ = array<i32, 1>()[0i];
       }"
     `);
     expect(code).toContain('array');

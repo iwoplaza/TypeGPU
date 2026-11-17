@@ -247,7 +247,7 @@ describe('meta', () => {
       "fn fn_1() {
         let a = 1;
         const b = 1;
-        1;
+        _ = 1;
       }"
     `);
   });
