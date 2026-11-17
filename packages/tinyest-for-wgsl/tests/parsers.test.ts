@@ -189,6 +189,50 @@ describe('transpileBabelFn and transpileAcornFn', () => {
   );
 
   it(
+    'rejects destructured args that cannot be translated',
+    dualTest((p, transpileFn) => {
+      expect(() => transpileFn(p('({ a = 1, b }) => a + b'))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Default values in destructured parameters are not supported in TGSL ('a').]`,
+      );
+      expect(() =>
+        transpileFn(p('({ a: alias = 1 }) => alias')),
+      ).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Default values in destructured parameters are not supported in TGSL ('a').]`,
+      );
+      expect(() => transpileFn(p('({ a, ...rest }) => a'))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Rest elements in destructured parameters are not supported in TGSL.]`,
+      );
+      expect(() => transpileFn(p('({ pos: { x } }) => x'))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Nested destructuring in parameters is not supported in TGSL ('pos').]`,
+      );
+      expect(() => transpileFn(p('({ pos: [x] }) => x'))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Nested destructuring in parameters is not supported in TGSL ('pos').]`,
+      );
+      expect(() => transpileFn(p(`({ 'a': b }) => b`))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Only identifier keys are supported in destructured parameters in TGSL.]`,
+      );
+      expect(() => transpileFn(p('({ [a]: b }) => b'))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Only identifier keys are supported in destructured parameters in TGSL.]`,
+      );
+    }),
+  );
+
+  it(
+    'rejects unsupported parameter types',
+    dualTest((p, transpileFn) => {
+      expect(() => transpileFn(p('(...args) => 1'))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Unsupported function parameter type(s): RestElement]`,
+      );
+      expect(() => transpileFn(p('([a]) => a'))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Unsupported function parameter type(s): ArrayPattern]`,
+      );
+      expect(() => transpileFn(p('(a = 1) => a'))).toThrowErrorMatchingInlineSnapshot(
+        `[Error: Unsupported function parameter type(s): AssignmentPattern]`,
+      );
+    }),
+  );
+
+  it(
     'handles mixed type parameters',
     dualTest((p, transpileFn) => {
       const { params, externalNames } = transpileFn(
