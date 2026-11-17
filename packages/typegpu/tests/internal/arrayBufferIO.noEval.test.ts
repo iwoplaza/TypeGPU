@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect } from 'vitest';
+import { afterAll, beforeAll, describe, expect, vi } from 'vitest';
 import { d, writeToArrayBuffer, setGlobalJITPreference } from 'typegpu';
 import { it } from 'typegpu-testing-utility';
 
@@ -9,6 +9,30 @@ beforeAll(() => {
 afterAll(() => {
   setGlobalJITPreference('auto');
 });
+
+/**
+ * Writes the same value into two copies of `initial`, once with the fallback writer
+ * and once with the compiled writer.
+ */
+function writeWithBothWriters<T extends d.AnyData>(
+  initial: Uint32Array,
+  schema: T,
+  data: d.InferInput<T>,
+  options: { startOffset?: number; endOffset?: number },
+) {
+  const fallback = initial.slice();
+  writeToArrayBuffer(fallback.buffer, schema, data, options);
+
+  const compiled = initial.slice();
+  setGlobalJITPreference('auto');
+  try {
+    writeToArrayBuffer(compiled.buffer, schema, data, options);
+  } finally {
+    setGlobalJITPreference('disabled');
+  }
+
+  return { fallback: [...fallback], compiled: [...compiled] };
+}
 
 describe('arrayBufferIO', () => {
   it('handles d.vec input', () => {
@@ -192,6 +216,66 @@ describe('arrayBufferIO', () => {
       writeToArrayBuffer(buffer, Outer, { a: 1, inner: { v: d.vec2u(2, 3), w: 4 }, z: 5 });
 
       expect([...new Uint32Array(buffer)]).toStrictEqual([1, 0, 0, 0, 2, 3, 4, 0, 5]);
+    });
+  });
+
+  describe('endOffset', () => {
+    it('stops an array at endOffset', () => {
+      const { fallback, compiled } = writeWithBothWriters(
+        new Uint32Array(4),
+        d.arrayOf(d.u32, 4),
+        [1, 2, 3, 4],
+        { endOffset: 8 },
+      );
+
+      expect(fallback).toStrictEqual([1, 2, 0, 0]);
+      expect(fallback).toStrictEqual(compiled);
+    });
+
+    it('stops a struct at endOffset', () => {
+      const { fallback, compiled } = writeWithBothWriters(
+        new Uint32Array(2),
+        d.struct({ a: d.u32, b: d.u32 }),
+        { a: 1, b: 2 },
+        { endOffset: 4 },
+      );
+
+      expect(fallback).toStrictEqual([1, 0]);
+      expect(fallback).toStrictEqual(compiled);
+    });
+
+    it('only touches bytes between startOffset and endOffset', () => {
+      const { fallback, compiled } = writeWithBothWriters(
+        new Uint32Array(6).fill(10),
+        d.arrayOf(d.u32, 6),
+        [1, 2, 3, 4],
+        { startOffset: 8, endOffset: 16 },
+      );
+
+      expect(fallback).toStrictEqual([10, 10, 1, 2, 10, 10]);
+      expect(fallback).toStrictEqual(compiled);
+    });
+
+    it('leaves padding and unwritten elements inside the range untouched', () => {
+      const { fallback, compiled } = writeWithBothWriters(
+        new Uint32Array(12).fill(10),
+        d.arrayOf(d.vec3u, 3),
+        [d.vec3u(1, 2, 3), d.vec3u(4, 5, 6)],
+        { endOffset: 40 },
+      );
+
+      expect(fallback).toStrictEqual([1, 2, 3, 10, 4, 5, 6, 10, 10, 10, 10, 10]);
+      expect(fallback).toStrictEqual(compiled);
+    });
+
+    it('stops at endOffset when writing to a mapped buffer', ({ root }) => {
+      const buffer = root.createBuffer(d.arrayOf(d.u32, 4), () => {
+        buffer.write([1, 2, 3, 4], { endOffset: 8 });
+      });
+
+      const rawBuffer = root.unwrap(buffer);
+      const mapped = vi.mocked(rawBuffer.getMappedRange).mock.results[0]?.value as ArrayBuffer;
+      expect([...new Uint32Array(mapped)]).toStrictEqual([1, 2, 0, 0]);
     });
   });
 });

@@ -853,9 +853,21 @@ export function writeToArrayBuffer<T extends wgsl.BaseData>(
     }
   }
 
-  const writer = new BufferWriter(buffer);
-  writer.seekTo(startOffset);
-  writeData(writer, schema, data);
+  const schemaSize = sizeOf(schema);
+  if (startOffset + schemaSize <= endOffset) {
+    const writer = new BufferWriter(buffer);
+    writer.seekTo(startOffset);
+    writeData(writer, schema, data);
+    return;
+  }
+
+  // Writing into a scratch copy of the range, so that nothing past endOffset is touched
+  const rangeSize = Math.max(0, endOffset - startOffset);
+  const target = new Uint8Array(buffer, startOffset, rangeSize);
+  const scratch = new Uint8Array(schemaSize);
+  scratch.set(target);
+  writeData(new BufferWriter(scratch.buffer), schema, data);
+  target.set(scratch.subarray(0, rangeSize));
 }
 
 export function readFromArrayBuffer<T extends wgsl.BaseData>(
