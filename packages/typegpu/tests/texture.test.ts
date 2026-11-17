@@ -1811,7 +1811,7 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
         expect(() => texture.write(incorrectData)).toThrow('Buffer size mismatch');
       });
 
-      it('warns and returns early when generateMipmaps would generate no mipmaps', ({ root }) => {
+      it('throws when the base mip level is out of range', ({ root }) => {
         const texture = root
           .createTexture({
             size: [32, 32],
@@ -1820,19 +1820,30 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
           })
           .$usage('render');
 
-        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        expect(() => texture.generateMipmaps(3)).toThrowErrorMatchingInlineSnapshot(
+          `[Error: Base mip level 3 is out of range. Texture has 3 mip levels.]`,
+        );
+        expect(() => texture.generateMipmaps(5)).toThrowErrorMatchingInlineSnapshot(
+          `[Error: Base mip level 5 is out of range. Texture has 3 mip levels.]`,
+        );
+        expect(() => texture.generateMipmaps(-1)).toThrowErrorMatchingInlineSnapshot(
+          `[Error: Base mip level -1 is out of range. Texture has 3 mip levels.]`,
+        );
+      });
 
-        // Base mip level 3 would result in 0 mip levels to generate, so it should return early
-        expect(() => texture.generateMipmaps(3)).not.toThrow();
+      it('throws when the requested mip levels go past the last mip level', ({ root, device }) => {
+        const texture = root
+          .createTexture({
+            size: [32, 32],
+            format: 'rgba8unorm',
+            mipLevelCount: 3,
+          })
+          .$usage('render');
 
-        expect(consoleSpy.mock.calls[0]).toMatchInlineSnapshot(`
-          [
-            "⚠️ [suspicious] ",
-            "generateMipmaps is a no-op: would generate 0 mip levels (base: 3, total: 3)",
-          ]
-        `);
-
-        consoleSpy.mockRestore();
+        expect(() => texture.generateMipmaps(1, 5)).toThrowErrorMatchingInlineSnapshot(
+          `[Error: Cannot generate 5 mip levels starting at mip level 1. Texture has 3 mip levels.]`,
+        );
+        expect(device.mock.createCommandEncoder).not.toHaveBeenCalled();
       });
 
       it('warns when generateMipmaps would generate only 1 mip level', ({ root }) => {
