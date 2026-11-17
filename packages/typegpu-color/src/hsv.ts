@@ -1,12 +1,13 @@
 import { tgpu } from 'typegpu';
 import { f32, i32, vec3f } from 'typegpu/data';
-import { floor, max, min } from 'typegpu/std';
+import { floor, fract, max, min } from 'typegpu/std';
 
 export const hsvToRgb = tgpu.fn(
   [vec3f],
   vec3f,
 )((hsv) => {
-  const h = hsv.x;
+  // In [0, 1), so that the sector index below is never negative
+  const h = fract(hsv.x);
   const s = hsv.y;
   const v = hsv.z;
 
