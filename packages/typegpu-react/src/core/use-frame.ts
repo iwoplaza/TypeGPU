@@ -15,10 +15,9 @@ export function startFrameLoop(cb: (ctx: FrameCtx) => void): () => void {
   let frameId: number | undefined;
   let startTime: number | undefined;
   let lastTime: number | undefined;
+  let stopped = false;
 
   const loop = () => {
-    frameId = requestAnimationFrame(loop);
-
     const now = performance.now();
     if (lastTime === undefined || startTime === undefined) {
       startTime = now;
@@ -29,11 +28,17 @@ export function startFrameLoop(cb: (ctx: FrameCtx) => void): () => void {
       elapsedSeconds: (now - startTime) / 1000,
     });
     lastTime = now;
+
+    // Scheduling only after the callback returns, so that a throwing callback stops the loop
+    if (!stopped) {
+      frameId = requestAnimationFrame(loop);
+    }
   };
 
   loop();
 
   return () => {
+    stopped = true;
     if (frameId !== undefined) {
       cancelAnimationFrame(frameId);
     }

@@ -48,8 +48,6 @@ export function useFrame(cb: FrameCallback) {
       let lastTime: number | undefined;
 
       function loop(timestamp?: number) {
-        frameId.value = requestAnimationFrame(loop);
-
         const now = timestamp ?? performance.now();
         if (lastTime === undefined || startTime === undefined) {
           startTime = now;
@@ -60,6 +58,9 @@ export function useFrame(cb: FrameCallback) {
           elapsedSeconds: (now - startTime) / 1000,
         });
         lastTime = now;
+
+        // Scheduling only after the callback returns, so that a throwing callback stops the loop
+        frameId.value = requestAnimationFrame(loop);
       }
 
       loop();
