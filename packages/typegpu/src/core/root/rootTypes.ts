@@ -180,6 +180,12 @@ type NormalizeOutput<T> = T extends { readonly [$internal]: unknown } | number |
     : OmitBuiltins<InstanceToSchema<T>>
   : { [K in keyof OmitBuiltins<T>]: InstanceToSchema<OmitBuiltins<T>[K]> };
 
+/**
+ * `attribs` can only be omitted if the vertex function has no non-builtin inputs.
+ */
+type RenderDescriptorBase<TVertexIn, TAttribs> = TgpuRenderPipeline.DescriptorBase &
+  ({} extends OmitBuiltins<TVertexIn> ? { attribs?: TAttribs } : { attribs: TAttribs });
+
 export interface WithBinding extends Withable<WithBinding> {
   createComputePipeline<ComputeIn extends IORecord<AnyComputeBuiltin>>(
     descriptor: TgpuComputePipeline.Descriptor<ComputeIn>,
@@ -192,8 +198,7 @@ export interface WithBinding extends Withable<WithBinding> {
     TVertexOut = unknown,
     TFragmentOut = unknown,
   >(
-    descriptor: TgpuRenderPipeline.DescriptorBase & {
-      attribs?: TAttribs;
+    descriptor: RenderDescriptorBase<TVertexIn, TAttribs> & {
       vertex:
         | TgpuVertexFn<TVertexIn, Assume<TVertexOut, TgpuVertexFn.Out>>
         | ((
@@ -220,8 +225,7 @@ export interface WithBinding extends Withable<WithBinding> {
     TAttribs extends LayoutToAllowedAttribs<TVertexIn> = LayoutToAllowedAttribs<TVertexIn>,
     TVertexOut extends TgpuVertexFn.Out = TgpuVertexFn.Out,
   >(
-    descriptor: TgpuRenderPipeline.DescriptorBase & {
-      attribs?: TAttribs;
+    descriptor: RenderDescriptorBase<TVertexIn, TAttribs> & {
       vertex:
         | TgpuVertexFn<TVertexIn, Assume<TVertexOut, TgpuVertexFn.Out>>
         | ((
@@ -250,10 +254,9 @@ export interface WithBinding extends Withable<WithBinding> {
     TVertexOut extends TgpuVertexFn.Out = TgpuVertexFn.Out,
     TFragmentOut = unknown,
   >(
-    descriptor: TgpuRenderPipeline.DescriptorBase &
+    descriptor: RenderDescriptorBase<TVertexIn, TAttribs> &
       (
         | {
-            attribs?: TAttribs;
             vertex:
               | TgpuVertexFn<TVertexIn, Assume<TVertexOut, TgpuVertexFn.Out>>
               | ((
@@ -275,7 +278,6 @@ export interface WithBinding extends Withable<WithBinding> {
             targets?: FragmentOutToTargets<NoInfer<TFragmentOut>>;
           }
         | {
-            attribs?: TAttribs;
             vertex:
               | TgpuVertexFn<TVertexIn, Assume<TVertexOut, TgpuVertexFn.Out>>
               | ((
