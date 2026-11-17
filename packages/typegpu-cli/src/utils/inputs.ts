@@ -3,7 +3,7 @@ import { cancelExit } from './prompts.ts';
 import type { PackageJson } from './types.ts';
 import { hasDependency, typegpuPkgs, getVersionRange } from './pkg.ts';
 
-function isValidProjectDirectory(projectDir: string) {
+export function isValidProjectDirectory(projectDir: string) {
   const trimmedDir = projectDir.trim();
   return (
     projectDir.length === 0 || (trimmedDir.length > 0 && !/[<>:"\\|?*\s]|\/+$/.test(trimmedDir))

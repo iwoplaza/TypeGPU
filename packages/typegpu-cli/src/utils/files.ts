@@ -39,7 +39,7 @@ export async function prepareDirectory(
   projectDir: string,
   options: { interactive?: boolean } = {},
 ) {
-  const dir = path.join(cwd, projectDir);
+  const dir = path.resolve(cwd, projectDir);
   const interactive = options.interactive ?? true;
 
   if (!fs.existsSync(dir)) {

@@ -4,7 +4,12 @@ import * as p from '@clack/prompts';
 import { pmFromUserAgent, pmInstall } from './utils/pm.ts';
 import { cancelExit, confirmStep, failAndExit, rgbText } from './utils/prompts.ts';
 import { scaffoldProject, prepareDirectory } from './utils/files.ts';
-import { getProjectName, isValidPackageName, getPackageName } from './utils/inputs.ts';
+import {
+  getProjectName,
+  isValidPackageName,
+  isValidProjectDirectory,
+  getPackageName,
+} from './utils/inputs.ts';
 import { detect, resolveCommand } from 'package-manager-detector';
 import { addAgentSkills, askForAgentSkills } from './steps/skills.ts';
 import {
@@ -50,6 +55,10 @@ export async function createProject(cwd: string, options?: CreateProjectOptions)
   p.intro('Creating a new TypeGPU project.');
 
   const nonInteractive = options?.nonInteractive ?? false;
+  if (options?.projectDir !== undefined && !isValidProjectDirectory(options.projectDir)) {
+    failAndExit(`Invalid project directory: ${options.projectDir}`);
+  }
+
   const projectName =
     options?.projectDir ??
     (nonInteractive ? DEFAULT_PROJECT_DIR : await getProjectName(DEFAULT_PROJECT_DIR));
