@@ -618,15 +618,186 @@ describe('GlslGenerator - operator', () => {
     }
 
     expect(tgpu.resolve([foo], glOptions())).toMatchInlineSnapshot(`
-      "float remainder(float x, float y) {
+      "uint remainderU32(uint x, uint y) {
+        return ((y == 0u) ? 0u : (x % max(y, 1u)));
+      }
+
+      int remainderI32(int x, int y) {
+        uint ux = uint(x);
+        uint uy = uint(y);
+        uint absX = ((x < 0) ? (0u - ux) : ux);
+        uint absY = ((y < 0) ? (0u - uy) : uy);
+        int rem = int(remainderU32(absX, absY));
+        return ((x < 0) ? -(rem) : rem);
+      }
+
+      float remainder(float x, float y) {
         float truncDiv = (sign((x / y)) * floor(abs((x / y))));
         return (x - (y * truncDiv));
       }
 
       float foo() {
         int value = 2;
-        int rem = (value % 5);
+        int rem = remainderI32(value, 5);
         return remainder(float((1 + rem)), 0.5);
+      }"
+    `);
+  });
+
+  it('translates signed integer % to a helper with WGSL semantics', () => {
+    const wrap = tgpu.fn(
+      [d.i32, d.i32],
+      d.i32,
+    )((a, n) => {
+      return ((a % n) + n) % n;
+    });
+
+    expect(tgpu.resolve([wrap], glOptions())).toMatchInlineSnapshot(`
+      "uint remainderU32(uint x, uint y) {
+        return ((y == 0u) ? 0u : (x % max(y, 1u)));
+      }
+
+      int remainderI32(int x, int y) {
+        uint ux = uint(x);
+        uint uy = uint(y);
+        uint absX = ((x < 0) ? (0u - ux) : ux);
+        uint absY = ((y < 0) ? (0u - uy) : uy);
+        int rem = int(remainderU32(absX, absY));
+        return ((x < 0) ? -(rem) : rem);
+      }
+
+      int wrap(int a, int n) {
+        return remainderI32((remainderI32(a, n) + n), n);
+      }"
+    `);
+  });
+
+  it('translates unsigned integer % with a runtime divisor to a helper that handles 0', () => {
+    const rem = tgpu.fn(
+      [d.u32, d.u32],
+      d.u32,
+    )((a, n) => {
+      return (a % n) + (a % 7);
+    });
+
+    expect(tgpu.resolve([rem], glOptions())).toMatchInlineSnapshot(`
+      "uint remainderU32(uint x, uint y) {
+        return ((y == 0u) ? 0u : (x % max(y, 1u)));
+      }
+
+      uint rem(uint a, uint n) {
+        return (remainderU32(a, n) + (a % 7u));
+      }"
+    `);
+  });
+
+  it('translates integer vector % to helpers', () => {
+    const rem = tgpu.fn(
+      [d.vec3i, d.vec2u],
+      d.i32,
+    )((v, w) => {
+      const a = std.mod(v, 3);
+      const b = std.mod(w, d.vec2u(2, w.x));
+      return a.x + d.i32(b.y);
+    });
+
+    expect(tgpu.resolve([rem], glOptions())).toMatchInlineSnapshot(`
+      "uint remainderU32(uint x, uint y) {
+        return ((y == 0u) ? 0u : (x % max(y, 1u)));
+      }
+
+      int remainderI32(int x, int y) {
+        uint ux = uint(x);
+        uint uy = uint(y);
+        uint absX = ((x < 0) ? (0u - ux) : ux);
+        uint absY = ((y < 0) ? (0u - uy) : uy);
+        int rem_1 = int(remainderU32(absX, absY));
+        return ((x < 0) ? -(rem_1) : rem_1);
+      }
+
+      ivec3 remainderVec3i(ivec3 x, ivec3 y) {
+        return ivec3(remainderI32(x.x, y.x), remainderI32(x.y, y.y), remainderI32(x.z, y.z));
+      }
+
+      uvec2 remainderVec2u(uvec2 x, uvec2 y) {
+        return uvec2(remainderU32(x.x, y.x), remainderU32(x.y, y.y));
+      }
+
+      int rem(ivec3 v, uvec2 w) {
+        ivec3 a = remainderVec3i(v, ivec3(3));
+        uvec2 b = remainderVec2u(w, uvec2(2u, w.x));
+        return (a.x + int(b.y));
+      }"
+    `);
+  });
+
+  it('translates %= to an assignment of the helper result', () => {
+    const rem = tgpu.fn(
+      [d.i32, d.f32],
+      d.f32,
+    )((a, b) => {
+      let x = d.i32(a);
+      x %= 5;
+      let y = d.f32(b);
+      y %= 2;
+      return d.f32(x) + y;
+    });
+
+    expect(tgpu.resolve([rem], glOptions())).toMatchInlineSnapshot(`
+      "uint remainderU32(uint x, uint y) {
+        return ((y == 0u) ? 0u : (x % max(y, 1u)));
+      }
+
+      int remainderI32(int x, int y) {
+        uint ux = uint(x);
+        uint uy = uint(y);
+        uint absX = ((x < 0) ? (0u - ux) : ux);
+        uint absY = ((y < 0) ? (0u - uy) : uy);
+        int rem_1 = int(remainderU32(absX, absY));
+        return ((x < 0) ? -(rem_1) : rem_1);
+      }
+
+      float remainder(float x, float y) {
+        float truncDiv = (sign((x / y)) * floor(abs((x / y))));
+        return (x - (y * truncDiv));
+      }
+
+      float rem(int a, float b) {
+        int x = a;
+        x = remainderI32(x, 5);
+        float y = b;
+        y = remainder(y, 2.0);
+        return (float(x) + y);
+      }"
+    `);
+  });
+
+  it('masks runtime shift amounts to the bit width', () => {
+    const rotl = tgpu.fn(
+      [d.u32, d.u32],
+      d.u32,
+    )((x, k) => {
+      let y = d.u32(x);
+      y <<= k;
+      return (x << k) | (x >>> (32 - k)) | (y >>> 3);
+    });
+
+    const shiftVec = tgpu.fn(
+      [d.vec2i, d.vec2u],
+      d.vec2i,
+    )((v, k) => {
+      return std.bitShiftRight(v, k);
+    });
+
+    expect(tgpu.resolve([rotl, shiftVec], glOptions())).toMatchInlineSnapshot(`
+      "uint rotl(uint x, uint k) {
+        uint y = x;
+        y <<= (k & 31u);
+        return (((x << (k & 31u)) | (x >> ((32u - k) & 31u))) | (y >> 3u));
+      }
+
+      ivec2 shiftVec(ivec2 v, uvec2 k) {
+        return (v >> (k & 31u));
       }"
     `);
   });

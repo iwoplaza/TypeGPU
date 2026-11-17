@@ -399,6 +399,29 @@ function isF32VecfSchema(
   );
 }
 
+type IntegerKind = 'i32' | 'u32';
+
+const integerSchemaKinds: Partial<Record<string, [kind: IntegerKind, componentCount: number]>> = {
+  i32: ['i32', 1],
+  vec2i: ['i32', 2],
+  vec3i: ['i32', 3],
+  vec4i: ['i32', 4],
+  u32: ['u32', 1],
+  vec2u: ['u32', 2],
+  vec3u: ['u32', 3],
+  vec4u: ['u32', 4],
+};
+
+function getIntegerSchemaKind(schema: d.BaseData | UnknownData) {
+  return schema === UnknownData ? undefined : integerSchemaKinds[schema.type];
+}
+
+type IntegerVecType = 'vec2i' | 'vec3i' | 'vec4i' | 'vec2u' | 'vec3u' | 'vec4u';
+
+function getKnownNumber(snippet: Snippet): number | undefined {
+  return typeof snippet.value === 'number' ? snippet.value : undefined;
+}
+
 const HELPERS = {
   // TODO(#2821): Make signature more accurate when std.sign and std.abs
   // accept a wider union
@@ -406,6 +429,47 @@ const HELPERS = {
     'use gpu';
     const truncDiv = std.sign(x / y) * std.floor(std.abs(x / y));
     return x - y * truncDiv;
+  },
+  // GLSL ES 3.00 leaves `%` undefined for negative operands and for a zero divisor, while WGSL
+  // defines it as `x - truncate(x / y) * y` (and 0 when `y` is 0). The remainder is computed on the
+  // magnitudes instead, as unsigned integers, and gets the sign of the dividend.
+  remainderI32: (x: number, y: number): number => {
+    'use gpu';
+    const ux = d.u32(x);
+    const uy = d.u32(y);
+    const absX = std.select(ux, 0 - ux, x < 0);
+    const absY = std.select(uy, 0 - uy, y < 0);
+    const rem = d.i32(absX % absY);
+    return std.select(rem, -rem, x < 0);
+  },
+  // WGSL defines `x % 0` as 0, GLSL ES 3.00 leaves it undefined.
+  remainderU32: (x: number, y: number): number => {
+    'use gpu';
+    return std.select(x % std.max(y, 1), 0, y === 0);
+  },
+  remainderVec2i: (x: d.v2i, y: d.v2i): d.v2i => {
+    'use gpu';
+    return d.vec2i(x.x % y.x, x.y % y.y);
+  },
+  remainderVec3i: (x: d.v3i, y: d.v3i): d.v3i => {
+    'use gpu';
+    return d.vec3i(x.x % y.x, x.y % y.y, x.z % y.z);
+  },
+  remainderVec4i: (x: d.v4i, y: d.v4i): d.v4i => {
+    'use gpu';
+    return d.vec4i(x.x % y.x, x.y % y.y, x.z % y.z, x.w % y.w);
+  },
+  remainderVec2u: (x: d.v2u, y: d.v2u): d.v2u => {
+    'use gpu';
+    return d.vec2u(x.x % y.x, x.y % y.y);
+  },
+  remainderVec3u: (x: d.v3u, y: d.v3u): d.v3u => {
+    'use gpu';
+    return d.vec3u(x.x % y.x, x.y % y.y, x.z % y.z);
+  },
+  remainderVec4u: (x: d.v4u, y: d.v4u): d.v4u => {
+    'use gpu';
+    return d.vec4u(x.x % y.x, x.y % y.y, x.z % y.z, x.w % y.w);
   },
   flipYConditionally: (coords: d.v2f, flip: boolean): d.v2f => {
     'use gpu';
@@ -504,6 +568,15 @@ const HELPERS = {
     );
     return bytes;
   },
+};
+
+const vectorRemainderHelpers = {
+  vec2i: HELPERS.remainderVec2i,
+  vec3i: HELPERS.remainderVec3i,
+  vec4i: HELPERS.remainderVec4i,
+  vec2u: HELPERS.remainderVec2u,
+  vec3u: HELPERS.remainderVec3u,
+  vec4u: HELPERS.remainderVec4u,
 };
 
 /**
@@ -995,19 +1068,104 @@ export class GlslGenerator extends WgslGenerator {
       return super.emitCall(comparisonBuiltin, [], [lhs, rhs]);
     }
 
-    if (op === '%' && (isF32VecfSchema(lhs.dataType) || isF32VecfSchema(rhs.dataType))) {
-      const result = this._callShellless(HELPERS.remainder, [lhs, rhs]);
+    if (op === '%' || op === '%=') {
+      const remainder = this.#emitRemainder(lhs, rhs);
+      if (remainder !== undefined) {
+        return op === '%=' ? `${this.ctx.resolveSnippet(lhs).value} = ${remainder}` : remainder;
+      }
+    }
+
+    if (op === '<<' || op === '>>' || op === '<<=' || op === '>>=') {
+      // WGSL takes the shift amount modulo the bit width, GLSL ES 3.00 leaves shifts by
+      // the bit width or more undefined. Integers are always 32-bit (highp) here.
+      const shift = getKnownNumber(rhs);
+      if (shift === undefined || shift < 0 || shift >= 32) {
+        const rhsStr = this.ctx.resolveSnippet(rhs).value;
+        return super.emitBinaryOp(lhs, op, snip(`(${rhsStr} & 31u)`, rhs.dataType, 'runtime'));
+      }
+    }
+
+    return super.emitBinaryOp(lhs, op, rhs);
+  }
+
+  #emitRawUnsignedRemainder = false;
+
+  /**
+   * Returns a call to a helper that implements WGSL's semantics for `lhs % rhs`,
+   * or `undefined` if the GLSL `%` operator can be used as is.
+   */
+  #emitRemainder(lhs: Snippet, rhs: Snippet): string | undefined {
+    let helper: (typeof HELPERS)[keyof typeof HELPERS];
+    let args = [lhs, rhs];
+
+    if (isF32VecfSchema(lhs.dataType) || isF32VecfSchema(rhs.dataType)) {
+      helper = HELPERS.remainder;
+    } else {
+      const concreteKind = getIntegerSchemaKind(lhs.dataType) ?? getIntegerSchemaKind(rhs.dataType);
+      const kindOf = (snippet: Snippet) =>
+        snippet.dataType === abstractInt && concreteKind
+          ? ([concreteKind[0], 1] as const)
+          : getIntegerSchemaKind(snippet.dataType);
+      const lhsKind = kindOf(lhs);
+      const rhsKind = kindOf(rhs);
+      if (!lhsKind || !rhsKind) {
+        return undefined;
+      }
+
+      const [kind] = lhsKind;
+      const componentCount = Math.max(lhsKind[1], rhsKind[1]);
+      const knownLhs = getKnownNumber(lhs);
+      const knownRhs = getKnownNumber(rhs);
+
+      if (kind === 'u32') {
+        if (this.#emitRawUnsignedRemainder || (knownRhs !== undefined && knownRhs !== 0)) {
+          return undefined;
+        }
+      } else if (
+        knownLhs !== undefined &&
+        knownLhs >= 0 &&
+        knownRhs !== undefined &&
+        knownRhs > 0
+      ) {
+        return undefined;
+      }
+
+      if (componentCount === 1) {
+        helper = kind === 'i32' ? HELPERS.remainderI32 : HELPERS.remainderU32;
+      } else {
+        const vecType = `vec${componentCount}${kind === 'i32' ? 'i' : 'u'}` as IntegerVecType;
+        helper = vectorRemainderHelpers[vecType];
+        // The helpers take two vectors, so a scalar operand is spread over the components
+        const vecSchema = d[vecType];
+        args = args.map((arg) =>
+          kindOf(arg)?.[1] === 1
+            ? snip(
+                `${this.ctx.resolve(vecSchema).value}(${this.ctx.resolveSnippet(arg).value})`,
+                vecSchema,
+                'runtime',
+              )
+            : arg,
+        );
+      }
+    }
+
+    const isUnsignedScalarHelper = helper === HELPERS.remainderU32;
+    const prevRaw = this.#emitRawUnsignedRemainder;
+    // The body of `remainderU32` uses `%` itself, with a divisor that is never 0
+    this.#emitRawUnsignedRemainder = isUnsignedScalarHelper;
+    try {
+      const result = this._callShellless(helper, args);
       if (!result) {
         const lhsStr = this.ctx.resolveSnippet(lhs).value;
         const rhsStr = this.ctx.resolveSnippet(rhs).value;
         throw new Error(
-          `[@typegpu/gl] Invalid use of '%', incompatible with the GLSL generator: ${lhsStr} (type: ${String(lhs.dataType)}) ${op} ${rhsStr} (type: ${String(rhs.dataType)})`,
+          `[@typegpu/gl] Invalid use of '%', incompatible with the GLSL generator: ${lhsStr} (type: ${String(lhs.dataType)}) % ${rhsStr} (type: ${String(rhs.dataType)})`,
         );
       }
       return result.value;
+    } finally {
+      this.#emitRawUnsignedRemainder = prevRaw;
     }
-
-    return super.emitBinaryOp(lhs, op, rhs);
   }
 
   /**
