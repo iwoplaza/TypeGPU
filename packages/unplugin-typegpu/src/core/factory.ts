@@ -110,6 +110,11 @@ function wrapInAutoName(
     .prependRight(path.node.end ?? 0, `, "${name}"))`);
 }
 
+function annotateAsPure(this: UnpluginPluginState, path: NodePath<t.CallExpression>): void {
+  // Inserted right before the call, so it stays inside of an autoname wrapper
+  this.magicString.prependRight(path.node.start ?? 0, '/*#__PURE__*/');
+}
+
 function replaceWithAssignmentOverload(
   this: UnpluginPluginState,
   path: NodePath<t.AssignmentExpression>,
@@ -191,6 +196,7 @@ export const unpluginFactory = ((rawOptions, _meta) => {
           wrapInAutoName,
           replaceWithAssignmentOverload,
           replaceWithBinaryOverload,
+          annotateAsPure,
         });
 
         traverse(ast, functionVisitor, undefined, state);

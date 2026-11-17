@@ -236,7 +236,7 @@ describe('marked arrow functions passed to shells', () => {
   test('babel', () => {
     expect(babelTransform(code)).toMatchInlineSnapshot(`
       "import { tgpu } from 'typegpu';
-      const shell = tgpu.fn([]);
+      const shell = /*#__PURE__*/tgpu.fn([]);
       shell(/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a, b) => {
         'use gpu';
 
@@ -266,7 +266,7 @@ describe('marked arrow functions passed to shells', () => {
     expect(await rollupTransform(code)).toMatchInlineSnapshot(`
       "import { tgpu } from 'typegpu';
 
-      const shell = tgpu.fn([]);
+      const shell = /*#__PURE__*/tgpu.fn([]);
 
           shell((/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((a, b) => {
             'use gpu';
@@ -305,7 +305,7 @@ describe('marked anonymous function expressions passed to shells', () => {
   test('babel', () => {
     expect(babelTransform(code)).toMatchInlineSnapshot(`
       "import { tgpu } from 'typegpu';
-      const shell = tgpu.fn([]);
+      const shell = /*#__PURE__*/tgpu.fn([]);
       shell(/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function (a, b) {
         'use gpu';
 
@@ -335,7 +335,7 @@ describe('marked anonymous function expressions passed to shells', () => {
     expect(await rollupTransform(code)).toMatchInlineSnapshot(`
       "import { tgpu } from 'typegpu';
 
-      const shell = tgpu.fn([]);
+      const shell = /*#__PURE__*/tgpu.fn([]);
 
           shell((/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function(a, b){
             'use gpu';
@@ -374,7 +374,7 @@ describe('marked named function expressions passed to shells', () => {
   test('babel', () => {
     expect(babelTransform(code)).toMatchInlineSnapshot(`
       "import { tgpu } from 'typegpu';
-      const shell = tgpu.fn([]);
+      const shell = /*#__PURE__*/tgpu.fn([]);
       shell(/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function addGPU(a, b) {
         'use gpu';
 
@@ -404,7 +404,7 @@ describe('marked named function expressions passed to shells', () => {
     expect(await rollupTransform(code)).toMatchInlineSnapshot(`
       "import { tgpu } from 'typegpu';
 
-      const shell = tgpu.fn([]);
+      const shell = /*#__PURE__*/tgpu.fn([]);
 
           shell((/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function addGPU(a, b){
             'use gpu';
