@@ -1110,6 +1110,105 @@ describe('TgpuBuffer', () => {
   });
 });
 
+describe('TgpuBuffer.$addFlags', () => {
+  it('ORs plain flags with the existing ones', ({ root, device }) => {
+    const buffer = root
+      .createBuffer(d.u32)
+      .$usage('vertex')
+      .$addFlags(GPUBufferUsage.STORAGE)
+      .$addFlags(GPUBufferUsage.QUERY_RESOLVE);
+    root.unwrap(buffer);
+
+    expect(device.mock.createBuffer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usage:
+          GPUBufferUsage.COPY_DST |
+          GPUBufferUsage.COPY_SRC |
+          GPUBufferUsage.VERTEX |
+          GPUBufferUsage.STORAGE |
+          GPUBufferUsage.QUERY_RESOLVE,
+      }),
+    );
+  });
+
+  it('resets the flags when MAP_READ or MAP_WRITE is added', ({ root }) => {
+    const readBuffer = root
+      .createBuffer(d.u32)
+      .$addFlags(GPUBufferUsage.QUERY_RESOLVE)
+      .$addFlags(GPUBufferUsage.MAP_READ);
+    expect(root.unwrap(readBuffer).usage).toBe(GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ);
+
+    const writeBuffer = root.createBuffer(d.u32).$addFlags(GPUBufferUsage.MAP_WRITE);
+    expect(root.unwrap(writeBuffer).usage).toBe(GPUBufferUsage.COPY_SRC | GPUBufferUsage.MAP_WRITE);
+  });
+
+  it('throws for buffers that wrap an existing GPUBuffer', ({ root }) => {
+    const rawBuffer = root.device.createBuffer({
+      size: 4,
+      usage: GPUBufferUsage.STORAGE,
+    });
+    const buffer = root.createBuffer(d.u32, rawBuffer);
+
+    expect(() => buffer.$addFlags(GPUBufferUsage.COPY_DST)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot add flags to a buffer that is not managed by TypeGPU.]`,
+    );
+  });
+
+  it('throws when MAP_READ or MAP_WRITE is added after a usage', ({ root }) => {
+    const buffer = root.createBuffer(d.u32).$usage('storage').$name('values');
+
+    expect(() => buffer.$addFlags(GPUBufferUsage.MAP_READ)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot add the MAP_READ flag to buffer 'values', as it is already used as storage. WebGPU only allows MAP_READ to be combined with COPY_DST.]`,
+    );
+    expect(() => buffer.$addFlags(GPUBufferUsage.MAP_WRITE)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot add the MAP_WRITE flag to buffer 'values', as it is already used as storage. WebGPU only allows MAP_WRITE to be combined with COPY_SRC.]`,
+    );
+    expect(buffer.usableAsStorage).toBe(true);
+    expect(root.unwrap(buffer).usage).toBe(
+      GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE,
+    );
+  });
+
+  it('throws when a usage is added after MAP_READ or MAP_WRITE', ({ root }) => {
+    const readBuffer = root.createBuffer(d.u32).$addFlags(GPUBufferUsage.MAP_READ).$name('a');
+    const writeBuffer = root.createBuffer(d.u32).$addFlags(GPUBufferUsage.MAP_WRITE).$name('b');
+
+    expect(() => readBuffer.$usage('storage')).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Buffer 'a' cannot be used as storage, as it has the MAP_READ flag. WebGPU only allows MAP_READ to be combined with COPY_DST.]`,
+    );
+    expect(() => writeBuffer.$usage('vertex')).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Buffer 'b' cannot be used as vertex, as it has the MAP_WRITE flag. WebGPU only allows MAP_WRITE to be combined with COPY_SRC.]`,
+    );
+    expect(readBuffer.usableAsStorage).toBe(false);
+    expect(writeBuffer.usableAsVertex).toBe(false);
+  });
+
+  it('writes MAP_WRITE buffers through the mapped range while they are mapped', ({ root }) => {
+    const buffer = root.createBuffer(d.u32, 7).$addFlags(GPUBufferUsage.MAP_WRITE);
+    const rawBuffer = root.unwrap(buffer);
+
+    expect(rawBuffer.usage).toBe(GPUBufferUsage.COPY_SRC | GPUBufferUsage.MAP_WRITE);
+    expect(rawBuffer.getMappedRange).toHaveBeenCalled();
+  });
+
+  it('throws when writing to or clearing an unmapped MAP_WRITE buffer', ({ root, device }) => {
+    const buffer = root.createBuffer(d.u32).$addFlags(GPUBufferUsage.MAP_WRITE).$name('staging');
+    root.unwrap(buffer);
+
+    expect(() => buffer.write(1)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot write to buffer 'staging', as it does not have the COPY_DST usage. Buffers with the MAP_WRITE flag can only be written to while mapped.]`,
+    );
+    expect(() => buffer.patch(1)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot write to buffer 'staging', as it does not have the COPY_DST usage. Buffers with the MAP_WRITE flag can only be written to while mapped.]`,
+    );
+    expect(() => buffer.clear()).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot clear buffer 'staging', as it does not have the COPY_DST usage. Buffers with the MAP_WRITE flag can only be written to while mapped.]`,
+    );
+    expect(device.mock.queue.writeBuffer).not.toHaveBeenCalled();
+    expect(device.mock.createCommandEncoder).not.toHaveBeenCalled();
+  });
+});
+
 describe('TgpuBuffer (InferInput)', () => {
   it('should accept plain tuples and TypedArrays for vec schemas at the type level', ({ root }) => {
     const vec3fBuf = root.createBuffer(d.vec3f);

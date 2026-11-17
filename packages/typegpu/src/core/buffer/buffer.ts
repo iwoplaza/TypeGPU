@@ -186,6 +186,22 @@ function physicalSizeOf(schema: BaseData): number {
   return roundUp(sizeOf(schema), 4);
 }
 
+function mapFlagName(flags: GPUBufferUsageFlags): 'MAP_READ' | 'MAP_WRITE' | undefined {
+  if (flags & GPUBufferUsage.MAP_READ) {
+    return 'MAP_READ';
+  }
+  if (flags & GPUBufferUsage.MAP_WRITE) {
+    return 'MAP_WRITE';
+  }
+  return undefined;
+}
+
+function mapFlagRule(mapFlag: 'MAP_READ' | 'MAP_WRITE'): string {
+  return mapFlag === 'MAP_READ'
+    ? 'WebGPU only allows MAP_READ to be combined with COPY_DST.'
+    : 'WebGPU only allows MAP_WRITE to be combined with COPY_SRC.';
+}
+
 export function INTERNAL_createBuffer<TData extends AnyData>(
   group: ExperimentalTgpuRoot,
   typeSchema: TData,
@@ -361,6 +377,13 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
         throw new Error(`Buffer of type ${this.dataType.type} cannot be used as ${usage}`);
       }
 
+      const mapFlag = mapFlagName(this.flags);
+      if (mapFlag) {
+        throw new Error(
+          `Buffer '${getName(this) ?? '<unnamed>'}' cannot be used as ${usage}, as it has the ${mapFlag} flag. ${mapFlagRule(mapFlag)}`,
+        );
+      }
+
       if (usage === 'uniform') {
         warnIfNotUniformAligned(this.dataType);
       }
@@ -385,6 +408,14 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
   $addFlags(flags: GPUBufferUsageFlags) {
     if (!this.#ownBuffer) {
       throw new Error('Cannot add flags to a buffer that is not managed by TypeGPU.');
+    }
+
+    const mapFlag = mapFlagName(flags);
+    const usage = this[$soul].usages[0];
+    if (mapFlag && usage) {
+      throw new Error(
+        `Cannot add the ${mapFlag} flag to buffer '${getName(this) ?? '<unnamed>'}', as it is already used as ${usage}. ${mapFlagRule(mapFlag)}`,
+      );
     }
 
     if (flags & GPUBufferUsage.MAP_READ) {
@@ -421,6 +452,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
       return;
     }
 
+    this.#assertCopyDst('write to');
     const { startOffset, endOffset } = calculateOffsets(options, this.dataType, data);
     const size = this.#alignedWriteSize(startOffset, endOffset);
 
@@ -437,6 +469,15 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
       startOffset,
       size,
     );
+  }
+
+  #assertCopyDst(operation: string): void {
+    if (!(this.buffer.usage & GPUBufferUsage.COPY_DST)) {
+      throw new Error(
+        `Cannot ${operation} buffer '${getName(this) ?? '<unnamed>'}', as it does not have the COPY_DST usage. ` +
+          'Buffers with the MAP_WRITE flag can only be written to while mapped.',
+      );
+    }
   }
 
   /**
@@ -472,6 +513,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
     if (gpuBuffer.mapState === 'mapped') {
       patchArrayBuffer(this.#getMappedRange(), this.dataType, data);
     } else {
+      this.#assertCopyDst('write to');
       // Every range is validated before the patch touches #hostBuffer, so a failing patch
       // is neither uploaded halfway nor left behind in `arrayBuffer`
       const instructions = getPatchInstructions(
@@ -497,6 +539,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
     const gpuBuffer = this.buffer;
 
     if (encoder) {
+      this.#assertCopyDst('clear');
       encoder[$internal].rawEncoder.clearBuffer(gpuBuffer);
       return;
     }
@@ -506,6 +549,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
       return;
     }
 
+    this.#assertCopyDst('clear');
     const rawEncoder = this[$soul].device.createCommandEncoder();
     rawEncoder.clearBuffer(gpuBuffer);
     this[$soul].device.queue.submit([rawEncoder.finish()]);
