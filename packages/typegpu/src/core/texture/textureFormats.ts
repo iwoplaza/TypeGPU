@@ -53,7 +53,7 @@ export type StorageTextureFormats =
   | 'rgb10a2uint'
   | 'rg11b10ufloat';
 
-type ParseChannelType<T extends GPUTextureFormat> = T extends `${string}uint${string}`
+type ParseChannelType<T extends GPUTextureFormat> = T extends 'stencil8' | `${string}uint${string}`
   ? 'u32'
   : T extends `${string}sint${string}`
     ? 'i32'

@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { getTextureFormatInfo } from '../../src/core/texture/textureFormats.ts';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import {
+  getTextureFormatInfo,
+  type TextureFormats,
+} from '../../src/core/texture/textureFormats.ts';
+import type { F32, U32, Vec4f, Vec4u } from '../../src/data/wgslTypes.ts';
 import { f32, i32, u32 } from '../../src/data/numeric.ts';
 import { vec4f, vec4i, vec4u } from '../../src/data/vector.ts';
 
@@ -131,6 +135,21 @@ describe('getTextureFormatInfo', () => {
         expect(info.canRenderAttachment).toBe(canRenderAttachment);
       },
     );
+
+    it('has type-level channel types matching the runtime', () => {
+      expectTypeOf<TextureFormats['stencil8']>().toEqualTypeOf<{
+        channelType: U32;
+        vectorType: Vec4u;
+      }>();
+      expectTypeOf<
+        TextureFormats[
+          | 'depth16unorm'
+          | 'depth24plus'
+          | 'depth24plus-stencil8'
+          | 'depth32float'
+          | 'depth32float-stencil8']
+      >().toEqualTypeOf<{ channelType: F32; vectorType: Vec4f }>();
+    });
 
     it('depth24plus-stencil8 has both depth and stencil aspect info', () => {
       const info = getTextureFormatInfo('depth24plus-stencil8');
