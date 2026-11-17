@@ -1469,15 +1469,7 @@ Try 'return ${typeStr}(${str});' instead.
       );
     }
 
-    const definitionDataType = eq.dataType;
-
-    if (definitionDataType === UnknownData || wgsl.isVoid(definitionDataType)) {
-      const rhsStr = stringifyNode(eqNode);
-      const declaration = `let ${rawId}`;
-      throw new WgslTypeError(
-        `'${declaration} = ${rhsStr}' is invalid, cannot determine WGSL type of '${rhsStr}'${schemaWrappingSuggestion(declaration, rhsStr, eq.value)}`,
-      );
-    }
+    this._assertDeterminableType(`let ${rawId}`, eqNode, eq);
 
     if (isStoredInMemory(eq) && !wgsl.isNaturallyEphemeral(eq.dataType)) {
       // `let` declarations cannot store references
@@ -1493,30 +1485,10 @@ Try 'return ${typeStr}(${str});' instead.
       );
     }
 
-    const concreteType = concretize(definitionDataType);
-    const snippet = snip(
-      this.ctx.makeUniqueIdentifier(rawId, 'block'),
-      concreteType,
-      /* origin */ 'local-def',
-      false,
-    );
-    this.ctx.defineVariable(rawId, snippet);
-
-    const rhsSnippet = tryConvertSnippet(this.ctx, eq, definitionDataType, false);
-    const rhsStr = this.ctx.resolveSnippet(rhsSnippet).value;
-
     // Even though the user defined a 'let' (expecting it to be reassigned), the
     // reassignment might happen in a pruned branch, in which case we can generate
     // more optimised code by emitting 'let' or 'const' instead of 'var'.
-    const scope = this.ctx.topFunctionScope;
-    invariant(scope, `Expected function scope to be present for ${rawId}`);
-    const emittedVarType = `#VAR_${scope.placeholderForVariable.size}#` as const;
-    scope.placeholderForVariable.set(snippet, emittedVarType);
-
-    return {
-      code: this._emitVarDecl(emittedVarType, snippet.value, concreteType, rhsStr),
-      definesInNearestScope: true,
-    };
+    return this._declareLocal(rawId, eq, 'local-def', '<deferred>');
   }
 
   protected _constStatement(statement: tinyest.Const): ResolvedStatement {
@@ -1546,12 +1518,7 @@ Try 'return ${typeStr}(${str});' instead.
         concretize(refSnippet.dataType as wgsl.BaseData) as wgsl.StorableData,
       );
       return {
-        code: stitch`${this.ctx.pre}var ${varName} = ${tryConvertSnippet(
-          this.ctx,
-          refSnippet,
-          refSnippet.dataType as wgsl.AnyWgslData,
-          false,
-        )};`,
+        code: stitch`${this.ctx.pre}var ${varName} = ${refSnippet};`,
         definesInNearestScope: true,
       };
     }
@@ -1559,15 +1526,8 @@ Try 'return ${typeStr}(${str});' instead.
     const rhsNaturallyEphemeral = wgsl.isNaturallyEphemeral(eq.dataType);
     let varOrigin: Origin = 'local-def';
     let varType: 'var' | 'let' | 'const' | '<deferred>' = '<deferred>';
-    let definitionDataType = eq.dataType;
 
-    if (definitionDataType === UnknownData || wgsl.isVoid(definitionDataType)) {
-      const rhsStr = stringifyNode(eqNode);
-      const declaration = `const ${rawId}`;
-      throw new WgslTypeError(
-        `'${declaration} = ${rhsStr}' is invalid, cannot determine WGSL type of '${rhsStr}'${schemaWrappingSuggestion(declaration, rhsStr, eq.value)}`,
-      );
-    }
+    this._assertDeterminableType(`const ${rawId}`, eqNode, eq);
 
     if (eq.origin === 'argument') {
       // Arguments are immutable, so we 'let' them be (kill me)
@@ -1599,19 +1559,44 @@ Try 'return ${typeStr}(${str});' instead.
       return this._aliasConstStatement(rawId, eqNode, eq);
     }
 
-    const concreteType = concretize(definitionDataType);
+    return this._declareLocal(rawId, eq, varOrigin, varType);
+  }
+
+  private _assertDeterminableType(
+    declaration: string,
+    eqNode: tinyest.Expression,
+    eq: Snippet,
+  ): void {
+    if (eq.dataType === UnknownData || wgsl.isVoid(eq.dataType)) {
+      const rhsStr = stringifyNode(eqNode);
+      throw new WgslTypeError(
+        `'${declaration} = ${rhsStr}' is invalid, cannot determine WGSL type of '${rhsStr}'${schemaWrappingSuggestion(declaration, rhsStr, eq.value)}`,
+      );
+    }
+  }
+
+  /**
+   * Declares a new local variable holding the value of `eq`.
+   * A `'<deferred>'` keyword is decided after the whole function is generated.
+   */
+  private _declareLocal(
+    rawId: string,
+    eq: Snippet,
+    origin: Origin,
+    varType: 'let' | 'const' | '<deferred>',
+  ): ResolvedStatement {
+    const concreteType = concretize(eq.dataType as wgsl.BaseData);
     const snippet = snip(
       this.ctx.makeUniqueIdentifier(rawId, 'block'),
       concreteType,
-      /* origin */ varOrigin,
+      origin,
       false,
     );
     this.ctx.defineVariable(rawId, snippet);
 
-    const rhsSnippet = tryConvertSnippet(this.ctx, eq, definitionDataType, false);
-    const rhsStr = this.ctx.resolveSnippet(rhsSnippet).value;
+    const rhsStr = this.ctx.resolveSnippet(eq).value;
 
-    let emittedVarType: 'var' | 'let' | 'const' | `#VAR_${number}#`;
+    let emittedVarType: 'let' | 'const' | `#VAR_${number}#`;
     if (varType === '<deferred>') {
       const scope = this.ctx.topFunctionScope;
       invariant(scope, `Expected function scope to be present for ${rawId}`);
