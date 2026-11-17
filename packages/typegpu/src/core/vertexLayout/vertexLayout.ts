@@ -2,6 +2,7 @@ import type { Disarray } from '../../data/dataTypes.ts';
 import { getCustomLocation, isLooseDecorated, isUnstruct } from '../../data/dataTypes.ts';
 import { type OffsetInfo, offsetsForProps } from '../../data/offsets.ts';
 import { strideOf } from '../../data/schemaMemoryLayout.ts';
+import { sizeOf } from '../../data/sizeOf.ts';
 import type { BaseData, WgslArray } from '../../data/wgslTypes.ts';
 import { isDecorated, isWgslStruct } from '../../data/wgslTypes.ts';
 import type { TgpuNamable } from '../../shared/meta.ts';
@@ -59,6 +60,21 @@ export function isVertexLayout(value: unknown): value is TgpuVertexLayout {
 
 const defaultAttribEntry = Symbol('defaultAttribEntry');
 
+function validateAttribOffset(
+  data: BaseData,
+  format: VertexFormat,
+  offset: number,
+  key: string | undefined,
+) {
+  const requiredAlignment = Math.min(4, sizeOf(data));
+  if (offset % requiredAlignment !== 0) {
+    const name = key !== undefined ? `'${key}' (${format})` : `(${format})`;
+    throw new Error(
+      `Vertex attribute ${name} is at byte offset ${offset}, but WebGPU requires attributes of this format to be placed at a multiple of ${requiredAlignment} bytes. Use d.align() or d.size() to adjust the layout.`,
+    );
+  }
+}
+
 function dataToContainedAttribs<TLayoutData extends WgslArray | Disarray, TData extends BaseData>(
   layout: TgpuVertexLayout<TLayoutData>,
   data: TData,
@@ -73,7 +89,7 @@ function dataToContainedAttribs<TLayoutData extends WgslArray | Disarray, TData 
     }
 
     // passing offset unchanged because the parent already applied alignment
-    return dataToContainedAttribs(layout, data.inner, offset, customLocationMap);
+    return dataToContainedAttribs(layout, data.inner, offset, customLocationMap, key);
   }
 
   if (isWgslStruct(data) || isUnstruct(data)) {
@@ -94,6 +110,7 @@ function dataToContainedAttribs<TLayoutData extends WgslArray | Disarray, TData 
 
   if ('type' in data && typeof data.type === 'string') {
     if (vertexFormats.includes(data.type as VertexFormat)) {
+      validateAttribOffset(data, data.type as VertexFormat, offset, key);
       return {
         _layout: layout, // hidden property, used to determine which buffers to apply when executing the pipeline
         format: data.type as VertexFormat,
@@ -105,6 +122,7 @@ function dataToContainedAttribs<TLayoutData extends WgslArray | Disarray, TData 
     const format = (kindToDefaultFormatMap as Record<string, VertexFormat>)[data.type];
 
     if (format) {
+      validateAttribOffset(data, format, offset, key);
       return {
         _layout: layout, // hidden property, used to determine which buffers to apply when executing the pipeline
         format,
@@ -140,6 +158,17 @@ class TgpuVertexLayoutImpl<TData extends WgslArray | Disarray> implements TgpuVe
     };
     this.stride = strideOf(arraySchema);
     this.attrib = dataToContainedAttribs(this, arraySchema.elementType, 0, this.#customLocationMap);
+
+    if (this.stride % 4 !== 0) {
+      const elementType = arraySchema.elementType;
+      const elementName =
+        isWgslStruct(elementType) || isUnstruct(elementType)
+          ? String(elementType)
+          : elementType.type;
+      throw new Error(
+        `Vertex layout of ${elementName} has a stride of ${this.stride} bytes, but WebGPU requires the stride to be a multiple of 4. Use d.size() or d.align() to pad the element type.`,
+      );
+    }
   }
 
   get stepMode(): 'vertex' | 'instance' {

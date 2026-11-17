@@ -61,7 +61,7 @@ describe('connectAttributesToShader', () => {
         d.unstruct({
           alpha: d.f32, // 4 bytes
           beta: d.unorm8x2, // 2 bytes
-          gamma: d.u32, // 4 bytes
+          gamma: d.align(4, d.u32), // 2 bytes of padding + 4 bytes
         }),
         n,
       ),
@@ -77,7 +77,7 @@ describe('connectAttributesToShader', () => {
     expect(result).toStrictEqual({
       bufferDefinitions: [
         {
-          arrayStride: 10,
+          arrayStride: 12,
           stepMode: 'vertex',
           attributes: [
             {
@@ -92,7 +92,7 @@ describe('connectAttributesToShader', () => {
             },
             {
               format: 'uint32',
-              offset: 6,
+              offset: 8,
               shaderLocation: 4,
             },
           ],
@@ -114,7 +114,7 @@ describe('connectAttributesToShader', () => {
       d.disarrayOf(
         d.unstruct({
           alpha: d.f32, // 4 bytes
-          beta: d.unorm8x2, // 2 bytes
+          beta: d.size(4, d.unorm8x2), // 2 bytes + 2 bytes of padding
         }),
         n,
       ),
@@ -132,7 +132,7 @@ describe('connectAttributesToShader', () => {
     expect(result).toStrictEqual({
       bufferDefinitions: [
         {
-          arrayStride: 6,
+          arrayStride: 8,
           stepMode: 'vertex',
           attributes: [
             {
@@ -198,9 +198,9 @@ describe('connectAttributesToShader', () => {
       d.disarrayOf(
         d.unstruct({
           alpha: d.f16, // 2 bytes
+          delta: d.float16, // 2 bytes
           beta: d.float16x2, // 4 bytes
           gamma: d.u32, // 4 bytes
-          delta: d.float16, // 2 bytes
         }),
         n,
       ),
@@ -227,17 +227,17 @@ describe('connectAttributesToShader', () => {
             },
             {
               format: 'float16x2',
-              offset: 2,
+              offset: 4,
               shaderLocation: 3,
             },
             {
               format: 'uint32',
-              offset: 6,
+              offset: 8,
               shaderLocation: 4,
             },
             {
               format: 'float16',
-              offset: 10,
+              offset: 2,
               shaderLocation: 5,
             },
           ],

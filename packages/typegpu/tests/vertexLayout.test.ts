@@ -99,4 +99,61 @@ describe('tgpu.vertexLayout', () => {
   it('throws when trying to use type that has no attribute representation', () => {
     expect(() => tgpu.vertexLayout(d.disarrayOf(d.vec3h))).toThrow();
   });
+
+  it('throws when the stride is not a multiple of 4', () => {
+    expect(() => tgpu.vertexLayout(d.disarrayOf(d.unorm8x2))).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex layout of unorm8x2 has a stride of 2 bytes, but WebGPU requires the stride to be a multiple of 4. Use d.size() or d.align() to pad the element type.]`,
+    );
+    expect(() =>
+      tgpu.vertexLayout(d.disarrayOf(d.unstruct({ a: d.unorm8x2, b: d.unorm8 }).$name('Vertex'))),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex layout of unstruct:Vertex has a stride of 3 bytes, but WebGPU requires the stride to be a multiple of 4. Use d.size() or d.align() to pad the element type.]`,
+    );
+  });
+
+  it('throws when an attribute offset is misaligned for its format', () => {
+    expect(() =>
+      tgpu.vertexLayout(d.disarrayOf(d.unstruct({ a: d.unorm8, b: d.float32 }))),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex attribute 'b' (float32) is at byte offset 1, but WebGPU requires attributes of this format to be placed at a multiple of 4 bytes. Use d.align() or d.size() to adjust the layout.]`,
+    );
+    expect(() =>
+      tgpu.vertexLayout(d.disarrayOf(d.unstruct({ a: d.uint8, b: d.unorm8x2, c: d.uint8 }))),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex attribute 'b' (unorm8x2) is at byte offset 1, but WebGPU requires attributes of this format to be placed at a multiple of 2 bytes. Use d.align() or d.size() to adjust the layout.]`,
+    );
+    expect(() =>
+      tgpu.vertexLayout(
+        d.disarrayOf(d.unstruct({ a: d.location(0, d.unorm8), b: d.location(1, d.f32) })),
+      ),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex attribute 'b' (float32) is at byte offset 1, but WebGPU requires attributes of this format to be placed at a multiple of 4 bytes. Use d.align() or d.size() to adjust the layout.]`,
+    );
+  });
+
+  it('accepts packed formats placed at valid offsets', () => {
+    const single = tgpu.vertexLayout(d.disarrayOf(d.unorm8x4));
+    expect(single.stride).toBe(4);
+    expect(single.attrib).toMatchObject({ format: 'unorm8x4', offset: 0 });
+
+    const packed = tgpu.vertexLayout(
+      d.disarrayOf(d.unstruct({ a: d.unorm8x2, b: d.unorm8x2, c: d.float32 })),
+    );
+    expect(packed.stride).toBe(8);
+    expect(packed.attrib).toMatchObject({
+      a: { format: 'unorm8x2', offset: 0 },
+      b: { format: 'unorm8x2', offset: 2 },
+      c: { format: 'float32', offset: 4 },
+    });
+
+    const padded = tgpu.vertexLayout(
+      d.disarrayOf(d.unstruct({ a: d.unorm8, b: d.align(4, d.float32), c: d.size(4, d.uint8) })),
+    );
+    expect(padded.stride).toBe(12);
+    expect(padded.attrib).toMatchObject({
+      a: { format: 'unorm8', offset: 0 },
+      b: { format: 'float32', offset: 4 },
+      c: { format: 'uint8', offset: 8 },
+    });
+  });
 });
