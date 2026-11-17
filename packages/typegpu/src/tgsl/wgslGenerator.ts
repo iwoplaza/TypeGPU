@@ -211,6 +211,48 @@ const unaryOpCodeToCodegen = {
 
     return snip(`!(${argStr})`, bool, 'runtime', argExpr.possibleSideEffects);
   },
+  '+': (ctx: ResolutionCtx, [argExpr]: Snippet[]) => {
+    if (argExpr === undefined) {
+      throw new Error('The unary operator `+` expects 1 argument, but 0 were provided.');
+    }
+
+    const type = argExpr.dataType;
+    if (!wgsl.isNumericSchema(type) && !(wgsl.isVec(type) && !wgsl.isVecBool(type))) {
+      throw new WgslTypeError(
+        `Unary operator + requires a numeric operand. Got '${stringifySnippet(argExpr)}' of type ${String(type)}.`,
+      );
+    }
+
+    if (asComptime(argExpr)) {
+      return argExpr;
+    }
+
+    return snip(
+      ctx.resolveSnippet(argExpr).value,
+      type,
+      /* origin */ 'runtime',
+      argExpr.possibleSideEffects,
+    );
+  },
+  '~': (ctx: ResolutionCtx, [argExpr]: Snippet[]) => {
+    if (argExpr === undefined) {
+      throw new Error('The unary operator `~` expects 1 argument, but 0 were provided.');
+    }
+
+    const type = argExpr.dataType;
+    if (!wgsl.isInteger(type) && !wgsl.isIntegerVec(type)) {
+      throw new WgslTypeError(
+        `Unary operator ~ requires an integer or vector of integers. Got '${stringifySnippet(argExpr)}' of type ${String(type)}.`,
+      );
+    }
+
+    return snip(
+      `~${ctx.resolveSnippet(argExpr).value}`,
+      type,
+      /* origin */ 'runtime',
+      argExpr.possibleSideEffects,
+    );
+  },
 } satisfies Partial<Record<tinyest.UnaryOperator, (...args: never[]) => unknown>>;
 
 const binaryOpCodeToCodegen = {
@@ -866,18 +908,15 @@ export class WgslGenerator implements ShaderGenerator {
     if (expression[0] === NODE.unaryExpr) {
       // Unary Expression
       const [_, op, arg] = expression;
-      const argExpr = this._expression(arg);
-
       const codegen = unaryOpCodeToCodegen[op as keyof typeof unaryOpCodeToCodegen];
-      if (codegen) {
-        return codegen(this.ctx, [argExpr]);
+      if (!codegen) {
+        throw new WgslTypeError(
+          `'${stringifyNode(expression)}' is invalid, the unary operator '${op}' is not supported in TypeGPU functions.`,
+        );
       }
 
-      const argStr = this.ctx.resolveSnippet(argExpr).value;
-
-      const type = operatorToType(argExpr.dataType, op);
-      // Result of an operation, so not a reference to anything
-      return snip(`${op}${argStr}`, type, /* origin */ 'runtime', argExpr.possibleSideEffects);
+      const argExpr = this._expression(arg);
+      return codegen(this.ctx, [argExpr]);
     }
 
     if (expression[0] === NODE.memberAccess) {
