@@ -6,6 +6,12 @@ describe('inverseSqrt', () => {
     expect(std.inverseSqrt(4)).toBe(0.5);
   });
 
+  it('works component-wise on vectors', () => {
+    expect(std.inverseSqrt(d.vec2f(4, 16))).toStrictEqual(d.vec2f(0.5, 0.25));
+    expect(std.inverseSqrt(d.vec3h(1, 4, 64))).toStrictEqual(d.vec3h(1, 0.5, 0.125));
+    expect(std.inverseSqrt(d.vec4f(1, 4, 16, 0.25))).toStrictEqual(d.vec4f(1, 0.5, 0.25, 2));
+  });
+
   it('casts integer scalar arguments to f32', () => {
     using warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
