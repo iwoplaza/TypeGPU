@@ -2,6 +2,7 @@ import { Operator } from 'tsover-runtime';
 import { MatBase } from './matrix.ts';
 import { VecBase } from './vectorImpl.ts';
 import { assignInfixOperator } from '../tgsl/infixDispatch.ts';
+import { powOperator } from '../std/numeric.ts';
 
 let infixOperatorsAssigned = false;
 
@@ -19,6 +20,8 @@ export function assignInfixOperators(): void {
   assignInfixOperator(MatBase, 'mul', Operator.star);
   assignInfixOperator(VecBase, 'div', Operator.slash);
   assignInfixOperator(VecBase, 'mod', Operator.percent);
+  // No `.pow()` method, only the `**` operator
+  Object.defineProperty(VecBase.prototype, Operator.starStar, { value: powOperator });
   assignInfixOperator(VecBase, 'bitShiftLeft', Symbol()); // bitShift does not yet have tsover operator symbol
   assignInfixOperator(VecBase, 'bitShiftRight', Symbol()); // bitShift does not yet have tsover operator symbol
 }

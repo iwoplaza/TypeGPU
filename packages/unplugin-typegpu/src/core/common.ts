@@ -443,11 +443,13 @@ const operators = {
   '*': '__tsover_mul',
   '/': '__tsover_div',
   '%': '__tsover_mod',
+  '**': '__tsover_pow',
   '+=': '__tsover_add',
   '-=': '__tsover_sub',
   '*=': '__tsover_mul',
   '/=': '__tsover_div',
   '%=': '__tsover_mod',
+  '**=': '__tsover_pow',
 };
 
 function containsUseGpuDirective(

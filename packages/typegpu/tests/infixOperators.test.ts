@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { d } from 'typegpu';
+import { d, tgpu } from 'typegpu';
 import { isCloseTo } from 'typegpu/std';
 
 describe('infix operators', () => {
@@ -68,5 +68,64 @@ describe('infix operators', () => {
 
     // vector / vector
     expect(d.vec3i(-1, -4, -9).div(d.vec3i(-1, -2, -3))).toStrictEqual(d.vec3i(1, 2, 3));
+  });
+});
+
+describe('** operator on vectors', () => {
+  it('raises float vectors to a vector power on the CPU', () => {
+    const square = (v: d.v2f) => {
+      'use gpu';
+      return v ** d.vec2f(2, 2);
+    };
+
+    const mixed = (v: d.v3h) => {
+      'use gpu';
+      return v ** d.vec3h(2, 3, 0.5);
+    };
+
+    expect(square(d.vec2f(3, 4))).toStrictEqual(d.vec2f(9, 16));
+    expect(mixed(d.vec3h(3, 2, 16))).toStrictEqual(d.vec3h(9, 8, 4));
+  });
+
+  it('keeps the sign of negative bases for odd integer powers, like the GPU', () => {
+    const cube = (v: d.v3f) => {
+      'use gpu';
+      return v ** d.vec3f(3);
+    };
+
+    expect(cube(d.vec3f(-2, 0, 2))).toStrictEqual(d.vec3f(-8, 0, 8));
+    expect(tgpu.resolve([tgpu.fn([d.vec3f], d.vec3f)(cube)])).toMatchInlineSnapshot(`
+      "fn cube(v: vec3f) -> vec3f {
+        return (sign(v) * pow(abs(v), vec3f(3)));
+      }"
+    `);
+  });
+
+  it('rejects a scalar exponent on the CPU, like on the GPU', () => {
+    const square = (v: d.v2f): d.v2f => {
+      'use gpu';
+      // @ts-expect-error: the exponent has to be a vector of the same type
+      return v ** 2;
+    };
+
+    expect(() => square(d.vec2f(3, 4))).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Unsupported signature. Expected the following kinds to be equal: 'vec2f, number'.]`,
+    );
+    expect(() => tgpu.resolve([tgpu.fn([d.vec2f], d.vec2f)(square)])).toThrow(
+      'Unsupported data types: vec2f, abstractInt',
+    );
+  });
+
+  it('generates the same WGSL as before', () => {
+    const square = (v: d.v2f) => {
+      'use gpu';
+      return v ** d.vec2f(2, 2);
+    };
+
+    expect(tgpu.resolve([tgpu.fn([d.vec2f], d.vec2f)(square)])).toMatchInlineSnapshot(`
+      "fn square(v: vec2f) -> vec2f {
+        return (v * v);
+      }"
+    `);
   });
 });
