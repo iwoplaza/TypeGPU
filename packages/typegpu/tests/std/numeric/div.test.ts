@@ -61,6 +61,29 @@ describe('div', () => {
     expect(div(d.vec2i(I32_MIN, 9), -1)).toStrictEqual(d.vec2i(I32_MIN, -9));
   });
 
+  it('throws when an integer division by 0 would be folded into a shader', () => {
+    const constant = () => {
+      'use gpu';
+      return div(d.vec2u(7, 7), d.vec2u(2, 0));
+    };
+    const runtime = tgpu.fn(
+      [d.vec2u],
+      d.vec2u,
+    )((rhs) => {
+      'use gpu';
+      return div(d.vec2u(7, 7), rhs);
+    });
+
+    expect(() => tgpu.resolve([constant])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn*:constant
+      - fn*:constant()
+      - fn:div: Cannot evaluate '7 / 0' while generating a shader. Integer division by zero is only well-defined at runtime.]
+    `);
+    expect(tgpu.resolve([runtime])).toContain('(vec2u(7) / rhs)');
+  });
+
   it('truncates integer division toward zero', () => {
     expect(div(d.vec2i(7, -7), d.vec2i(2, 2))).toStrictEqual(d.vec2i(3, -3));
     expect(div(d.vec2i(7, -7), d.vec2i(-2, -2))).toStrictEqual(d.vec2i(-3, 3));

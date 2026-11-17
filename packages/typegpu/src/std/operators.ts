@@ -1,4 +1,5 @@
 import { dualImpl } from '../core/function/dualImpl.ts';
+import { getExecMode, getResolutionCtx } from '../execMode.ts';
 import { stitch } from '../core/resolve/stitch.ts';
 import { abstractFloat, f16, f32, u32 } from '../data/numeric.ts';
 import { vec2i, vec2u, vec3i, vec3u, vec4i, vec4u } from '../data/vector.ts';
@@ -225,10 +226,27 @@ export const mul = dualImpl({
 const I32_MIN = -(2 ** 31);
 
 /**
+ * When a shader is being generated and all operands are known, the result gets baked into the shader.
+ * WGSL treats a const-expression that divides an integer by zero as a shader-creation error,
+ * so it should not silently turn into a value.
+ */
+function assertNotFoldingIntoShader(a: number, op: '/' | '%'): void {
+  if (getResolutionCtx() && getExecMode().type === 'normal') {
+    throw new Error(
+      `Cannot evaluate '${a} ${op} 0' while generating a shader. Integer division by zero is only well-defined at runtime.`,
+    );
+  }
+}
+
+/**
  * Integer division with WGSL's runtime semantics: `e1 / 0` and `I32_MIN / -1` evaluate to `e1`.
  */
 export function intDivComponent(a: number, b: number): number {
-  if (b === 0 || (a === I32_MIN && b === -1)) {
+  if (b === 0) {
+    assertNotFoldingIntoShader(a, '/');
+    return a;
+  }
+  if (a === I32_MIN && b === -1) {
     return a;
   }
   return Math.trunc(a / b);
@@ -238,7 +256,11 @@ export function intDivComponent(a: number, b: number): number {
  * Integer remainder with WGSL's runtime semantics: `e1 % 0` and `I32_MIN % -1` evaluate to `0`.
  */
 function intModComponent(a: number, b: number): number {
-  if (b === 0 || (a === I32_MIN && b === -1)) {
+  if (b === 0) {
+    assertNotFoldingIntoShader(a, '%');
+    return 0;
+  }
+  if (a === I32_MIN && b === -1) {
     return 0;
   }
   return a % b;
