@@ -418,6 +418,20 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
       attest(texture4.createView()).type.errors.snap('Expected 1-2 arguments, but got 0.');
     });
 
+    it('the default view of a stencil8 texture samples u32', ({ root }) => {
+      const texture = root
+        .createTexture({
+          size: [16, 16],
+          format: 'stencil8',
+        })
+        .$usage('sampled');
+
+      const view = texture.createView();
+
+      expectTypeOf(view).toEqualTypeOf<TgpuTextureView<d.WgslTexture2d<d.U32>>>();
+      expect(view.schema.sampleType).toBe(d.u32);
+    });
+
     it('creates an unfilterable-float view of a depth texture', ({ root, device }) => {
       const texture = root
         .createTexture({
