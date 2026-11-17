@@ -1,4 +1,4 @@
-import { getEffectiveSampleTypes, getTextureFormatInfo } from './textureFormats.ts';
+import { getEffectiveCanRenderAttachment, getEffectiveSampleTypes } from './textureFormats.ts';
 import { type ImageWrite, sameSize, type TextureChannel } from './textureWrite.ts';
 
 const FULLSCREEN_VERTEX_SHADER = `
@@ -174,7 +174,7 @@ export function generateTextureMipmaps(
       `Cannot generate mipmaps for format '${format}': only float formats are supported.`,
     );
   }
-  if (!getTextureFormatInfo(format).canRenderAttachment) {
+  if (!getEffectiveCanRenderAttachment(device, format)) {
     throw new Error(
       `Cannot generate mipmaps for format '${format}': format does not support render attachments.`,
     );

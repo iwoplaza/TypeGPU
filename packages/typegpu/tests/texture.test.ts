@@ -723,6 +723,45 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
         `);
       });
 
+      it('rejects mipmap generation for feature-gated renderable formats without the feature', ({
+        root,
+        device,
+      }) => {
+        const createTex = (format: GPUTextureFormat) =>
+          root.createTexture({ size: [32, 32], format, mipLevelCount: 2 }).$usage('render');
+
+        expect(() => createTex('rgba8snorm').generateMipmaps()).toThrowErrorMatchingInlineSnapshot(
+          `[Error: Cannot generate mipmaps for format 'rgba8snorm': format does not support render attachments.]`,
+        );
+        expect(() => createTex('r16unorm').generateMipmaps()).toThrow(
+          /format does not support render attachments/,
+        );
+        expect(() => createTex('rg11b10ufloat').generateMipmaps()).toThrow(
+          /format does not support render attachments/,
+        );
+        expect(device.mock.createRenderPipeline).not.toHaveBeenCalled();
+      });
+
+      it.for([
+        { format: 'r8snorm', feature: 'texture-formats-tier1' },
+        { format: 'rg8snorm', feature: 'texture-formats-tier1' },
+        { format: 'rgba8snorm', feature: 'texture-formats-tier1' },
+        { format: 'rgba16unorm', feature: 'texture-formats-tier1' },
+        { format: 'rg16snorm', feature: 'texture-formats-tier1' },
+        { format: 'rg11b10ufloat', feature: 'rg11b10ufloat-renderable' },
+      ] as const)(
+        'generates mipmaps for $format when $feature is enabled',
+        ({ format, feature }, { root, device }) => {
+          device.mock.features.add(feature);
+          const texture = root
+            .createTexture({ size: [32, 32], format, mipLevelCount: 2 })
+            .$usage('render');
+
+          expect(() => texture.generateMipmaps()).not.toThrow();
+          expect(device.mock.createRenderPipeline).toHaveBeenCalledTimes(1);
+        },
+      );
+
       it('calls queue.writeTexture when write is called with buffer data', ({ root, device }) => {
         const texture = root.createTexture({
           size: [4, 4],
