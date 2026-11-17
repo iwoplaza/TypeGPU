@@ -35,3 +35,71 @@ describe('as type', () => {
     `);
   });
 });
+
+describe('angle-bracket type assertion', () => {
+  test('babel', () => {
+    const code = `
+    const hello = (a: number, b: number | undefined) => {
+      'use gpu';
+      return a + <number>b;
+    };
+  `;
+
+    expect(babelTransform(code)).toMatchInlineSnapshot(`
+      "const hello = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a: number, b: number | undefined) => {
+        'use gpu';
+
+        return __tsover_add(a, <number> b);
+      }, {
+        v: 2,
+        name: "hello",
+        ast: {
+          params: [{
+            type: "i",
+            name: "a"
+          }, {
+            type: "i",
+            name: "b"
+          }],
+          body: [0, [[10, [1, "a", "+", "b"]]]]
+        },
+        externals: {}
+      }) && $.f)({});"
+    `);
+  });
+});
+
+describe('instantiation expression', () => {
+  test('babel', () => {
+    const code = `
+    import { foo } from './foo';
+
+    const hello = (a: number) => {
+      'use gpu';
+      return (foo<number>)(a);
+    };
+  `;
+
+    expect(babelTransform(code)).toMatchInlineSnapshot(`
+      "import { foo } from './foo';
+      const hello = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a: number) => {
+        'use gpu';
+
+        return foo<number>(a);
+      }, {
+        v: 2,
+        name: "hello",
+        ast: {
+          params: [{
+            type: "i",
+            name: "a"
+          }],
+          body: [0, [[10, [6, "foo", ["a"]]]]]
+        },
+        externals: {
+          "foo": () => foo
+        }
+      }) && $.f)({});"
+    `);
+  });
+});
