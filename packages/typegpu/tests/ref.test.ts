@@ -522,7 +522,7 @@ describe('d.ref', () => {
       fn main() {
         let pos = (&positions[0i]);
         advance(pos);
-        pos;
+        _ = pos;
       }"
     `);
   });
