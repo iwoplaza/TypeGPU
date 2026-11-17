@@ -1,9 +1,8 @@
-import { useMemo, useRef, useState } from 'react';
-import { d, type TgpuBuffer, type ValidateUniformSchema } from 'typegpu';
+import { useLayoutEffect, useMemo } from 'react';
+import type { d, TgpuBuffer, TgpuUniform, ValidateUniformSchema } from 'typegpu';
 
 import { $buffer } from './symbols.ts';
-import { useRoot } from './root-context.tsx';
-import { useChangeDetection, useDeferredCleanup, useStableSchema } from './helper-hooks.ts';
+import { useRootResource } from './use-root-resource.ts';
 
 interface MirroredValue<TSchema extends d.AnyWgslData> {
   schema: TSchema;
@@ -11,41 +10,39 @@ interface MirroredValue<TSchema extends d.AnyWgslData> {
   readonly [$buffer]: TgpuBuffer<TSchema>;
 }
 
+/** The last value written to each uniform, so that only changes get written */
+const lastWrittenValues = new WeakMap<TgpuUniform<d.AnyWgslData>, unknown>();
+
 export function useMirroredUniform<
   TSchema extends d.AnyWgslData,
   TValue extends d.InferInput<TSchema>,
 >(_schema: ValidateUniformSchema<TSchema>, value: TValue): MirroredValue<TSchema> {
-  const root = useRoot();
-  const [fakeState] = useState(() => ({
-    uniform: root.createUniform(_schema, value),
-  }));
+  const [uniform, schema] = useRootResource(
+    _schema,
+    (root, schema) => {
+      const uniform = root.createUniform(schema, value);
+      lastWrittenValues.set(uniform, value);
+      return uniform;
+    },
+    (uniform) => uniform.buffer.destroy(),
+  );
 
-  const [schema, schemaChanged] = useStableSchema(_schema);
-  const rootChanged = useChangeDetection(root);
-  const prevValueRef = useRef(value);
-
-  if (schemaChanged || rootChanged) {
-    fakeState.uniform.buffer.destroy();
-    fakeState.uniform = root.createUniform(schema, value);
-    prevValueRef.current = value;
-  } else if (prevValueRef.current !== value) {
-    fakeState.uniform.write(value);
-    prevValueRef.current = value;
-  }
-
-  useDeferredCleanup(() => {
-    fakeState.uniform.buffer.destroy();
-  });
+  useLayoutEffect(() => {
+    if (lastWrittenValues.get(uniform) !== value) {
+      uniform.write(value);
+      lastWrittenValues.set(uniform, value);
+    }
+  }, [uniform, value]);
 
   const mirroredValue = useMemo(
     () => ({
-      [$buffer]: fakeState.uniform.buffer,
+      [$buffer]: uniform.buffer,
       schema,
       get $() {
-        return fakeState.uniform.$;
+        return uniform.$;
       },
     }),
-    [schema, fakeState.uniform],
+    [schema, uniform],
   );
 
   return mirroredValue as MirroredValue<TSchema>;

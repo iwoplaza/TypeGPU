@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import type { TgpuBuffer, TgpuReadonly, ValidateStorageSchema, d } from 'typegpu';
 
-import { useRoot } from './root-context.tsx';
-import { useChangeDetection, useDeferredCleanup, useStableSchema } from './helper-hooks.ts';
+import { useRootResource } from './use-root-resource.ts';
 
 export interface UseReadonlyOptions<TSchema extends d.AnyWgslData> {
   initial?: ((buffer: TgpuBuffer<NoInfer<TSchema>>) => void) | d.InferInput<NoInfer<TSchema>>;
@@ -14,26 +12,16 @@ export function useReadonly<TSchema extends d.AnyWgslData>(
   options?: UseReadonlyOptions<TSchema>,
 ): TgpuReadonly<TSchema> {
   const { initial, onInit } = options ?? {};
-  const root = useRoot();
-  const [fakeState] = useState(() => {
-    const readonly = root.createReadonly(_schema, initial);
-    onInit?.(readonly);
 
-    return { readonly };
-  });
+  const [readonly] = useRootResource(
+    _schema,
+    (root, schema) => {
+      const readonly = root.createReadonly(schema, initial);
+      onInit?.(readonly);
+      return readonly;
+    },
+    (readonly) => readonly.buffer.destroy(),
+  );
 
-  const [schema, schemaChanged] = useStableSchema(_schema);
-  const rootChanged = useChangeDetection(root);
-
-  if (schemaChanged || rootChanged) {
-    fakeState.readonly.buffer.destroy();
-    fakeState.readonly = root.createReadonly(schema, initial);
-    onInit?.(fakeState.readonly);
-  }
-
-  useDeferredCleanup(() => {
-    fakeState.readonly.buffer.destroy();
-  });
-
-  return fakeState.readonly;
+  return readonly;
 }

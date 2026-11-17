@@ -1,8 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 
 import { useRoot } from './root-context.tsx';
 import useStableEvent from './use-stable-event.ts';
-import { useChangeDetection } from './helper-hooks.ts';
 
 /**
  * Only used to capture the canvas element. Has to be extremely vague to
@@ -49,16 +48,20 @@ export function createUseConfigureContextHook(useResizer: UseResizerHook) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const ctxRef = useRef<GPUCanvasContext>(null);
     const root = useRoot();
-    const rootChanged = useChangeDetection(root);
+    const configuredRootRef = useRef(root);
 
     // If the root changed, and the context has been previously configured, we need to reconfigure it.
-    if (rootChanged && ctxRef.current) {
-      ctxRef.current.configure({
+    useLayoutEffect(() => {
+      if (configuredRootRef.current === root) {
+        return;
+      }
+      configuredRootRef.current = root;
+      ctxRef.current?.configure({
         device: root.device,
         format: navigator.gpu.getPreferredCanvasFormat(),
         ...restOptions,
       });
-    }
+    }, [root]);
 
     // The size last reported to the user, reset on every attachment so that each new context gets
     // its initial notification

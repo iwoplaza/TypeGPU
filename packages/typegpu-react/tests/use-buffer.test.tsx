@@ -59,8 +59,11 @@ describe('useBuffer', () => {
     rerender({ schema: d.vec2f, value: d.vec2f(1, 2) });
 
     expect(createBufferSpy).toHaveBeenCalledTimes(2);
-    expect(destroyBufferSpy).toHaveBeenCalledTimes(1);
     expect(createBufferSpy).toHaveBeenCalledWith(d.vec2f, d.vec2f(1, 2));
+    // Destroyed only after the new one has been committed, and the cleanup delay has passed
+    expect(destroyBufferSpy).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(destroyBufferSpy).toHaveBeenCalledTimes(1);
   });
 
   it('should not recreate the buffer for deeply equal schemas', ({ RootWrapper, root }) => {
@@ -97,16 +100,23 @@ describe('useBuffer', () => {
       expect(createBufferSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle buffer creation in StrictMode', async ({ RootWrapper, root }) => {
+    it('should not leave buffers alive after unmounting in StrictMode', async ({
+      RootWrapper,
+      root,
+    }) => {
       using createBufferSpy = vi.spyOn(root, 'createBuffer');
 
-      renderHook(() => useBuffer(d.f32, { initial: 1.0 }), {
+      const { unmount } = renderHook(() => useBuffer(d.f32, { initial: 1.0 }), {
         wrapper: RootWrapper,
         reactStrictMode: true,
       });
 
-      // Creates uniform twice, and discards one of them
-      expect(createBufferSpy).toHaveBeenCalledTimes(2);
+      unmount();
+      vi.runAllTimers();
+
+      const buffers = createBufferSpy.mock.results.map((r) => r.value as TgpuBuffer<d.F32>);
+      expect(buffers.length).toBeGreaterThan(0);
+      expect(buffers.filter((buffer) => !buffer.destroyed)).toHaveLength(0);
     });
 
     it('should handle cleanup timeouts in StrictMode', async ({ RootWrapper, root }) => {
@@ -117,7 +127,7 @@ describe('useBuffer', () => {
         reactStrictMode: true,
       });
 
-      expect(createBufferSpy).toHaveBeenCalledTimes(2);
+      expect(createBufferSpy).toHaveBeenCalledTimes(1);
       const createdBuffer = result.current;
       using destroyBufferSpy = vi.spyOn(createdBuffer, 'destroy');
 
