@@ -2,7 +2,16 @@ import { dualImpl, MissingCpuImplError } from '../core/function/dualImpl.ts';
 import { stitch } from '../core/resolve/stitch.ts';
 import { mat2x2f, mat3x3f, mat4x4f } from '../data/matrix.ts';
 import { clampScalar, smoothstepScalar } from '../data/numberOps.ts';
-import { abstractFloat, abstractInt, f16, f32, i32, u32 } from '../data/numeric.ts';
+import {
+  abstractFloat,
+  abstractInt,
+  f16,
+  f32,
+  fromHalfBits,
+  i32,
+  toHalfBits,
+  u32,
+} from '../data/numeric.ts';
 import { type Snippet, snip, withValue } from '../data/snippet.ts';
 import { abstruct } from '../data/struct.ts';
 import {
@@ -21,6 +30,7 @@ import {
 } from '../data/vector.ts';
 import { VectorOps } from '../data/vectorOps.ts';
 import {
+  f32Kind,
   floatKind,
   matrixKind,
   numericKind,
@@ -30,6 +40,7 @@ import {
   assertKind,
   upCast,
   generalizeFn,
+  kindOf,
 } from '../data/generalizeFn.ts';
 import {
   type AnyFloat32VecInstance,
@@ -54,7 +65,7 @@ import {
   type VecData,
   WORKAROUND_getSchema,
 } from '../data/wgslTypes.ts';
-import { SignatureNotSupportedError } from '../errors.ts';
+import { SignatureNotSupportedError, WgslTypeError } from '../errors.ts';
 import type { Infer } from '../shared/repr.ts';
 import { assertExhaustive } from '../shared/utilityTypes.ts';
 import { unify } from '../tgsl/conversion.ts';
@@ -393,8 +404,10 @@ export const determinant = dualImpl<(value: AnyMatInstance) => number>({
     }
     return { argTypes: [arg], returnType: f32 };
   },
-  normalImpl:
-    'CPU implementation for determinant not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: (value) => {
+    assertKind(value, matrixKind);
+    return VectorOps.determinant[value.kind](value);
+  },
   codegenImpl: (_ctx, [value]) => stitch`determinant(${value})`,
   sideEffects: false,
 });
@@ -521,8 +534,12 @@ export const extractBits = dualImpl<typeof cpuExtractBits>({
 export const faceForward = dualImpl<<T extends AnyFloatVecInstance>(e1: T, e2: T, e3: T) => T>({
   name: 'faceForward',
   signature: unifyRestrictedSignature(anyFloatVec),
-  normalImpl:
-    'CPU implementation for faceForward not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: (e1, e2, e3) => {
+    assertKind([e1, e2, e3], floatKind, true);
+    assertEqualKinds(e1, e2, e3);
+    const sign = dot(e2, e3) < 0 ? 1 : -1;
+    return generalizeFn((v) => v * sign, [e1]);
+  },
   codegenImpl: (_ctx, [e1, e2, e3]) => stitch`faceForward(${e1}, ${e2}, ${e3})`,
   sideEffects: false,
 });
@@ -620,6 +637,39 @@ const FrexpResults = {
   vec4h: abstruct({ fract: vec4h, exp: vec4i }),
 } as const;
 
+const frexpScalar = (value: number): { fract: number; exp: number } => {
+  if (value === 0 || !Number.isFinite(value)) {
+    return { fract: value, exp: 0 };
+  }
+  let exp = Math.floor(Math.log2(Math.abs(value))) + 1;
+  let fract = value / 2 ** exp;
+  // Correcting for imprecision of `Math.log2`
+  if (Math.abs(fract) >= 1) {
+    fract /= 2;
+    exp += 1;
+  } else if (Math.abs(fract) < 0.5) {
+    fract *= 2;
+    exp -= 1;
+  }
+  return { fract, exp };
+};
+
+const intVecByLength = { 2: vec2i, 3: vec3i, 4: vec4i } as const;
+
+function cpuFrexp<T extends AnyFloatVecInstance | number>(
+  value: T,
+): Infer<(typeof FrexpResults)[keyof typeof FrexpResults]> {
+  assertKind(value, floatKind);
+  if (typeof value === 'number') {
+    return frexpScalar(value);
+  }
+  const exps = Array.from({ length: value.length }, (_, i) => frexpScalar(value[i] as number).exp);
+  return {
+    fract: generalizeFn((v) => frexpScalar(v).fract, [value]),
+    exp: intVecByLength[value.length](...(exps as [number, number, number, number])),
+  } as Infer<(typeof FrexpResults)[keyof typeof FrexpResults]>;
+}
+
 type FrexpOverload = {
   (value: number): Infer<(typeof FrexpResults)['f32']>;
   <T extends AnyFloatVecInstance>(value: T): Infer<(typeof FrexpResults)[T['kind']]>;
@@ -627,8 +677,9 @@ type FrexpOverload = {
 
 export const frexp = dualImpl<FrexpOverload>({
   name: 'frexp',
-  normalImpl:
-    'CPU implementation for frexp not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuFrexp as FrexpOverload,
+  // The result struct cannot be resolved as a WGSL value, so it must not be folded at compile time
+  noComptime: true,
   signature: (value) => {
     const returnType = FrexpResults[value.type as keyof typeof FrexpResults];
 
@@ -702,10 +753,17 @@ function cpuLdexp<T extends v2f | v2h>(e1: T, e2: v2i): T;
 function cpuLdexp<T extends v3f | v3h>(e1: T, e2: v3i): T;
 function cpuLdexp<T extends v4f | v4h>(e1: T, e2: v4i): T;
 function cpuLdexp<T extends AnyFloatVecInstance | number>(
-  _e1: T,
-  _e2: AnyIntegerVecInstance | number,
+  e1: T,
+  e2: AnyIntegerVecInstance | number,
 ): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+  assertKind(e1, floatKind);
+  const expectedExpKind = typeof e1 === 'number' ? 'number' : `vec${e1.length}i`;
+  if (kindOf(e2) !== expectedExpKind) {
+    throw new WgslTypeError(
+      `Unsupported signature. Expected exponent of kind '${expectedExpKind}', got '${kindOf(e2)}'.`,
+    );
+  }
+  return generalizeFn((a, b) => a * 2 ** b, [e1, e2 as T]);
 }
 
 export const ldexp = dualImpl<typeof cpuLdexp>({
@@ -732,8 +790,7 @@ export const ldexp = dualImpl<typeof cpuLdexp>({
         );
     }
   },
-  normalImpl:
-    'CPU implementation for ldexp not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuLdexp,
   codegenImpl: (_ctx, [e1, e2]) => stitch`ldexp(${e1}, ${e2})`,
   sideEffects: false,
 });
@@ -885,9 +942,14 @@ type ModfOverload = {
 function cpuModf(e: number): Infer<(typeof ModfResult)['f32']>;
 function cpuModf<T extends AnyFloatVecInstance>(e: T): Infer<(typeof ModfResult)[T['kind']]>;
 function cpuModf<T extends AnyFloatVecInstance | number>(
-  _value: T,
+  value: T,
 ): Infer<(typeof ModfResult)[keyof typeof ModfResult]> {
-  throw new Error('Unreachable code. The function is only used for the type.');
+  assertKind(value, floatKind);
+  const whole = generalizeFn(Math.trunc, [value]);
+  return {
+    fract: generalizeFn((v) => v - Math.trunc(v), [value]),
+    whole,
+  } as Infer<(typeof ModfResult)[keyof typeof ModfResult]>;
 }
 
 export const modf: ModfOverload = dualImpl<typeof cpuModf>({
@@ -903,8 +965,9 @@ export const modf: ModfOverload = dualImpl<typeof cpuModf>({
 
     return { argTypes: [e], returnType };
   },
-  normalImpl:
-    'CPU implementation for modf not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuModf,
+  // The result struct cannot be resolved as a WGSL value, so it must not be folded at compile time
+  noComptime: true,
   codegenImpl: (_ctx, [value]) => stitch`modf(${value})`,
   sideEffects: false,
 });
@@ -985,8 +1048,9 @@ export const powOperator = dualImpl({
 
 function cpuQuantizeToF16(value: number): number;
 function cpuQuantizeToF16<T extends AnyFloat32VecInstance>(value: T): T;
-function cpuQuantizeToF16<T extends AnyFloat32VecInstance | number>(_value: T): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+function cpuQuantizeToF16<T extends AnyFloat32VecInstance | number>(value: T): T {
+  assertKind(value, f32Kind);
+  return generalizeFn((v) => fromHalfBits(toHalfBits(v)), [value]);
 }
 
 export const quantizeToF16 = dualImpl<typeof cpuQuantizeToF16>({
@@ -999,8 +1063,7 @@ export const quantizeToF16 = dualImpl<typeof cpuQuantizeToF16>({
     }
     return { argTypes: [uarg], returnType: uarg };
   },
-  normalImpl:
-    'CPU implementation for quantizeToF16 not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuQuantizeToF16,
   codegenImpl: (_ctx, [value]) => stitch`quantizeToF16(${value})`,
   sideEffects: false,
 });
@@ -1048,8 +1111,17 @@ export const reflect = dualImpl({
 
 export const refract = dualImpl<<T extends AnyFloatVecInstance>(e1: T, e2: T, e3: number) => T>({
   name: 'refract',
-  normalImpl:
-    'CPU implementation for refract not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: (e1, e2, e3) => {
+    assertKind([e1, e2], floatKind, true);
+    assertEqualKinds(e1, e2);
+    const d = dot(e2, e1);
+    const k = 1 - e3 * e3 * (1 - d * d);
+    if (k < 0) {
+      return generalizeFn(() => 0, [e1]);
+    }
+    const s = e3 * d + Math.sqrt(k);
+    return generalizeFn((a, b) => e3 * a - s * b, [e1, e2]);
+  },
   codegenImpl: (_ctx, [e1, e2, e3]) => stitch`refract(${e1}, ${e2}, ${e3})`,
   signature: (e1, e2, _e3) => ({
     argTypes: [e1, e2, isHalfPrecisionSchema(e1) ? f16 : f32],
