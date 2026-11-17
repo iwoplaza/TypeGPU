@@ -1,4 +1,5 @@
 export {
+  getTranspilationErrorNode,
   transpileAcornFn,
   transpileAcornNode,
   transpileBabelFn,
@@ -6,4 +7,4 @@ export {
   transpileFn,
   transpileNode,
 } from './parsers.ts';
-export type { Externals, TranspilationOptions, TranspilationResult } from './types.ts';
+export type { Externals, JsNode, TranspilationOptions, TranspilationResult } from './types.ts';

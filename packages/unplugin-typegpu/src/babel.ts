@@ -1,6 +1,10 @@
 import type { NodePath, TraverseOptions } from '@babel/traverse';
 import defu from 'defu';
-import type { Externals, TranspilationResult } from 'tinyest-for-wgsl';
+import {
+  getTranspilationErrorNode,
+  type Externals,
+  type TranspilationResult,
+} from 'tinyest-for-wgsl';
 import * as t from '@babel/types';
 import { METADATA_FORMAT_VERSION } from './core/version.ts';
 import {
@@ -181,7 +185,15 @@ export default function TypeGPUPlugin() {
           return;
         }
 
-        path.traverse(functionVisitor, state);
+        try {
+          path.traverse(functionVisitor, state);
+        } catch (error) {
+          const node = getTranspilationErrorNode(error);
+          if (!(error instanceof Error) || !node?.loc || !path.hub) {
+            throw error;
+          }
+          throw path.hub.buildError(node as t.Node, error.message, Error);
+        }
       },
     } satisfies TraverseOptions<PluginState>,
   };
