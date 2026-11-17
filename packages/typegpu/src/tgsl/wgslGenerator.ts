@@ -1443,6 +1443,17 @@ Try 'return ${typeStr}(${str});' instead.
       return stitch`${this.ctx.pre}return ${returnSnippet};`;
     }
 
+    const expectedReturnType = this.ctx.topFunctionReturnType;
+    if (
+      expectedReturnType &&
+      !wgsl.isVoid(expectedReturnType) &&
+      !(expectedReturnType instanceof AutoStruct)
+    ) {
+      throw new WgslTypeError(
+        `'${stringifyNode(statement)}' is invalid, the function is expected to return a value of type '${this.ctx.resolve(expectedReturnType).value}'.`,
+      );
+    }
+
     this.ctx.reportReturnType(wgsl.Void);
     return `${this.ctx.pre}return;`;
   }

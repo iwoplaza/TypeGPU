@@ -1,5 +1,4 @@
 import type * as tinyest from 'tinyest';
-import { NodeTypeCatalog as NODE } from 'tinyest';
 import { type Assertion, expect } from 'vitest';
 import { tgpu, d, type TgpuFn } from 'typegpu';
 import {
@@ -41,7 +40,8 @@ class ExtractingGenerator extends WgslGenerator {
       this.returnedSnippet = expectedReturnType
         ? this._expressionWithTypeConversion(statement[1], expectedReturnType)
         : this._expression(statement[1]);
-      return super._return([NODE.return]);
+      this.ctx.reportReturnType(d.Void);
+      return `${this.ctx.pre}return;`;
     }
 
     // Proceed as usual
