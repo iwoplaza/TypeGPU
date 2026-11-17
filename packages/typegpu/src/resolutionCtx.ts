@@ -69,8 +69,8 @@ import { getName, hasTinyestMetadata, isNamable, setName } from './shared/meta.t
 import { FuncParameterType } from 'tinyest';
 import { accessProp } from './tgsl/accessProp.ts';
 import { createIoSchema } from './core/function/ioSchema.ts';
-import { isShelllessImpl } from './core/function/shelllessImpl.ts';
-import { isTgpuFn } from './core/function/tgpuFn.ts';
+import { isShelllessImpl, type ShelllessImpl } from './core/function/shelllessImpl.ts';
+import { isTgpuFn, type TgpuFn } from './core/function/tgpuFn.ts';
 import type { IOData } from './core/function/fnTypes.ts';
 import { AutoStruct } from './data/autoStruct.ts';
 import { EntryInputRouter } from './core/function/entryInputRouter.ts';
@@ -93,6 +93,11 @@ import { minify } from './minify.ts';
  * of the resolution process.
  */
 const CATCHALL_BIND_GROUP_IDX_MARKER = '#CATCHALL#';
+/**
+ * How many instances of a single function can be nested inside each other, when each one
+ * is resolved under different slot bindings (compile-time recursion).
+ */
+const MAX_INSTANCE_DEPTH = 32;
 
 export type ResolutionCtxImplOptions = {
   readonly enableExtensions?: WgslEnableExtension[] | undefined;
@@ -219,6 +224,26 @@ class ItemStateStackImpl implements ItemStateStack {
         // Skip
       } else {
         throw new Error('Unknown layer type.');
+      }
+    }
+
+    return slot.defaultValue;
+  }
+
+  /**
+   * Reads the value of `slot` as seen from `layer` (the top of the stack by default),
+   * without marking the slot as used by any item.
+   */
+  peekSlot<T>(slot: TgpuSlot<T>, layer?: StackLayer): T | undefined {
+    const start = layer ? this._stack.lastIndexOf(layer) : this._stack.length - 1;
+    for (let i = start; i >= 0; --i) {
+      const current = this._stack[i];
+      if (current?.type === 'slotBinding') {
+        const boundValue = current.bindingMap.get(slot);
+
+        if (boundValue !== undefined) {
+          return boundValue as T;
+        }
       }
     }
 
@@ -437,13 +462,10 @@ export class ResolutionCtxImpl implements ResolutionCtx {
   private readonly _declarations: ResolvedDeclaration[] = [];
   private _varyingLocations: Record<string, number> | undefined;
   /**
-   * Holds a set of base (slot-less) functions that have started their resolution process.
-   * Used for recursion detection check - a function is recursive if:
-   * - it was passed to ctx.resolve while already present in this set,
-   * - it never finished resolution (<=> it does not appear in `memoizedResolves`).
-   * The set is NOT cleared after the resolution finishes.
+   * The item layers of instances that are currently being resolved, for each item.
+   * Used for recursion detection, see `#assertNotRecursive`.
    */
-  readonly #startedFunctionResolves: WeakSet<object> = new WeakSet();
+  readonly #instancesInProgress = new WeakMap<object, ItemLayer[]>();
   readonly #logGenerator: LogGenerator;
 
   readonly gen: ShaderGenerator;
@@ -1031,6 +1053,9 @@ export class ResolutionCtxImpl implements ResolutionCtx {
     const instances = this.#namespaceInternal.memoizedResolves.get(item) ?? [];
 
     this._itemStateStack.pushItem();
+    const inProgress = this.#instancesInProgress.get(item) ?? [];
+    inProgress.push(this._itemStateStack.topItem);
+    this.#instancesInProgress.set(item, inProgress);
 
     try {
       for (const instance of instances) {
@@ -1094,7 +1119,39 @@ export class ResolutionCtxImpl implements ResolutionCtx {
 
       throw new ResolutionError(err, [item]);
     } finally {
+      inProgress.pop();
       this._itemStateStack.pop('item');
+    }
+  }
+
+  /**
+   * A function that is already being resolved can be resolved again only if it
+   * produces a different instance, which happens when one of the slots that the
+   * in-progress instance read so far has a different value now.
+   * Otherwise the new instance would go down the same path, and reach itself again.
+   */
+  #assertNotRecursive(item: TgpuFn | ShelllessImpl) {
+    const inProgress = this.#instancesInProgress.get(item);
+    if (!inProgress?.length) {
+      return;
+    }
+
+    const stack = this._itemStateStack;
+    for (const layer of inProgress) {
+      const isSameInstance = [...layer.usedSlots].every((slot) =>
+        slot.areEqual(stack.peekSlot(slot), stack.peekSlot(slot, layer)),
+      );
+      if (isSameInstance) {
+        throw new Error(
+          `Recursive function ${item} detected. Recursion is not allowed on the GPU.`,
+        );
+      }
+    }
+
+    if (inProgress.length >= MAX_INSTANCE_DEPTH) {
+      throw new Error(
+        `Function ${item} is being resolved ${MAX_INSTANCE_DEPTH} levels deep under different slot bindings. Make sure the slot values it calls itself with reach a value that ends the recursion.`,
+      );
     }
   }
 
@@ -1113,15 +1170,7 @@ export class ResolutionCtxImpl implements ResolutionCtx {
 
     if ((isTgpuFn(item) || isShelllessImpl(item)) && !isProviding(item)) {
       // We skip providing functions to only perform the checks on slot-less functions.
-      if (
-        this.#startedFunctionResolves.has(item) &&
-        !this.#namespaceInternal.memoizedResolves.has(item)
-      ) {
-        throw new Error(
-          `Recursive function ${item} detected. Recursion is not allowed on the GPU.`,
-        );
-      }
-      this.#startedFunctionResolves.add(item as object);
+      this.#assertNotRecursive(item);
     }
 
     if (isProviding(item)) {

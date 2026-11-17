@@ -1021,6 +1021,205 @@ describe('tgsl fn when using plugin', () => {
     `);
   });
 
+  it('allows a function to call itself under different slot bindings', () => {
+    const depth = tgpu.slot(2);
+    const sum: TgpuFn<(n: d.I32) => d.I32> = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      'use gpu';
+      if (depth.$ === 0) return n;
+      return n + sum.with(depth, depth.$ - 1)(n);
+    });
+
+    expect(tgpu.resolve([sum])).toMatchInlineSnapshot(`
+      "fn sum_2(n: i32) -> i32 {
+        return n;
+      }
+
+      fn sum_1(n: i32) -> i32 {
+        return (n + sum_2(n));
+      }
+
+      fn sum(n: i32) -> i32 {
+        return (n + sum_1(n));
+      }"
+    `);
+  });
+
+  it('allows mutually recursive functions under different slot bindings', () => {
+    const depth = tgpu.slot(2);
+    let odd: TgpuFn<(n: d.I32) => d.I32>;
+    const even = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      'use gpu';
+      if (depth.$ === 0) return n;
+      return odd.with(depth, depth.$ - 1)(n * 2);
+    });
+    odd = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      'use gpu';
+      return even(n + 1);
+    });
+
+    expect(tgpu.resolve([even])).toMatchInlineSnapshot(`
+      "fn even_2(n: i32) -> i32 {
+        return n;
+      }
+
+      fn odd_1(n: i32) -> i32 {
+        return even_2((n + 1i));
+      }
+
+      fn even_1(n: i32) -> i32 {
+        return odd_1((n * 2i));
+      }
+
+      fn odd(n: i32) -> i32 {
+        return even_1((n + 1i));
+      }
+
+      fn even(n: i32) -> i32 {
+        return odd((n * 2i));
+      }"
+    `);
+  });
+
+  it('throws when a function calls itself with a slot rebound to the same value', () => {
+    const depth = tgpu.slot(2);
+    const sum: TgpuFn<(n: d.I32) => d.I32> = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      'use gpu';
+      if (depth.$ === 0) return n;
+      return n + sum.with(depth, depth.$)(n);
+    });
+
+    expect(() => tgpu.resolve([sum])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:sum
+      - fn:sum: Recursive function fn:sum detected. Recursion is not allowed on the GPU.]
+    `);
+  });
+
+  it('throws when a function calls itself with a slot it does not use rebound', () => {
+    const depth = tgpu.slot(2);
+    const other = tgpu.slot(0);
+    const sum: TgpuFn<(n: d.I32) => d.I32> = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      'use gpu';
+      if (depth.$ === 0) return n;
+      return n + sum.with(other, 1)(n);
+    });
+
+    expect(() => tgpu.resolve([sum])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:sum
+      - fn:sum: Recursive function fn:sum detected. Recursion is not allowed on the GPU.]
+    `);
+  });
+
+  it('throws on mutual recursion where a slot is rebound to the same value', () => {
+    const depth = tgpu.slot(2);
+    let odd: TgpuFn<(n: d.I32) => d.I32>;
+    const even = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      'use gpu';
+      if (depth.$ === 0) return n;
+      return odd.with(depth, depth.$)(n * 2);
+    });
+    odd = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      'use gpu';
+      return even(n + 1);
+    });
+
+    expect(() => tgpu.resolve([even])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:even
+      - fn:odd
+      - fn:even: Recursive function fn:even detected. Recursion is not allowed on the GPU.]
+    `);
+  });
+
+  it('throws on recursion after another instance of the function was already resolved', () => {
+    const flag = tgpu.slot(false);
+    const f: TgpuFn<() => d.I32> = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
+      'use gpu';
+      if (flag.$) return 1;
+      return f.with(flag, false)();
+    });
+
+    const main = () => {
+      'use gpu';
+      return f.with(flag, true)() + f();
+    };
+
+    expect(() => tgpu.resolve([main])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn*:main
+      - fn*:main()
+      - fn:f
+      - fn:f: Recursive function fn:f detected. Recursion is not allowed on the GPU.]
+    `);
+  });
+
+  it('throws when slot values never reach the end of compile-time recursion', () => {
+    const depth = tgpu.slot(2);
+    const sum: TgpuFn<(n: d.I32) => d.I32> = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((n) => {
+      'use gpu';
+      if (depth.$ === 0) return n;
+      return n + sum.with(depth, depth.$ + 1)(n);
+    });
+
+    expect(() => tgpu.resolve([sum])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      ...
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum
+      - fn:sum: Function fn:sum is being resolved 32 levels deep under different slot bindings. Make sure the slot values it calls itself with reach a value that ends the recursion.]
+    `);
+  });
+
   it('allows for re-resolves of slotted functions', () => {
     const slot = tgpu.slot<number>(1);
     const helper = tgpu
