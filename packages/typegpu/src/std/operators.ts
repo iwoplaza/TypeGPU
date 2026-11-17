@@ -222,6 +222,28 @@ export const mul = dualImpl({
   sideEffects: false,
 });
 
+const I32_MIN = -(2 ** 31);
+
+/**
+ * Integer division with WGSL's runtime semantics: `e1 / 0` and `I32_MIN / -1` evaluate to `e1`.
+ */
+export function intDivComponent(a: number, b: number): number {
+  if (b === 0 || (a === I32_MIN && b === -1)) {
+    return a;
+  }
+  return Math.trunc(a / b);
+}
+
+/**
+ * Integer remainder with WGSL's runtime semantics: `e1 % 0` and `I32_MIN % -1` evaluate to `0`.
+ */
+function intModComponent(a: number, b: number): number {
+  if (b === 0 || (a === I32_MIN && b === -1)) {
+    return 0;
+  }
+  return a % b;
+}
+
 function cpuDiv(lhs: number, rhs: number): number; // default js division
 function cpuDiv<T extends NumVec>(lhs: T, rhs: T): T; // component-wise division
 function cpuDiv<T extends NumVec>(lhs: number, rhs: T): T; // mixed division
@@ -230,6 +252,9 @@ function cpuDiv(lhs: NumVec | number, rhs: NumVec | number): NumVec | number {
   assertKind([lhs, rhs], numericKind);
   const cast = upCast([lhs, rhs]);
   assertEqualKinds(...cast);
+  if (isInteger32VecInstance(cast[0])) {
+    return generalizeFn(intDivComponent, cast);
+  }
   return generalizeFn((a, b) => a / b, cast);
 }
 
@@ -260,6 +285,9 @@ export const mod = dualImpl({
     assertKind([a, b], numericKind);
     const cast = upCast([a, b]);
     assertEqualKinds(...cast);
+    if (isInteger32VecInstance(cast[0])) {
+      return generalizeFn(intModComponent, cast);
+    }
     return generalizeFn((a, b) => a % b, cast);
   }) as ModOverload,
   codegenImpl: (ctx, [lhs, rhs]) => ctx.gen.emitBinaryOp(lhs, '%', rhs),

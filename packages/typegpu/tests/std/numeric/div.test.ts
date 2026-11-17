@@ -48,13 +48,23 @@ describe('div', () => {
     expect(div(d.vec4u(1, 2, 8, 9), d.vec4u(4))).toStrictEqual(d.vec4u(0, 0, 2, 2));
   });
 
-  it('forbids division by 0', () => {
-    expect(() => div(d.vec2u(1, 2), d.vec2u(0))).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Cannot convert value 'Infinity' to type u32 because of the Finite Math Assumption (see: https://www.w3.org/TR/WGSL/#finite-math-assumption)]`,
-    );
-    expect(() => div(d.vec4u(1, 2, 8, 9), 0)).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Cannot convert value 'Infinity' to type u32 because of the Finite Math Assumption (see: https://www.w3.org/TR/WGSL/#finite-math-assumption)]`,
-    );
+  it('follows WGSL runtime semantics for integer division by 0', () => {
+    expect(div(d.vec2u(7, 7), d.vec2u(2, 0))).toStrictEqual(d.vec2u(3, 7));
+    expect(div(d.vec4u(1, 2, 8, 9), 0)).toStrictEqual(d.vec4u(1, 2, 8, 9));
+    expect(div(d.vec2i(7, -7), d.vec2i(0, 0))).toStrictEqual(d.vec2i(7, -7));
+    expect(div(d.vec3i(7, -7, 0), 0)).toStrictEqual(d.vec3i(7, -7, 0));
+  });
+
+  it('follows WGSL runtime semantics for I32_MIN / -1', () => {
+    const I32_MIN = -2147483648;
+    expect(div(d.vec2i(I32_MIN, I32_MIN), d.vec2i(-1, 1))).toStrictEqual(d.vec2i(I32_MIN, I32_MIN));
+    expect(div(d.vec2i(I32_MIN, 9), -1)).toStrictEqual(d.vec2i(I32_MIN, -9));
+  });
+
+  it('truncates integer division toward zero', () => {
+    expect(div(d.vec2i(7, -7), d.vec2i(2, 2))).toStrictEqual(d.vec2i(3, -3));
+    expect(div(d.vec2i(7, -7), d.vec2i(-2, -2))).toStrictEqual(d.vec2i(-3, 3));
+    expect(div(d.vec2u(4294967295, 7), d.vec2u(2, 2))).toStrictEqual(d.vec2u(2147483647, 3));
   });
 
   describe('in tgsl', () => {
