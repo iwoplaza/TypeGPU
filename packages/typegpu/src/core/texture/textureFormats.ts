@@ -236,6 +236,23 @@ function parseSampleTypes(format: string): readonly GPUTextureSampleType[] {
 
 const FLOAT32_FORMATS = new Set(['r32float', 'rg32float', 'rgba32float']);
 
+/**
+ * Formats that are only renderable when the device has a specific feature enabled.
+ * @see https://gpuweb.github.io/gpuweb/#plain-color-formats
+ */
+const RENDER_ATTACHMENT_FEATURES: Partial<Record<GPUTextureFormat, GPUFeatureName>> = {
+  r8snorm: 'texture-formats-tier1',
+  rg8snorm: 'texture-formats-tier1',
+  rgba8snorm: 'texture-formats-tier1',
+  r16unorm: 'texture-formats-tier1',
+  r16snorm: 'texture-formats-tier1',
+  rg16unorm: 'texture-formats-tier1',
+  rg16snorm: 'texture-formats-tier1',
+  rgba16unorm: 'texture-formats-tier1',
+  rgba16snorm: 'texture-formats-tier1',
+  rg11b10ufloat: 'rg11b10ufloat-renderable',
+};
+
 export function getEffectiveSampleTypes(
   device: GPUDevice,
   format: GPUTextureFormat,
@@ -244,4 +261,15 @@ export function getEffectiveSampleTypes(
     return ['unfilterable-float'];
   }
   return getTextureFormatInfo(format).sampleTypes;
+}
+
+export function getEffectiveCanRenderAttachment(
+  device: GPUDevice,
+  format: GPUTextureFormat,
+): boolean {
+  const requiredFeature = RENDER_ATTACHMENT_FEATURES[format];
+  if (requiredFeature && !device.features.has(requiredFeature)) {
+    return false;
+  }
+  return getTextureFormatInfo(format).canRenderAttachment;
 }
