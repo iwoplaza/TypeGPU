@@ -216,7 +216,7 @@ export function buildWriter(
       let code = `if (ArrayBuffer.isView(${valueExpr})) {\n`;
       code += `  new Uint8Array(output.buffer).set(new Uint8Array(${valueExpr}.buffer, ${valueExpr}.byteOffset, ${copyLen}), output.byteOffset + (${offsetExpr}));\n`;
       code += `} else {\n`;
-      code += `for (let ${loopVar} = 0; ${loopVar} < ${node.elementCount}; ${loopVar}++) {\n`;
+      code += `for (let ${loopVar} = 0; ${loopVar} < Math.min(${node.elementCount}, ${valueExpr}.length); ${loopVar}++) {\n`;
       if (partial) {
         code += `if ((${offsetExpr} + ${loopVar} * ${elementSize}) >= endOffset) return;\n`;
       }

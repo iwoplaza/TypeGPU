@@ -246,6 +246,30 @@ describe('TgpuBuffer', () => {
     expect([...new Uint32Array(writtenBuffer)]).toStrictEqual([1, 22, 3]);
   });
 
+  it('should only upload the written elements of a shorter disarray', ({ root, device }) => {
+    const schema = d.disarrayOf(d.unorm8x4, 4);
+    const buffer = root.createBuffer(schema).$usage('vertex');
+    const rawBuffer = root.unwrap(buffer);
+
+    buffer.write([d.vec4f(0, 1, 0, 1), d.vec4f(1, 0, 1, 0)]);
+
+    expect(device.mock.queue.writeBuffer.mock.calls).toStrictEqual([
+      [rawBuffer, 0, expect.any(ArrayBuffer), 0, 8],
+    ]);
+  });
+
+  it('should round the upload of a shorter disarray up to 4 bytes', ({ root, device }) => {
+    const schema = d.disarrayOf(d.unorm8x2, 4);
+    const buffer = root.createBuffer(schema).$usage('vertex');
+    const rawBuffer = root.unwrap(buffer);
+
+    buffer.write([d.vec2f(0, 1)]);
+
+    expect(device.mock.queue.writeBuffer.mock.calls).toStrictEqual([
+      [rawBuffer, 0, expect.any(ArrayBuffer), 0, 4],
+    ]);
+  });
+
   it('should write a scalar array chunk from startOffset through the end when endOffset is omitted', ({
     root,
     device,
