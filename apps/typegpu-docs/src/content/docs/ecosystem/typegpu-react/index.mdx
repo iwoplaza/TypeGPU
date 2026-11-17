@@ -423,6 +423,12 @@ const primaryColor = useMirroredUniform(d.vec3f, d.vec3f(...theme.primaryColor))
 }
 ```
 
+:::note
+A component hidden by `<Activity mode="hidden">` releases its buffers after a short delay, the same way an unmounted one does.
+When it becomes visible again, its buffers get recreated: `initial` is applied and `onInit` is called again, and `useMirroredUniform`
+starts from the latest value. Anything written to the previous buffers (e.g. with `.write()` or by a compute shader) is lost.
+:::
+
 ## useBindGroup
 
 ```ts
