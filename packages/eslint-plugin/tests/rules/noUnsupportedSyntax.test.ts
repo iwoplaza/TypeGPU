@@ -11,6 +11,10 @@ describe('noUnsupportedSyntax', () => {
       "const cls = new (class { #priv = 1; fn = () => { 'use gpu'; const a = this.#priv; } } )()",
       "const fn = () => { 'use gpu'; switch (x) { case 1: break; } }",
       "const fn = () => { 'use gpu'; const obj = { [key]: 1 }; }",
+      "const fn = ({ pos, a: b }) => { 'use gpu'; return pos.x + b; }",
+      "const fn = (x) => { 'use gpu'; for (;;) { break; } }",
+      "const fn = async () => { const gpuFn = () => { 'use gpu'; return 1; }; await gpuFn; }",
+      'const fn = ({ a, ...rest }) => { outer: for (;;) { break outer; }; }',
     ],
     invalid: [
       {
@@ -73,6 +77,13 @@ describe('noUnsupportedSyntax', () => {
       {
         code: "const fn = async () => { 'use gpu'; await foo(); }",
         errors: [
+          {
+            messageId: 'unexpected',
+            data: {
+              snippet: "async () => { 'use gpu'; await foo(); }",
+              syntax: 'async function',
+            },
+          },
           {
             messageId: 'unexpected',
             data: { snippet: 'await foo()', syntax: 'await expression' },
@@ -333,7 +344,110 @@ describe('noUnsupportedSyntax', () => {
         errors: [
           {
             messageId: 'unexpected',
+            data: {
+              snippet: "function* fn() { 'use gpu'; yield 1; }",
+              syntax: 'generator function',
+            },
+          },
+          {
+            messageId: 'unexpected',
             data: { snippet: 'yield 1', syntax: 'yield expression' },
+          },
+        ],
+      },
+      {
+        code: "async function fn() { 'use gpu'; return 1; }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: {
+              snippet: "async function fn() { 'use gpu'; return 1; }",
+              syntax: 'async function',
+            },
+          },
+        ],
+      },
+      {
+        code: "const fn = ({ a, ...rest }) => { 'use gpu'; return a; }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: { snippet: '...rest', syntax: 'rest element in destructured parameter' },
+          },
+        ],
+      },
+      {
+        code: "const fn = ({ pos: { x }, dir: [y] }) => { 'use gpu'; return x + y; }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: { snippet: 'pos: { x }', syntax: 'nested destructuring in parameter' },
+          },
+          {
+            messageId: 'unexpected',
+            data: { snippet: 'dir: [y]', syntax: 'nested destructuring in parameter' },
+          },
+        ],
+      },
+      {
+        code: "const fn = ({ 'a': b, [c]: d }) => { 'use gpu'; return b + d; }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: { snippet: "'a': b", syntax: 'non-identifier key in destructured parameter' },
+          },
+          {
+            messageId: 'unexpected',
+            data: { snippet: '[c]: d', syntax: 'non-identifier key in destructured parameter' },
+          },
+        ],
+      },
+      {
+        code: "const fn = ({ a = 1 }) => { 'use gpu'; return a; }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: { snippet: 'a = 1', syntax: 'assignment pattern (default parameter)' },
+          },
+        ],
+      },
+      {
+        code: "const fn = (...args) => { 'use gpu'; return 1; }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: { snippet: '...args', syntax: 'rest parameter' },
+          },
+        ],
+      },
+      {
+        code: "const fn = ([a]) => { 'use gpu'; return a; }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: { snippet: '[a]', syntax: 'parameter using array destructuring' },
+          },
+        ],
+      },
+      {
+        code: "const fn = () => { 'use gpu'; outer: for (;;) { break outer; } }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: { snippet: 'outer: for (;;) { break outer; }', syntax: 'labeled statement' },
+          },
+        ],
+      },
+      {
+        code: "const fn = () => { 'use gpu'; let x = 1;; if (x); }",
+        errors: [
+          {
+            messageId: 'unexpected',
+            data: { snippet: ';', syntax: 'empty statement' },
+          },
+          {
+            messageId: 'unexpected',
+            data: { snippet: ';', syntax: 'empty statement' },
           },
         ],
       },
