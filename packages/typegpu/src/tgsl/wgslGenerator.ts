@@ -2,7 +2,7 @@ import * as tinyest from 'tinyest';
 import { stitch } from '../core/resolve/stitch.ts';
 import { arrayOf } from '../data/array.ts';
 import { type AnyData, UnknownData, unptr } from '../data/dataTypes.ts';
-import { bool, i32, u32 } from '../data/numeric.ts';
+import { bool, f16, f32, i32, u32 } from '../data/numeric.ts';
 import { vec2u, vec3u, vec4u } from '../data/vector.ts';
 import {
   fallthroughCopyOrigin,
@@ -2068,6 +2068,16 @@ ${stringifyNode(statement)}`);
 
       this.validateSnippetMutation(argExpr, statement);
       this.tryMarkModified(arg);
+
+      const argType = unptr(argExpr.dataType);
+      if (argType === f32 || argType === f16) {
+        // WGSL only allows `++` and `--` on integers
+        const one = this.numericLiteral(1, argType);
+        return {
+          code: `${this.ctx.pre}${argStr} ${op[0]}= ${one.value};`,
+          definesInNearestScope: false,
+        };
+      }
 
       return { code: `${this.ctx.pre}${argStr}${op};`, definesInNearestScope: false };
     }
