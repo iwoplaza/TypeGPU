@@ -17,4 +17,10 @@ describe('round', () => {
       }"
     `);
   });
+
+  it('rounds vectors component-wise, with ties to even', () => {
+    expect(std.round(d.vec2f(0.5, 1.5))).toStrictEqual(d.vec2f(0, 2));
+    expect(std.round(d.vec3h(-1.5, -2.5, -3.5))).toStrictEqual(d.vec3h(-2, -2, -4));
+    expect(std.round(d.vec4f(2.4, 2.6, -2.4, -2.6))).toStrictEqual(d.vec4f(2, 3, -2, -3));
+  });
 });

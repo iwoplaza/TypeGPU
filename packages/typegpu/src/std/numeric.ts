@@ -1,4 +1,4 @@
-import { dualImpl, MissingCpuImplError } from '../core/function/dualImpl.ts';
+import { dualImpl } from '../core/function/dualImpl.ts';
 import { stitch } from '../core/resolve/stitch.ts';
 import { mat2x2f, mat3x3f, mat4x4f } from '../data/matrix.ts';
 import { clampScalar, smoothstepScalar } from '../data/numberOps.ts';
@@ -369,12 +369,7 @@ function cpuDegrees(value: number): number;
 function cpuDegrees<T extends AnyFloatVecInstance>(value: T): T;
 function cpuDegrees<T extends AnyFloatVecInstance | number>(value: T): T {
   assertKind(value, floatKind);
-  if (typeof value === 'number') {
-    return ((value * 180) / Math.PI) as T;
-  }
-  throw new MissingCpuImplError(
-    'CPU implementation for degrees on vectors not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  );
+  return generalizeFn((v) => (v * 180) / Math.PI, [value]);
 }
 
 export const degrees = dualImpl<typeof cpuDegrees>({
@@ -577,12 +572,7 @@ function cpuFma<T extends AnyFloatVecInstance>(e1: T, e2: T, e3: T): T;
 function cpuFma<T extends AnyFloatVecInstance | number>(e1: T, e2: T, e3: T): T {
   assertKind([e1, e2, e3], floatKind);
   assertEqualKinds(e1, e2, e3);
-  if (typeof e1 === 'number') {
-    return (e1 * (e2 as number) + (e3 as number)) as T;
-  }
-  throw new MissingCpuImplError(
-    'CPU implementation for fma on vectors not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  );
+  return generalizeFn((a, b, c) => a * b + c, [e1, e2, e3]);
 }
 
 export const fma = dualImpl({
@@ -681,12 +671,7 @@ function cpuInverseSqrt(value: number): number;
 function cpuInverseSqrt<T extends AnyFloatVecInstance>(value: T): T;
 function cpuInverseSqrt<T extends AnyFloatVecInstance | number>(value: T): T {
   assertKind(value, floatKind);
-  if (typeof value === 'number') {
-    return (1 / Math.sqrt(value)) as T;
-  }
-  throw new MissingCpuImplError(
-    'CPU implementation for inverseSqrt on vectors not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  );
+  return generalizeFn((v) => 1 / Math.sqrt(v), [value]);
 }
 
 export const inverseSqrt = dualImpl({
@@ -1009,12 +994,7 @@ function cpuRadians(value: number): number;
 function cpuRadians<T extends AnyFloatVecInstance | number>(value: T): T;
 function cpuRadians<T extends AnyFloatVecInstance | number>(value: T): T {
   assertKind(value, floatKind);
-  if (typeof value === 'number') {
-    return ((value * Math.PI) / 180) as T;
-  }
-  throw new MissingCpuImplError(
-    'CPU implementation for radians on vectors not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  );
+  return generalizeFn((v) => (v * Math.PI) / 180, [value]);
 }
 
 export const radians = dualImpl({
@@ -1072,23 +1052,22 @@ export const reverseBits = dualImpl<typeof cpuReverseBits>({
   sideEffects: false,
 });
 
+const roundScalar = (value: number): number => {
+  const floor = Math.floor(value);
+  if (value === floor + 0.5) {
+    if (floor % 2 === 0) {
+      return floor;
+    }
+    return floor + 1;
+  }
+  return Math.round(value);
+};
+
 function cpuRound(value: number): number;
 function cpuRound<T extends AnyFloatVecInstance>(value: T): T;
 function cpuRound<T extends AnyFloatVecInstance | number>(value: T): T {
   assertKind(value, floatKind);
-  if (typeof value === 'number') {
-    const floor = Math.floor(value);
-    if (value === floor + 0.5) {
-      if (floor % 2 === 0) {
-        return floor as T;
-      }
-      return (floor + 1) as T;
-    }
-    return Math.round(value) as T;
-  }
-  throw new MissingCpuImplError(
-    'CPU implementation for round on vectors not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  );
+  return generalizeFn(roundScalar, [value]);
 }
 
 export const round = dualImpl({
@@ -1202,12 +1181,7 @@ function cpuStep<T extends AnyFloatVecInstance | number>(edge: T, x: T): T;
 function cpuStep<T extends AnyFloatVecInstance | number>(edge: T, x: T): T {
   assertKind([edge, x], floatKind);
   assertEqualKinds(edge, x);
-  if (typeof edge === 'number') {
-    return (edge <= (x as number) ? 1.0 : 0.0) as T;
-  }
-  throw new MissingCpuImplError(
-    'CPU implementation for step on vectors not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  );
+  return generalizeFn((e, v) => (e <= v ? 1.0 : 0.0), [edge, x]);
 }
 
 export const step = dualImpl({
@@ -1222,12 +1196,7 @@ function cpuTan(value: number): number;
 function cpuTan<T extends AnyFloatVecInstance>(value: T): T;
 function cpuTan<T extends AnyFloatVecInstance | number>(value: T): T {
   assertKind(value, floatKind);
-  if (typeof value === 'number') {
-    return Math.tan(value) as T;
-  }
-  throw new MissingCpuImplError(
-    'CPU implementation for tan on vectors not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  );
+  return generalizeFn(Math.tan, [value]);
 }
 
 export const tan = dualImpl({
@@ -1322,15 +1291,15 @@ export const transpose = dualImpl({
 
 function cpuTrunc(value: number): number;
 function cpuTrunc<T extends AnyFloatVecInstance>(value: T): T;
-function cpuTrunc<T extends AnyFloatVecInstance | number>(_value: T): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+function cpuTrunc<T extends AnyFloatVecInstance | number>(value: T): T {
+  assertKind(value, floatKind);
+  return generalizeFn(Math.trunc, [value]);
 }
 
-export const trunc = dualImpl<typeof cpuTrunc>({
+export const trunc = dualImpl({
   name: 'trunc',
   signature: unifyRestrictedSignature(anyFloat),
-  normalImpl:
-    'CPU implementation for trunc not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuTrunc,
   codegenImpl: (_ctx, [value]) => stitch`trunc(${value})`,
   sideEffects: false,
 });
