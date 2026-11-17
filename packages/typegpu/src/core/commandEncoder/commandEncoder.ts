@@ -1,4 +1,5 @@
 import { $internal } from '../../shared/symbols.ts';
+import { DEV, TEST } from '../../shared/env.ts';
 import { logger } from '../../tgpuLogger.ts';
 import type { ExperimentalTgpuRoot } from '../root/rootTypes.ts';
 import {
@@ -134,7 +135,7 @@ class TgpuCommandEncoderImpl implements TgpuCommandEncoder {
     const { rawEncoder, root, afterSubmit } = this[$internal];
     this.#recordPendingCommands();
 
-    if (afterSubmit.size > 0) {
+    if ((DEV || TEST) && afterSubmit.size > 0) {
       logger.warnOnce(
         'suspicious',
         root,
