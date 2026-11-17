@@ -639,7 +639,7 @@ describe('fire-text example', () => {
       }
 
       fn hsvToRgb(hsv: vec3f) -> vec3f {
-        let h = hsv.x;
+        let h = fract(hsv.x);
         let s = hsv.y;
         let v = hsv.z;
         let i = floor((h * 6f));
@@ -801,7 +801,7 @@ describe('fire-text example', () => {
       }
 
       fn hsvToRgb(hsv: vec3f) -> vec3f {
-        let h = hsv.x;
+        let h = fract(hsv.x);
         let s = hsv.y;
         let v = hsv.z;
         let i = floor((h * 6f));
