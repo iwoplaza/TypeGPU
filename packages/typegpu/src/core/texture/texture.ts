@@ -510,24 +510,28 @@ class TgpuTextureImpl<TProps extends TextureProps> implements TgpuTexture<TProps
       );
     }
 
-    const actualMipLevels = mipLevels ?? (this.props.mipLevelCount ?? 1) - baseMipLevel;
+    const mipLevelCount = this.props.mipLevelCount ?? 1;
+
+    if (baseMipLevel < 0 || baseMipLevel >= mipLevelCount) {
+      throw new Error(
+        `Base mip level ${baseMipLevel} is out of range. Texture has ${mipLevelCount} mip levels.`,
+      );
+    }
+
+    const actualMipLevels = mipLevels ?? mipLevelCount - baseMipLevel;
+
+    if (baseMipLevel + actualMipLevels > mipLevelCount) {
+      throw new Error(
+        `Cannot generate ${actualMipLevels} mip levels starting at mip level ${baseMipLevel}. Texture has ${mipLevelCount} mip levels.`,
+      );
+    }
 
     if (actualMipLevels <= 1) {
       logger.warn(
         'suspicious',
-        `generateMipmaps is a no-op: would generate ${actualMipLevels} mip levels (base: ${baseMipLevel}, total: ${
-          this.props.mipLevelCount ?? 1
-        })`,
+        `generateMipmaps is a no-op: would generate ${actualMipLevels} mip levels (base: ${baseMipLevel}, total: ${mipLevelCount})`,
       );
       return;
-    }
-
-    if (baseMipLevel >= (this.props.mipLevelCount ?? 1)) {
-      throw new Error(
-        `Base mip level ${baseMipLevel} is out of range. Texture has ${
-          this.props.mipLevelCount ?? 1
-        } mip levels.`,
-      );
     }
 
     generateTextureMipmaps(
