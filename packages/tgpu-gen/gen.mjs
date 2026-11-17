@@ -2,7 +2,16 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { ArrayInfo, StructInfo, TemplateInfo, WgslReflect } from 'wgsl_reflect';
+import {
+  ArrayInfo,
+  Const,
+  Override,
+  StructInfo,
+  TemplateInfo,
+  Var,
+  WgslParser,
+  WgslReflect,
+} from 'wgsl_reflect';
 
 /**
  * @typedef {import('wgsl_reflect').AliasInfo} AliasInfo
@@ -15,6 +24,41 @@ import { ArrayInfo, StructInfo, TemplateInfo, WgslReflect } from 'wgsl_reflect';
 const cwd = new URL(`file:${process.cwd()}/`);
 
 const LENGTH_VAR = 'arrayLength';
+
+const SUPPORTED_DATA_TYPES = new Set([
+  'bool',
+  'f16',
+  'f32',
+  'i32',
+  'u32',
+  ...['vec2', 'vec3', 'vec4'].flatMap((vec) => ['f', 'h', 'i', 'u', 'b'].map((s) => vec + s)),
+  'mat2x2f',
+  'mat3x3f',
+  'mat4x4f',
+]);
+
+const BUILTINS = {
+  vertex_index: 'vertexIndex',
+  instance_index: 'instanceIndex',
+  clip_distances: 'clipDistances',
+  position: 'position',
+  front_facing: 'frontFacing',
+  frag_depth: 'fragDepth',
+  primitive_index: 'primitiveIndex',
+  sample_index: 'sampleIndex',
+  sample_mask: 'sampleMask',
+  local_invocation_id: 'localInvocationId',
+  local_invocation_index: 'localInvocationIndex',
+  global_invocation_id: 'globalInvocationId',
+  global_invocation_index: 'globalInvocationIndex',
+  workgroup_id: 'workgroupId',
+  workgroup_index: 'workgroupIndex',
+  num_workgroups: 'numWorkgroups',
+  subgroup_invocation_id: 'subgroupInvocationId',
+  subgroup_size: 'subgroupSize',
+  subgroup_id: 'subgroupId',
+  num_subgroups: 'numSubgroups',
+};
 
 /**
  * @typedef {object} Options
@@ -112,12 +156,13 @@ export function generate(
   const bindGroupLayouts = generateBindGroupLayouts(reflect.getBindGroups(), options);
 
   const functions = generateFunctions(reflect.functions, wgsl, options);
+  const skipped = generateSkippedDeclarations(wgsl);
 
   const imports = generateImports(options);
   const exports_ = generateExports(options);
 
   return `/* generated via tgpu-gen by TypeGPU */
-${[imports, structs, aliases, bindGroupLayouts, functions, exports_]
+${[imports, structs, aliases, bindGroupLayouts, functions, skipped, exports_]
   .filter((generated) => generated && generated.trim() !== '')
   .join('\n')}
 `;
@@ -144,7 +189,7 @@ function generateStruct(struct, options) {
   return `${declareConst(struct.name, options)} = ${
     hasVarLengthMember(struct) ? `(${LENGTH_VAR}${options.toTs ? ': number' : ''}) => ` : ''
   }d.struct({
-  ${struct.members.map((member) => generateStructMember(member, options)).join('\n  ')}
+  ${struct.members.map((member) => generateStructMember(struct, member, options)).join('\n  ')}
 });`;
 }
 
@@ -170,17 +215,54 @@ function generateAliases(aliases, options) {
   return aliases.length > 0
     ? `\n/* aliases */
 ${aliases
-  .map((alias) => `${declareConst(alias.name, options)} = ${generateType(alias.type, options)};`)
+  .map(
+    (alias) =>
+      `${declareConst(alias.name, options)} = ${inContext(`alias '${alias.name}'`, () =>
+        generateType(alias.type, options),
+      )};`,
+  )
   .join('\n')}`
     : '';
 }
 
 /**
+ * @param {StructInfo} struct
  * @param {MemberInfo} member
  * @param {Options} options
  */
-function generateStructMember(member, options) {
-  return `${member.name}: ${generateType(member.type, options)},`;
+function generateStructMember(struct, member, options) {
+  return `${member.name}: ${inContext(`member '${member.name}' of struct '${struct.name}'`, () =>
+    generateType(member.type, options),
+  )},`;
+}
+
+/**
+ * Adds information about where the error occurred to errors thrown by `generate`.
+ *
+ * @template T
+ * @param {string} context
+ * @param {() => T} generate
+ * @returns {T}
+ */
+function inContext(context, generate) {
+  try {
+    return generate();
+  } catch (error) {
+    if (error instanceof Error) {
+      error.message = `${error.message} (in ${context})`;
+    }
+    throw error;
+  }
+}
+
+/**
+ * @param {TypeInfo} type_
+ * @returns {string}
+ */
+function wgslTypeName(type_) {
+  return type_ instanceof TemplateInfo && type_.format
+    ? `${type_.name}<${wgslTypeName(type_.format)}>`
+    : type_.name;
 }
 
 /**
@@ -188,13 +270,20 @@ function generateStructMember(member, options) {
  * @param {Options} options
  */
 function generateType(type_, options) {
-  if (type_.size === 0 && !type_.isArray && !options.declaredIdentifiers?.has(type_.name)) {
+  const builtin = type_.attributes?.find((attribute) => attribute.name === 'builtin');
+  if (
+    !builtin &&
+    type_.size === 0 &&
+    !type_.isArray &&
+    !options.declaredIdentifiers?.has(type_.name)
+  ) {
     throw new Error(`Unknown data type: ${type_.name}`);
   }
 
   /** @type {string} */
-  const tgpuType =
-    type_ instanceof StructInfo
+  const tgpuType = builtin
+    ? generateBuiltin(builtin)
+    : type_ instanceof StructInfo
       ? type_.name
       : type_ instanceof ArrayInfo
         ? `d.arrayOf(${generateType(type_.format, options)}, ${
@@ -204,22 +293,51 @@ function generateType(type_, options) {
           ? `d.atomic(${generateType(type_.format, options)})`
           : type_.size === 0
             ? type_.name
-            : `d.${replaceWithAlias(type_)}`;
+            : generateDataType(type_);
 
   const result =
-    type_.attributes?.reduce(
-      (acc, attribute) =>
-        ['align', 'size', 'location'].includes(attribute.name)
-          ? `d.${attribute.name}(${attribute.value}, ${acc})`
-          : acc,
-      tgpuType,
-    ) ?? tgpuType;
+    type_.attributes?.reduce((acc, attribute) => {
+      if (['align', 'size', 'location'].includes(attribute.name)) {
+        return `d.${attribute.name}(${attribute.value}, ${acc})`;
+      }
+      if (attribute.name === 'interpolate') {
+        const value = [attribute.value].flat().join(', ');
+        return `d.interpolate('${value}', ${acc})`;
+      }
+      if (attribute.name === 'invariant') {
+        return `d.invariant(${acc})`;
+      }
+      return acc;
+    }, tgpuType) ?? tgpuType;
 
   if (result.startsWith('d.')) {
     setUseImport('data', options);
   }
 
   return result;
+}
+
+/**
+ * @param {TypeInfo} type_
+ */
+function generateDataType(type_) {
+  const alias = replaceWithAlias(type_);
+  if (alias === undefined || !SUPPORTED_DATA_TYPES.has(alias)) {
+    throw new Error(`Unsupported data type: ${wgslTypeName(type_)}`);
+  }
+  return `d.${alias}`;
+}
+
+/**
+ * @param {import('wgsl_reflect').Attribute} attribute
+ */
+function generateBuiltin(attribute) {
+  const name = /** @type {string} */ (attribute.value);
+  const builtin = BUILTINS[/** @type {keyof typeof BUILTINS} */ (name)];
+  if (!builtin) {
+    throw new Error(`Unsupported builtin: ${name}`);
+  }
+  return `d.builtin.${builtin}`;
 }
 
 /**
@@ -328,7 +446,9 @@ function generateGroupLayout(group, options) {
   return Array.from(group)
     .map((variable, index) =>
       variable
-        ? `${variable.name}: ${generateVariable(variable, options)},`
+        ? `${variable.name}: ${inContext(`binding '${variable.name}'`, () =>
+            generateVariable(variable, options),
+          )},`
         : `_${index}: null, // skipping binding ${index}`,
     )
     .join('\n  ');
@@ -468,7 +588,12 @@ function generateFunctions(functions, wgsl, options) {
   return nonEntryFunctions.length > 0
     ? `\n/* functions */
 ${nonEntryFunctions
-  .map((func) => `${declareConst(func.name, options)} = ${generateFunction(func, wgsl, options)};`)
+  .map(
+    (func) =>
+      `${declareConst(func.name, options)} = ${inContext(`function '${func.name}'`, () =>
+        generateFunction(func, wgsl, options),
+      )};`,
+  )
   .join('\n\n')}`
     : '';
 }
@@ -502,6 +627,31 @@ function generateFunction(func, wgsl, options) {
 
   return body?.[0]
     ? `tgpu.fn(${inputs}${output ? `, ${output}` : ''})(/* wgsl */ \`${body[0]}\`)`
+    : '';
+}
+
+/**
+ * Module-scope declarations that have no TypeGPU counterpart generated by this tool.
+ *
+ * @param {string} wgsl
+ */
+function generateSkippedDeclarations(wgsl) {
+  const skipped = new WgslParser().parse(wgsl).flatMap((node) => {
+    if (node instanceof Const) {
+      return [`const ${node.name}`];
+    }
+    if (node instanceof Override) {
+      return [`override ${node.name}`];
+    }
+    if (node instanceof Var && (node.storage === 'workgroup' || node.storage === 'private')) {
+      return [`var<${node.storage}> ${node.name}`];
+    }
+    return [];
+  });
+
+  return skipped.length > 0
+    ? `\n/* skipped declarations (not supported by tgpu-gen) */
+${skipped.map((declaration) => `// ${declaration}`).join('\n')}`
     : '';
 }
 
