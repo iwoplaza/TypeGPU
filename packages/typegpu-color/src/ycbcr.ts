@@ -3,6 +3,10 @@ import { mat3x3f, vec3f } from 'typegpu/data';
 import { mul } from 'typegpu/std';
 
 /**
+ * Converts RGB to Y, Cb and Cr with the BT.601 coefficients, when used as `mul(rgb, rgbToYcbcrMatrix)`.
+ * For RGB in [0, 1], Y is in [0, 1], while Cb and Cr are centered at 0 and lie in [-0.5, 0.5]
+ * (YPbPr-style), without the 0.5 offset that YCbCr usually implies.
+ *
  * @example
  * import { rgbToYcbcrMatrix } from '@typegpu/color';
  *
@@ -11,19 +15,23 @@ import { mul } from 'typegpu/std';
 export const rgbToYcbcrMatrix = tgpu.const(
   mat3x3f,
   mat3x3f(
-    // row 1
+    // column 1 (Y)
     0.299,
     0.587,
     0.114,
-    // row 2
+    // column 2 (Cb)
     -0.168736,
     -0.331264,
     0.5,
-    // row 3
+    // column 3 (Cr)
     0.5,
     -0.418688,
     -0.081312,
   ),
 );
 
+/**
+ * For RGB in [0, 1], Y is in [0, 1], while Cb and Cr are centered at 0 and lie in [-0.5, 0.5].
+ * @see rgbToYcbcrMatrix
+ */
 export const rgbToYcbcr = tgpu.fn([vec3f], vec3f)((rgb) => mul(rgb, rgbToYcbcrMatrix.$));
