@@ -2,7 +2,7 @@ import * as tinyest from 'tinyest';
 import { stitch } from '../core/resolve/stitch.ts';
 import { arrayOf } from '../data/array.ts';
 import { type AnyData, UnknownData, unptr } from '../data/dataTypes.ts';
-import { bool, i32, u32 } from '../data/numeric.ts';
+import { bool, i32, toHalfBits, u32 } from '../data/numeric.ts';
 import { vec2u, vec3u, vec4u } from '../data/vector.ts';
 import {
   fallthroughCopyOrigin,
@@ -1327,12 +1327,26 @@ The generated shader will evaluate them in declaration order.`,
       return snip(`${value}u`, schema, /* origin */ 'constant', false);
     }
     if (schema.type === 'i32') {
+      if (value === -(2 ** 31)) {
+        // `-2147483648i` is a negation of `2147483648i`, which does not fit in an i32
+        return snip(`i32(${value})`, schema, /* origin */ 'constant', false);
+      }
       return snip(`${value}i`, schema, /* origin */ 'constant', false);
     }
 
+    if (
+      (schema.type === 'f32' && !Number.isFinite(Math.fround(value))) ||
+      (schema.type === 'f16' && (toHalfBits(value) & 0x7fff) === 0x7c00)
+    ) {
+      throw new Error(`Value '${value}' is out of range for type '${schema.type}'.`);
+    }
+
     const exp = value.toExponential();
+    const sign = Object.is(value, -0) ? '-' : '';
     const decimal =
-      schema.type === 'abstractFloat' && Number.isInteger(value) ? `${value}.` : `${value}`;
+      schema.type === 'abstractFloat' && Number.isInteger(value)
+        ? `${sign}${value}.`
+        : `${sign}${value}`;
 
     // Just picking the shorter one
     const base = exp.length < decimal.length ? exp : decimal;
