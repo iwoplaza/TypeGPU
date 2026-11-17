@@ -12,8 +12,8 @@ globalThis.GPUBufferUsage = {
 };
 
 globalThis.GPUMapMode = {
-  READ: 0,
-  WRITE: 1,
+  READ: 1,
+  WRITE: 2,
 };
 
 globalThis.GPUTextureUsage = {
