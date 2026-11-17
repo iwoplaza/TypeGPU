@@ -80,6 +80,32 @@ function validateFunction(functionNode: FunctionNode): void {
   }
 }
 
+type ObjectPatternProperty = (babel.ObjectPattern | acorn.ObjectPattern)['properties'][number];
+
+function parseDestructuredProp(prop: ObjectPatternProperty): { name: string; alias: string } {
+  if (prop.type === 'RestElement') {
+    throw new Error('Rest elements in destructured parameters are not supported in TGSL.');
+  }
+
+  if (prop.computed || prop.key.type !== 'Identifier') {
+    throw new Error('Only identifier keys are supported in destructured parameters in TGSL.');
+  }
+
+  if (prop.value.type === 'AssignmentPattern') {
+    throw new Error(
+      `Default values in destructured parameters are not supported in TGSL ('${prop.key.name}').`,
+    );
+  }
+
+  if (prop.value.type !== 'Identifier') {
+    throw new Error(
+      `Nested destructuring in parameters is not supported in TGSL ('${prop.key.name}').`,
+    );
+  }
+
+  return { name: prop.key.name, alias: prop.value.name };
+}
+
 function parseParams(functionNode: FunctionNode): tinyest.FuncParameter[] {
   return (
     functionNode.params as (
@@ -92,13 +118,7 @@ function parseParams(functionNode: FunctionNode): tinyest.FuncParameter[] {
     param.type === 'ObjectPattern'
       ? {
           type: tinyest.FuncParameterType.destructuredObject,
-          props: param.properties.flatMap((prop) =>
-            (prop.type === /* acorn */ 'Property' || prop.type === /* babel */ 'ObjectProperty') &&
-            prop.key.type === 'Identifier' &&
-            prop.value.type === 'Identifier'
-              ? [{ name: prop.key.name, alias: prop.value.name }]
-              : [],
-          ),
+          props: param.properties.map(parseDestructuredProp),
         }
       : {
           type: tinyest.FuncParameterType.identifier,
