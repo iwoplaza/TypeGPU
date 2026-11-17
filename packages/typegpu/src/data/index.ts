@@ -24,27 +24,27 @@ import {
   vec4u as _vec4u,
 } from './vector.ts';
 
-export const vec2b = (() => (assignInfixOperators(), _vec2b))();
-export const vec2f = (() => (assignInfixOperators(), _vec2f))();
-export const vec2h = (() => (assignInfixOperators(), _vec2h))();
-export const vec2i = (() => (assignInfixOperators(), _vec2i))();
-export const vec2u = (() => (assignInfixOperators(), _vec2u))();
-export const vec3b = (() => (assignInfixOperators(), _vec3b))();
-export const vec3f = (() => (assignInfixOperators(), _vec3f))();
-export const vec3h = (() => (assignInfixOperators(), _vec3h))();
-export const vec3i = (() => (assignInfixOperators(), _vec3i))();
-export const vec3u = (() => (assignInfixOperators(), _vec3u))();
-export const vec4b = (() => (assignInfixOperators(), _vec4b))();
-export const vec4f = (() => (assignInfixOperators(), _vec4f))();
-export const vec4h = (() => (assignInfixOperators(), _vec4h))();
-export const vec4i = (() => (assignInfixOperators(), _vec4i))();
-export const vec4u = (() => (assignInfixOperators(), _vec4u))();
+export const vec2b = /* @__PURE__ */ (() => (assignInfixOperators(), _vec2b))();
+export const vec2f = /* @__PURE__ */ (() => (assignInfixOperators(), _vec2f))();
+export const vec2h = /* @__PURE__ */ (() => (assignInfixOperators(), _vec2h))();
+export const vec2i = /* @__PURE__ */ (() => (assignInfixOperators(), _vec2i))();
+export const vec2u = /* @__PURE__ */ (() => (assignInfixOperators(), _vec2u))();
+export const vec3b = /* @__PURE__ */ (() => (assignInfixOperators(), _vec3b))();
+export const vec3f = /* @__PURE__ */ (() => (assignInfixOperators(), _vec3f))();
+export const vec3h = /* @__PURE__ */ (() => (assignInfixOperators(), _vec3h))();
+export const vec3i = /* @__PURE__ */ (() => (assignInfixOperators(), _vec3i))();
+export const vec3u = /* @__PURE__ */ (() => (assignInfixOperators(), _vec3u))();
+export const vec4b = /* @__PURE__ */ (() => (assignInfixOperators(), _vec4b))();
+export const vec4f = /* @__PURE__ */ (() => (assignInfixOperators(), _vec4f))();
+export const vec4h = /* @__PURE__ */ (() => (assignInfixOperators(), _vec4h))();
+export const vec4i = /* @__PURE__ */ (() => (assignInfixOperators(), _vec4i))();
+export const vec4u = /* @__PURE__ */ (() => (assignInfixOperators(), _vec4u))();
 
 import { mat2x2f as _mat2x2f, mat3x3f as _mat3x3f, mat4x4f as _mat4x4f } from './matrix.ts';
 
-export const mat2x2f = (() => (assignInfixOperators(), _mat2x2f))();
-export const mat3x3f = (() => (assignInfixOperators(), _mat3x3f))();
-export const mat4x4f = (() => (assignInfixOperators(), _mat4x4f))();
+export const mat2x2f = /* @__PURE__ */ (() => (assignInfixOperators(), _mat2x2f))();
+export const mat3x3f = /* @__PURE__ */ (() => (assignInfixOperators(), _mat3x3f))();
+export const mat4x4f = /* @__PURE__ */ (() => (assignInfixOperators(), _mat4x4f))();
 
 export { abstractFloat, abstractInt, bool, f16, f32, i32, u16, u32 } from './numeric.ts';
 export {
