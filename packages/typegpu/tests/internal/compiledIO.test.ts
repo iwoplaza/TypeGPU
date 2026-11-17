@@ -34,7 +34,7 @@ describe('buildWriter', () => {
       if (ArrayBuffer.isView(value.b)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.b.buffer, value.b.byteOffset, Math.min(value.b.byteLength, 32)), output.byteOffset + ((offset + 16)));
       } else {
-      for (let i = 0; i < Math.min(2, value.b.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.b.length); i < iEnd; i++) {
       output.setFloat32((((offset + 16) + i * 16) + 0), value.b[i][0], littleEndian);
       output.setFloat32((((offset + 16) + i * 16) + 4), value.b[i][1], littleEndian);
       output.setFloat32((((offset + 16) + i * 16) + 8), value.b[i][2], littleEndian);
@@ -43,7 +43,7 @@ describe('buildWriter', () => {
       if (ArrayBuffer.isView(value.c)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.c.buffer, value.c.byteOffset, Math.min(value.c.byteLength, 12)), output.byteOffset + ((offset + 48)));
       } else {
-      for (let i = 0; i < Math.min(3, value.c.length); i++) {
+      for (let i = 0, iEnd = Math.min(3, value.c.length); i < iEnd; i++) {
       output.setUint32(((offset + 48) + i * 4), value.c[i], littleEndian);
       }
       }
@@ -68,7 +68,7 @@ describe('buildWriter', () => {
       if (ArrayBuffer.isView(value.c)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.c.buffer, value.c.byteOffset, Math.min(value.c.byteLength, 12)), output.byteOffset + ((offset + 32)));
       } else {
-      for (let i = 0; i < Math.min(3, value.c.length); i++) {
+      for (let i = 0, iEnd = Math.min(3, value.c.length); i < iEnd; i++) {
       output.setUint32((((offset + 32) + i * 4) + 0), value.c[i].d, littleEndian);
       }
       }
@@ -84,7 +84,7 @@ describe('buildWriter', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 80)), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(5, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(5, value.length); i < iEnd; i++) {
       output.setFloat32(((offset + i * 16) + 0), value[i][0], littleEndian);
       output.setFloat32(((offset + i * 16) + 4), value[i][1], littleEndian);
       output.setFloat32(((offset + i * 16) + 8), value[i][2], littleEndian);
@@ -103,11 +103,11 @@ describe('buildWriter', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 24)), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(2, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.length); i < iEnd; i++) {
       if (ArrayBuffer.isView(value[i])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i].buffer, value[i].byteOffset, Math.min(value[i].byteLength, 12)), output.byteOffset + ((offset + i * 12)));
       } else {
-      for (let j = 0; j < Math.min(3, value[i].length); j++) {
+      for (let j = 0, jEnd = Math.min(3, value[i].length); j < jEnd; j++) {
       output.setUint32(((offset + i * 12) + j * 4), value[i][j], littleEndian);
       }
       }
@@ -130,11 +130,11 @@ describe('buildWriter', () => {
       if (ArrayBuffer.isView(value.b)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.b.buffer, value.b.byteOffset, Math.min(value.b.byteLength, 32)), output.byteOffset + ((offset + 8)));
       } else {
-      for (let i = 0; i < Math.min(2, value.b.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.b.length); i < iEnd; i++) {
       if (ArrayBuffer.isView(value.b[i])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.b[i].buffer, value.b[i].byteOffset, Math.min(value.b[i].byteLength, 16)), output.byteOffset + (((offset + 8) + i * 16)));
       } else {
-      for (let j = 0; j < Math.min(2, value.b[i].length); j++) {
+      for (let j = 0, jEnd = Math.min(2, value.b[i].length); j < jEnd; j++) {
       output.setFloat32(((((offset + 8) + i * 16) + j * 8) + 0), value.b[i][j][0], littleEndian);
       output.setFloat32(((((offset + 8) + i * 16) + j * 8) + 4), value.b[i][j][1], littleEndian);
       }
@@ -157,63 +157,63 @@ describe('buildWriter', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 131072)), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(2, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.length); i < iEnd; i++) {
       if (ArrayBuffer.isView(value[i])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i].buffer, value[i].byteOffset, Math.min(value[i].byteLength, 65536)), output.byteOffset + ((offset + i * 65536)));
       } else {
-      for (let j = 0; j < Math.min(2, value[i].length); j++) {
+      for (let j = 0, jEnd = Math.min(2, value[i].length); j < jEnd; j++) {
       if (ArrayBuffer.isView(value[i][j])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j].buffer, value[i][j].byteOffset, Math.min(value[i][j].byteLength, 32768)), output.byteOffset + (((offset + i * 65536) + j * 32768)));
       } else {
-      for (let k = 0; k < Math.min(2, value[i][j].length); k++) {
+      for (let k = 0, kEnd = Math.min(2, value[i][j].length); k < kEnd; k++) {
       if (ArrayBuffer.isView(value[i][j][k])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k].buffer, value[i][j][k].byteOffset, Math.min(value[i][j][k].byteLength, 16384)), output.byteOffset + ((((offset + i * 65536) + j * 32768) + k * 16384)));
       } else {
-      for (let i3 = 0; i3 < Math.min(2, value[i][j][k].length); i3++) {
+      for (let i3 = 0, i3End = Math.min(2, value[i][j][k].length); i3 < i3End; i3++) {
       if (ArrayBuffer.isView(value[i][j][k][i3])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3].buffer, value[i][j][k][i3].byteOffset, Math.min(value[i][j][k][i3].byteLength, 8192)), output.byteOffset + (((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192)));
       } else {
-      for (let i4 = 0; i4 < Math.min(2, value[i][j][k][i3].length); i4++) {
+      for (let i4 = 0, i4End = Math.min(2, value[i][j][k][i3].length); i4 < i4End; i4++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4].buffer, value[i][j][k][i3][i4].byteOffset, Math.min(value[i][j][k][i3][i4].byteLength, 4096)), output.byteOffset + ((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096)));
       } else {
-      for (let i5 = 0; i5 < Math.min(2, value[i][j][k][i3][i4].length); i5++) {
+      for (let i5 = 0, i5End = Math.min(2, value[i][j][k][i3][i4].length); i5 < i5End; i5++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5].buffer, value[i][j][k][i3][i4][i5].byteOffset, Math.min(value[i][j][k][i3][i4][i5].byteLength, 2048)), output.byteOffset + (((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048)));
       } else {
-      for (let i6 = 0; i6 < Math.min(2, value[i][j][k][i3][i4][i5].length); i6++) {
+      for (let i6 = 0, i6End = Math.min(2, value[i][j][k][i3][i4][i5].length); i6 < i6End; i6++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5][i6])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5][i6].buffer, value[i][j][k][i3][i4][i5][i6].byteOffset, Math.min(value[i][j][k][i3][i4][i5][i6].byteLength, 1024)), output.byteOffset + ((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024)));
       } else {
-      for (let i7 = 0; i7 < Math.min(2, value[i][j][k][i3][i4][i5][i6].length); i7++) {
+      for (let i7 = 0, i7End = Math.min(2, value[i][j][k][i3][i4][i5][i6].length); i7 < i7End; i7++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5][i6][i7])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5][i6][i7].buffer, value[i][j][k][i3][i4][i5][i6][i7].byteOffset, Math.min(value[i][j][k][i3][i4][i5][i6][i7].byteLength, 512)), output.byteOffset + (((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024) + i7 * 512)));
       } else {
-      for (let i8 = 0; i8 < Math.min(2, value[i][j][k][i3][i4][i5][i6][i7].length); i8++) {
+      for (let i8 = 0, i8End = Math.min(2, value[i][j][k][i3][i4][i5][i6][i7].length); i8 < i8End; i8++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5][i6][i7][i8])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5][i6][i7][i8].buffer, value[i][j][k][i3][i4][i5][i6][i7][i8].byteOffset, Math.min(value[i][j][k][i3][i4][i5][i6][i7][i8].byteLength, 256)), output.byteOffset + ((((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024) + i7 * 512) + i8 * 256)));
       } else {
-      for (let i9 = 0; i9 < Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8].length); i9++) {
+      for (let i9 = 0, i9End = Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8].length); i9 < i9End; i9++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5][i6][i7][i8][i9])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5][i6][i7][i8][i9].buffer, value[i][j][k][i3][i4][i5][i6][i7][i8][i9].byteOffset, Math.min(value[i][j][k][i3][i4][i5][i6][i7][i8][i9].byteLength, 128)), output.byteOffset + (((((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024) + i7 * 512) + i8 * 256) + i9 * 128)));
       } else {
-      for (let i10 = 0; i10 < Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9].length); i10++) {
+      for (let i10 = 0, i10End = Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9].length); i10 < i10End; i10++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10].buffer, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10].byteOffset, Math.min(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10].byteLength, 64)), output.byteOffset + ((((((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024) + i7 * 512) + i8 * 256) + i9 * 128) + i10 * 64)));
       } else {
-      for (let i11 = 0; i11 < Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10].length); i11++) {
+      for (let i11 = 0, i11End = Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10].length); i11 < i11End; i11++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11].buffer, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11].byteOffset, Math.min(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11].byteLength, 32)), output.byteOffset + (((((((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024) + i7 * 512) + i8 * 256) + i9 * 128) + i10 * 64) + i11 * 32)));
       } else {
-      for (let i12 = 0; i12 < Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11].length); i12++) {
+      for (let i12 = 0, i12End = Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11].length); i12 < i12End; i12++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12].buffer, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12].byteOffset, Math.min(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12].byteLength, 16)), output.byteOffset + ((((((((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024) + i7 * 512) + i8 * 256) + i9 * 128) + i10 * 64) + i11 * 32) + i12 * 16)));
       } else {
-      for (let i13 = 0; i13 < Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12].length); i13++) {
+      for (let i13 = 0, i13End = Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12].length); i13 < i13End; i13++) {
       if (ArrayBuffer.isView(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12][i13])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12][i13].buffer, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12][i13].byteOffset, Math.min(value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12][i13].byteLength, 8)), output.byteOffset + (((((((((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024) + i7 * 512) + i8 * 256) + i9 * 128) + i10 * 64) + i11 * 32) + i12 * 16) + i13 * 8)));
       } else {
-      for (let i14 = 0; i14 < Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12][i13].length); i14++) {
+      for (let i14 = 0, i14End = Math.min(2, value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12][i13].length); i14 < i14End; i14++) {
       output.setUint32((((((((((((((((offset + i * 65536) + j * 32768) + k * 16384) + i3 * 8192) + i4 * 4096) + i5 * 2048) + i6 * 1024) + i7 * 512) + i8 * 256) + i9 * 128) + i10 * 64) + i11 * 32) + i12 * 16) + i13 * 8) + i14 * 4), value[i][j][k][i3][i4][i5][i6][i7][i8][i9][i10][i11][i12][i13][i14], littleEndian);
       }
       }
@@ -280,7 +280,7 @@ describe('buildWriter (partial mode)', () => {
       if (ArrayBuffer.isView(value.b)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.b.buffer, value.b.byteOffset, Math.min(value.b.byteLength, Math.max(0, endOffset - ((offset + 16))))), output.byteOffset + ((offset + 16)));
       } else {
-      for (let i = 0; i < Math.min(2, value.b.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.b.length); i < iEnd; i++) {
       if (((offset + 16) + i * 16) >= endOffset) return;
       if ((((offset + 16) + i * 16) + 0) < endOffset) { output.setFloat32((((offset + 16) + i * 16) + 0), value.b[i][0], littleEndian); }
       if ((((offset + 16) + i * 16) + 4) < endOffset) { output.setFloat32((((offset + 16) + i * 16) + 4), value.b[i][1], littleEndian); }
@@ -290,7 +290,7 @@ describe('buildWriter (partial mode)', () => {
       if (ArrayBuffer.isView(value.c)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.c.buffer, value.c.byteOffset, Math.min(value.c.byteLength, Math.max(0, endOffset - ((offset + 48))))), output.byteOffset + ((offset + 48)));
       } else {
-      for (let i = 0; i < Math.min(3, value.c.length); i++) {
+      for (let i = 0, iEnd = Math.min(3, value.c.length); i < iEnd; i++) {
       if (((offset + 48) + i * 4) >= endOffset) return;
       if (((offset + 48) + i * 4) < endOffset) { output.setUint32(((offset + 48) + i * 4), value.c[i], littleEndian); }
       }
@@ -307,7 +307,7 @@ describe('buildWriter (partial mode)', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, Math.max(0, endOffset - (offset)))), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(5, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(5, value.length); i < iEnd; i++) {
       if ((offset + i * 2) >= endOffset) return;
       if ((offset + i * 2) < endOffset) { output.setUint16((offset + i * 2), value[i], littleEndian); }
       }
@@ -504,19 +504,19 @@ describe('createCompileInstructions', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 256)), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(2, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.length); i < iEnd; i++) {
       if (ArrayBuffer.isView(value[i])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i].buffer, value[i].byteOffset, Math.min(value[i].byteLength, 128)), output.byteOffset + ((offset + i * 128)));
       } else {
-      for (let j = 0; j < Math.min(2, value[i].length); j++) {
+      for (let j = 0, jEnd = Math.min(2, value[i].length); j < jEnd; j++) {
       if (ArrayBuffer.isView(value[i][j])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j].buffer, value[i][j].byteOffset, Math.min(value[i][j].byteLength, 64)), output.byteOffset + (((offset + i * 128) + j * 64)));
       } else {
-      for (let k = 0; k < Math.min(2, value[i][j].length); k++) {
+      for (let k = 0, kEnd = Math.min(2, value[i][j].length); k < kEnd; k++) {
       if (ArrayBuffer.isView(value[i][j][k])) {
         new Uint8Array(output.buffer).set(new Uint8Array(value[i][j][k].buffer, value[i][j][k].byteOffset, Math.min(value[i][j][k].byteLength, 32)), output.byteOffset + ((((offset + i * 128) + j * 64) + k * 32)));
       } else {
-      for (let i3 = 0; i3 < Math.min(2, value[i][j][k].length); i3++) {
+      for (let i3 = 0, i3End = Math.min(2, value[i][j][k].length); i3 < i3End; i3++) {
       output.setFloat32((((((offset + i * 128) + j * 64) + k * 32) + i3 * 16) + 0), value[i][j][k][i3][0], littleEndian);
       output.setFloat32((((((offset + i * 128) + j * 64) + k * 32) + i3 * 16) + 4), value[i][j][k][i3][1], littleEndian);
       output.setFloat32((((((offset + i * 128) + j * 64) + k * 32) + i3 * 16) + 8), value[i][j][k][i3][2], littleEndian);
@@ -685,7 +685,7 @@ describe('createCompileInstructions', () => {
       if (ArrayBuffer.isView(value.b)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.b.buffer, value.b.byteOffset, Math.min(value.b.byteLength, 8)), output.byteOffset + ((offset + 16)));
       } else {
-      for (let i = 0; i < Math.min(2, value.b.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.b.length); i < iEnd; i++) {
       output.setFloat32(((offset + 16) + i * 4), value.b[i], littleEndian);
       }
       }
@@ -714,7 +714,7 @@ describe('createCompileInstructions', () => {
       if (ArrayBuffer.isView(value.b)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.b.buffer, value.b.byteOffset, Math.min(value.b.byteLength, 8)), output.byteOffset + ((offset + 64)));
       } else {
-      for (let i = 0; i < Math.min(2, value.b.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.b.length); i < iEnd; i++) {
       output.setFloat32(((offset + 64) + i * 4), value.b[i], littleEndian);
       }
       }
@@ -776,7 +776,7 @@ describe('createCompileInstructions', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 36)), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(3, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(3, value.length); i < iEnd; i++) {
       output.setFloat32(((offset + i * 12) + 0), value[i][0], littleEndian);
       output.setFloat32(((offset + i * 12) + 4), value[i][1], littleEndian);
       output.setFloat32(((offset + i * 12) + 8), value[i][2], littleEndian);
@@ -813,7 +813,7 @@ describe('createCompileInstructions', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 16)), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(2, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.length); i < iEnd; i++) {
       output.setFloat16(((offset + i * 8) + 0), value[i][0], littleEndian);
       output.setFloat16(((offset + i * 8) + 2), value[i][1], littleEndian);
       output.setFloat16(((offset + i * 8) + 4), value[i][2], littleEndian);
@@ -835,7 +835,7 @@ describe('createCompileInstructions', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 56)), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(2, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.length); i < iEnd; i++) {
       output.setFloat32((((offset + i * 28) + 0) + 0), value[i].a[0], littleEndian);
       output.setFloat32((((offset + i * 28) + 0) + 4), value[i].a[1], littleEndian);
       output.setFloat32((((offset + i * 28) + 0) + 8), value[i].a[2], littleEndian);
@@ -1147,7 +1147,7 @@ describe('createCompileInstructions', () => {
       "if (ArrayBuffer.isView(value)) {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 44)), output.byteOffset + (offset));
       } else {
-      for (let i = 0; i < Math.min(2, value.length); i++) {
+      for (let i = 0, iEnd = Math.min(2, value.length); i < iEnd; i++) {
       output.setUint16((((offset + i * 22) + 0) + 0), Math.round(value[i].a.x * 65535), littleEndian);
       output.setUint16((((offset + i * 22) + 0) + 2), Math.round(value[i].a.y * 65535), littleEndian);
       output.setUint8((((offset + i * 22) + 4) + 0), Math.round(value[i].b.z * 255), littleEndian);
