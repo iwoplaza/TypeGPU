@@ -12,8 +12,6 @@ import { ArrayInfo, StructInfo, TemplateInfo, WgslReflect } from 'wgsl_reflect';
  * @typedef {import('wgsl_reflect').FunctionInfo} FunctionInfo
  */
 
-const cwd = new URL(`file:${process.cwd()}/`);
-
 const LENGTH_VAR = 'arrayLength';
 
 /**
@@ -31,13 +29,11 @@ const LENGTH_VAR = 'arrayLength';
  * @param {Options} options
  */
 async function main(options) {
-  const inputPath = new URL(options.inputPath, cwd);
-  const outputPath = new URL(options.outputPath, cwd);
-  const inputContents = await fs.readFile(inputPath, 'utf8');
+  const inputContents = await fs.readFile(options.inputPath, 'utf8');
 
   const generated = generate(inputContents, options);
   await fs.mkdir(path.dirname(options.outputPath), { recursive: true });
-  await fs.writeFile(outputPath, generated);
+  await fs.writeFile(options.outputPath, generated);
 }
 
 /**
