@@ -75,6 +75,7 @@ export const atomicLoad = dualImpl<<T extends AnyAtomic>(a: T) => number>({
   signature: (a) => ({ argTypes: [a], returnType: unwrapAtomic(a).inner }),
   codegenImpl: (_ctx, [a]) => stitch`atomicLoad(&${derefSnippet(a)})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 const atomicActionSignature = (a: BaseData) => ({
@@ -104,6 +105,7 @@ export const atomicAdd = dualImpl<<T extends AnyAtomic>(a: T, value: number) => 
   signature: atomicOpSignature,
   codegenImpl: (_ctx, [a, value]) => stitch`atomicAdd(&${derefSnippet(a)}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 export const atomicSub = dualImpl<<T extends AnyAtomic>(a: T, value: number) => number>({
@@ -112,6 +114,7 @@ export const atomicSub = dualImpl<<T extends AnyAtomic>(a: T, value: number) => 
   signature: atomicOpSignature,
   codegenImpl: (_ctx, [a, value]) => stitch`atomicSub(&${derefSnippet(a)}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 export const atomicMax = dualImpl<<T extends AnyAtomic>(a: T, value: number) => number>({
@@ -120,6 +123,7 @@ export const atomicMax = dualImpl<<T extends AnyAtomic>(a: T, value: number) => 
   signature: atomicOpSignature,
   codegenImpl: (_ctx, [a, value]) => stitch`atomicMax(&${derefSnippet(a)}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 export const atomicMin = dualImpl<<T extends AnyAtomic>(a: T, value: number) => number>({
@@ -128,6 +132,7 @@ export const atomicMin = dualImpl<<T extends AnyAtomic>(a: T, value: number) => 
   signature: atomicOpSignature,
   codegenImpl: (_ctx, [a, value]) => stitch`atomicMin(&${derefSnippet(a)}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 export const atomicAnd = dualImpl<<T extends AnyAtomic>(a: T, value: number) => number>({
@@ -136,6 +141,7 @@ export const atomicAnd = dualImpl<<T extends AnyAtomic>(a: T, value: number) => 
   signature: atomicOpSignature,
   codegenImpl: (_ctx, [a, value]) => stitch`atomicAnd(&${derefSnippet(a)}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 export const atomicOr = dualImpl<<T extends AnyAtomic>(a: T, value: number) => number>({
@@ -144,6 +150,7 @@ export const atomicOr = dualImpl<<T extends AnyAtomic>(a: T, value: number) => n
   signature: atomicOpSignature,
   codegenImpl: (_ctx, [a, value]) => stitch`atomicOr(&${derefSnippet(a)}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 export const atomicXor = dualImpl<<T extends AnyAtomic>(a: T, value: number) => number>({
@@ -152,6 +159,7 @@ export const atomicXor = dualImpl<<T extends AnyAtomic>(a: T, value: number) => 
   signature: atomicOpSignature,
   codegenImpl: (_ctx, [a, value]) => stitch`atomicXor(&${derefSnippet(a)}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 export const atomicExchange = dualImpl<<T extends AnyAtomic>(a: T, value: number) => number>({
@@ -160,6 +168,7 @@ export const atomicExchange = dualImpl<<T extends AnyAtomic>(a: T, value: number
   signature: atomicOpSignature,
   codegenImpl: (_ctx, [a, value]) => stitch`atomicExchange(&${derefSnippet(a)}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });
 
 const AtomicCompareExchangeResults = {
@@ -187,4 +196,5 @@ export const atomicCompareExchangeWeak = dualImpl<
   codegenImpl: (_ctx, [a, compare, value]) =>
     stitch`atomicCompareExchangeWeak(&${derefSnippet(a)}, ${compare}, ${value})`,
   sideEffects: true,
+  mustUse: false,
 });

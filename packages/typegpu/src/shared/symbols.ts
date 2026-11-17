@@ -44,6 +44,11 @@ export const $gpuCallable = Symbol(`typegpu:${version}:$gpuCallable`);
  * type hints and validation.
  */
 export const $gpuCallableStrictSignature = Symbol(`typegpu:${version}:$gpuCallableStrictSignature`);
+/**
+ * Set to `false` on GPU-callable values that return a value, but are not `@must_use` in WGSL,
+ * meaning a call to them can stand as a statement on its own.
+ */
+export const $gpuCallableMustUse = Symbol(`typegpu:${version}:$gpuCallableMustUse`);
 
 //
 // Type tokens

@@ -23,24 +23,13 @@ import {
 import { getName } from '../shared/meta.ts';
 import {
   $gpuCallable,
+  $gpuCallableMustUse,
   $gpuCallableStrictSignature,
   $internal,
   $providing,
   isMarkedInternal,
 } from '../shared/symbols.ts';
 import { safeStringify } from '../shared/stringify.ts';
-import {
-  atomicAdd,
-  atomicAnd,
-  atomicCompareExchangeWeak,
-  atomicExchange,
-  atomicLoad,
-  atomicMax,
-  atomicMin,
-  atomicOr,
-  atomicSub,
-  atomicXor,
-} from '../std/atomic.ts';
 import { powOperator } from '../std/numeric.ts';
 import { add, div, mul, neg, sub } from '../std/operators.ts';
 import { eq, ne, lt, le, gt, ge, not } from '../std/boolean.ts';
@@ -248,22 +237,6 @@ const usageToVarTemplateMap: Record<VariableScope | BindableBufferUsage | 'immed
 const functionInitialBlockDepth = 2;
 
 /**
- * Builtins that return a value, but are not `@must_use` in WGSL.
- */
-const nonMustUseBuiltins = new Set<unknown>([
-  atomicLoad,
-  atomicAdd,
-  atomicSub,
-  atomicMax,
-  atomicMin,
-  atomicAnd,
-  atomicOr,
-  atomicXor,
-  atomicExchange,
-  atomicCompareExchangeWeak,
-]);
-
-/**
  * Whether `type` is an atomic, a runtime-sized array, or a composite containing either.
  */
 function containsNonConstructible(type: unknown): boolean {
@@ -285,7 +258,7 @@ function containsNonConstructible(type: unknown): boolean {
  */
 function isCallableAsStatement(callee: unknown): boolean {
   return (
-    nonMustUseBuiltins.has(callee) ||
+    (isGPUCallable(callee) && callee[$gpuCallableMustUse] === false) ||
     // User-defined functions are never emitted as `@must_use`
     isTgpuFn(callee) ||
     isGenericFn(callee) ||
