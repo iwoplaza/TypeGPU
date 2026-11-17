@@ -53,10 +53,10 @@ const consecutiveTriangleVertexIndex = tgpu.fn(
  * Given a `vertexIndex`, returns the unit vector which can be
  * added to the circle center and scaled using radius.
  * Render using triangle list.
- * To decide on how many vertices to render, use `circleMaxAreaVertexCount(subdivLevel)`.
+ * To decide on how many vertices to render, use `circleVertexCount(subdivLevel)`.
  *
  * This method of triangulating a circle should generally be
- * more performant than `circleFan` due to less overdraw.
+ * more performant than a triangle fan due to less overdraw.
  * For more information, see https://www.humus.name/index.php?page=News&ID=228
  */
 export const circle = tgpu.fn(
