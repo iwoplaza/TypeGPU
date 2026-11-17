@@ -1,6 +1,6 @@
 import { ESLintUtils } from '@typescript-eslint/utils';
 
 export const createRule = ESLintUtils.RuleCreator(
-  // TODO: docs for lint rules
-  () => `https://docs.swmansion.com/TypeGPU/getting-started/`,
+  (name) =>
+    `https://github.com/software-mansion/TypeGPU/blob/main/packages/eslint-plugin/docs/rules/${name}.md`,
 );
