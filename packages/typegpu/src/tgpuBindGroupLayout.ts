@@ -34,6 +34,7 @@ import {
 } from './data/texture.ts';
 import type { TgpuRoot } from './core/root/rootTypes.ts';
 import type { RestoreContext } from './serial/types.ts';
+import { containsAtomic } from './data/atomic.ts';
 import type { BaseData, F32 } from './data/wgslTypes.ts';
 import { invariant, NotUniformError } from './errors.ts';
 import { NotStorageError, type StorageFlag } from './extension.ts';
@@ -268,6 +269,14 @@ export type TgpuBindGroup<
   unwrap(unwrapper: Unwrapper): GPUBindGroup;
 };
 
+function assertNoAtomics(key: string, kind: string, dataType: BaseData) {
+  if (containsAtomic(dataType)) {
+    throw new Error(
+      `Bind group layout entry '${key}' is a ${kind} buffer, but its schema contains atomics. Atomics can only be used in mutable storage buffers ({ storage: ..., access: 'mutable' }) and workgroup variables.`,
+    );
+  }
+}
+
 export function bindGroupLayout<Entries extends Record<string, TgpuLayoutEntry | null>>(
   entries: Entries,
 ): TgpuBindGroupLayout<Prettify<Entries>> {
@@ -365,12 +374,17 @@ class TgpuBindGroupLayoutImpl<
       normalizedEntries[key] = entry;
 
       if ('uniform' in entry) {
+        assertNoAtomics(key, 'uniform', entry.uniform);
         item = new TgpuLaidOutBufferImpl('uniform', entry.uniform, membership);
       }
 
       if ('storage' in entry) {
         const dataType = 'type' in entry.storage ? entry.storage : entry.storage(0);
-        item = new TgpuLaidOutBufferImpl(entry.access ?? 'readonly', dataType, membership);
+        const access = entry.access ?? 'readonly';
+        if (access === 'readonly') {
+          assertNoAtomics(key, 'readonly storage', dataType);
+        }
+        item = new TgpuLaidOutBufferImpl(access, dataType, membership);
         normalizedEntries[key] = { ...entry, storage: dataType };
       }
 

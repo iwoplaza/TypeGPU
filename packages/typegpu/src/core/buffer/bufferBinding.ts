@@ -1,3 +1,4 @@
+import { containsAtomic } from '../../data/atomic.ts';
 import { schemaCallWrapper } from '../../data/schemaCallWrapper.ts';
 import { snip } from '../../data/snippet.ts';
 import type { AnyWgslData, BaseData } from '../../data/wgslTypes.ts';
@@ -5,6 +6,7 @@ import { IllegalBufferAccessError } from '../../errors.ts';
 import { isInsideTgpuFn } from '../../execMode.ts';
 import { type StorageFlag } from '../../extension.ts';
 import { getName, setName, type TgpuNamable } from '../../shared/meta.ts';
+import { safeStringify } from '../../shared/stringify.ts';
 import type { Infer, InferGPU, InferInput, InferPatch, InferPartial } from '../../shared/repr.ts';
 import type { TgpuSoul } from '../../shared/soul.ts';
 import { $getNameForward, $gpuValueOf, $internal, $repr, $soul } from '../../shared/symbols.ts';
@@ -211,6 +213,11 @@ export class TgpuBufferBindingImpl<
   }
 
   constructor(usage: TType, buffer: BoundBuffer<TType, TData>) {
+    if (usage !== 'mutable' && containsAtomic(buffer.dataType)) {
+      throw new Error(
+        `Cannot create a '${usage}' binding of a buffer with schema ${safeStringify(buffer.dataType)}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.`,
+      );
+    }
     this.resourceType = usage;
     this[$getNameForward] = buffer;
     this[$soul] = {
