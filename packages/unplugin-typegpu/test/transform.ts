@@ -3,6 +3,7 @@ import virtual from '@rollup/plugin-virtual';
 import { type Plugin, rollup } from 'rollup';
 import babelPlugin from '../src/babel.ts';
 import type { Options } from '../src/core/common.ts';
+import { unpluginFactory } from '../src/core/factory.ts';
 import rollupPlugin from '../src/rollup.ts';
 
 const defaultOptions: Options = {
@@ -39,3 +40,13 @@ export const rollupTransform = (
   })
     .then((build) => build.generate({}))
     .then((generated) => generated.output[0].code);
+
+/**
+ * Runs the unplugin transform directly, without a bundler stripping types first
+ * (e.g. Vite with `enforce: 'pre'`).
+ */
+export const unpluginTransform = (code: string, options?: Options, id = 'code.ts') => {
+  const plugin = unpluginFactory({ ...defaultOptions, ...options }, { framework: 'rollup' });
+  const result = plugin.transform.handler.call({ warn: () => {} } as never, code, id);
+  return result?.code ?? code;
+};

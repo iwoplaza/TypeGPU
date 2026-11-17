@@ -143,10 +143,10 @@ describe('external prop access', () => {
     })();
 
     expect(tgpu.resolve([cls.fn])).toMatchInlineSnapshot(`
-      "const item: u32 = 0u;
+      "const const_1: u32 = 0u;
 
       fn fn_1() {
-        const a = item;
+        const a = const_1;
       }"
     `);
   });
