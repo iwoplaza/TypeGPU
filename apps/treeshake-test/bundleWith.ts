@@ -83,6 +83,7 @@ export async function bundleWithEsbuild(entryUrl: URL, outDir: URL): Promise<URL
     format: 'esm',
     minify: true,
     treeShaking: true,
+    define: { 'process.env.NODE_ENV': '"production"' },
   });
   return outPath;
 }
@@ -94,6 +95,7 @@ export async function bundleWithWebpack(entryPath: URL, outDir: URL): Promise<UR
   return new Promise((resolve, reject) => {
     webpack(
       {
+        mode: 'production',
         entry: entryPath.pathname,
         output: {
           path: path.dirname(outPath.pathname),
@@ -134,6 +136,7 @@ export async function bundleWithTsdown(entryUrl: URL, outDir: URL): Promise<URL>
         dir: path.dirname(outPath.pathname),
       },
       minify: true,
+      define: { 'process.env.NODE_ENV': '"production"' },
       platform: 'neutral',
       clean: false,
       entry: {
