@@ -48,6 +48,21 @@ describe('react/spinning-triangle example', () => {
         return VertexOut(vec4f((rotated * 0.7f), 0f, 1f), length((local - vertices[0i])), length((local - vertices[1i])), length((local - vertices[2i])));
       }
 
+      fn oklabToLinearRgb(lab: vec3f) -> vec3f {
+        let l_ = ((lab.x + (0.3963377774f * lab.y)) + (0.2158037573f * lab.z));
+        let m_ = ((lab.x - (0.1055613458f * lab.y)) - (0.0638541728f * lab.z));
+        let s_ = ((lab.x - (0.0894841775f * lab.y)) - (1.291485548f * lab.z));
+        let l = ((l_ * l_) * l_);
+        let m = ((m_ * m_) * m_);
+        let s = ((s_ * s_) * s_);
+        return vec3f((((4.0767416621f * l) - (3.3077115913f * m)) + (0.2309699292f * s)), (((-1.2684380046f * l) + (2.6097574011f * m)) - (0.3413193965f * s)), (((-0.0041960863f * l) - (0.7034186147f * m)) + (1.707614701f * s)));
+      }
+
+      fn isInGamut(lab: vec3f) -> bool {
+        let rgb = oklabToLinearRgb(lab);
+        return (all((rgb >= vec3f())) && all((rgb <= vec3f(1))));
+      }
+
       fn computeMaxSaturation(a: f32, b: f32) -> f32 {
         var k0 = 0f;
         var k1 = 0f;
@@ -112,16 +127,6 @@ describe('react/spinning-triangle example', () => {
           S = (S - ((f * f1) / ((f1 * f1) - ((0.5f * f) * f2))));
         }
         return S;
-      }
-
-      fn oklabToLinearRgb(lab: vec3f) -> vec3f {
-        let l_ = ((lab.x + (0.3963377774f * lab.y)) + (0.2158037573f * lab.z));
-        let m_ = ((lab.x - (0.1055613458f * lab.y)) - (0.0638541728f * lab.z));
-        let s_ = ((lab.x - (0.0894841775f * lab.y)) - (1.291485548f * lab.z));
-        let l = ((l_ * l_) * l_);
-        let m = ((m_ * m_) * m_);
-        let s = ((s_ * s_) * s_);
-        return vec3f((((4.0767416621f * l) - (3.3077115913f * m)) + (0.2309699292f * s)), (((-1.2684380046f * l) + (2.6097574011f * m)) - (0.3413193965f * s)), (((-0.0041960863f * l) - (0.7034186147f * m)) + (1.707614701f * s)));
       }
 
       fn cbrt(x: f32) -> f32 {
@@ -199,12 +204,18 @@ describe('react/spinning-triangle example', () => {
       }
 
       fn gamutClipAdaptiveL05(lab: vec3f) -> vec3f {
-        const alpha = 0.20000000298023224f;
+        if (isInGamut(lab)) {
+          return lab;
+        }
         let L = lab.x;
         const eps = 1e-5;
-        let C = max(eps, length(lab.yz));
+        let C = length(lab.yz);
+        if ((C < eps)) {
+          return vec3f(clamp(L, 0f, 1f), 0f, 0f);
+        }
         let a_ = (lab.y / C);
         let b_ = (lab.z / C);
+        const alpha = 0.20000000298023224f;
         let Ld = (L - 0.5f);
         let e1 = ((0.5f + abs(Ld)) + (alpha * C));
         let L0 = (0.5f * (1f + (sign(Ld) * (e1 - sqrt(max(0f, ((e1 * e1) - (2f * abs(Ld)))))))));

@@ -1,6 +1,20 @@
 import { tgpu } from 'typegpu';
-import { f32, struct, vec3f } from 'typegpu/data';
-import { abs, clamp, length, max, min, mix, pow, select, sign, sqrt } from 'typegpu/std';
+import { bool, f32, struct, vec3f } from 'typegpu/data';
+import {
+  abs,
+  all,
+  clamp,
+  ge,
+  le,
+  length,
+  max,
+  min,
+  mix,
+  pow,
+  select,
+  sign,
+  sqrt,
+} from 'typegpu/std';
 import { linearToSrgb, srgbToLinear } from './srgb.ts';
 
 const cbrt = tgpu.fn(
@@ -255,13 +269,29 @@ const findGamutIntersection = tgpu.fn(
   return t;
 });
 
+const isInGamut = tgpu.fn(
+  [vec3f],
+  bool,
+)((lab) => {
+  const rgb = oklabToLinearRgb(lab);
+  return all(ge(rgb, vec3f(0))) && all(le(rgb, vec3f(1)));
+});
+
 const gamutClipPreserveChroma = tgpu.fn(
   [vec3f],
   vec3f,
 )((lab) => {
+  if (isInGamut(lab)) {
+    return vec3f(lab);
+  }
+
   const L = lab.x;
   const eps = 0.00001;
-  const C = max(eps, length(lab.yz));
+  const C = length(lab.yz);
+  if (C < eps) {
+    // Achromatic, the hue is undefined
+    return vec3f(clamp(L, 0, 1), 0, 0);
+  }
   const a_ = lab.y / C;
   const b_ = lab.z / C;
   const L0 = clamp(L, 0, 1);
@@ -279,13 +309,21 @@ const gamutClipAdaptiveL05 = tgpu.fn(
   [vec3f],
   vec3f,
 )((lab) => {
-  const alpha = oklabGamutClipAlphaAccess.$;
+  if (isInGamut(lab)) {
+    return vec3f(lab);
+  }
+
   const L = lab.x;
   const eps = 0.00001;
-  const C = max(eps, length(lab.yz));
+  const C = length(lab.yz);
+  if (C < eps) {
+    // Achromatic, the hue is undefined
+    return vec3f(clamp(L, 0, 1), 0, 0);
+  }
   const a_ = lab.y / C;
   const b_ = lab.z / C;
 
+  const alpha = oklabGamutClipAlphaAccess.$;
   const Ld = L - 0.5;
   const e1 = 0.5 + abs(Ld) + alpha * C;
   const L0 = 0.5 * (1 + sign(Ld) * (e1 - sqrt(max(0, e1 * e1 - 2 * abs(Ld)))));
@@ -302,13 +340,21 @@ const gamutClipAdaptiveL0cusp = tgpu.fn(
   [vec3f],
   vec3f,
 )((lab) => {
-  const alpha = oklabGamutClipAlphaAccess.$;
+  if (isInGamut(lab)) {
+    return vec3f(lab);
+  }
+
   const L = lab.x;
   const eps = 0.00001;
-  const C = max(eps, length(lab.yz));
+  const C = length(lab.yz);
+  if (C < eps) {
+    // Achromatic, the hue is undefined
+    return vec3f(clamp(L, 0, 1), 0, 0);
+  }
   const a_ = lab.y / C;
   const b_ = lab.z / C;
 
+  const alpha = oklabGamutClipAlphaAccess.$;
   const cusp = findCusp(a_, b_);
   const Ld = L - cusp.L;
   const k = 2 * select(cusp.L, 1 - cusp.L, Ld > 0);
