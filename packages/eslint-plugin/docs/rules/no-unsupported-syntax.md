@@ -31,6 +31,12 @@ const fn = () => {
   throw new Error(); // ThrowStatement
 }
 ```
+```ts
+const fn = ({ pos: { x }, ...rest }) => { // nested destructuring, rest element
+  'use gpu';
+  return x;
+}
+```
 
 Examples of **correct** code for this rule:
 

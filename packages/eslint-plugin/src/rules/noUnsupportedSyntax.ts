@@ -1,6 +1,6 @@
 import type { TSESTree } from '@typescript-eslint/utils';
 import { enhanceRule } from '../enhanceRule.ts';
-import { directiveTracking } from '../enhancers/directiveTracking.ts';
+import { directiveTracking, type FunctionNode } from '../enhancers/directiveTracking.ts';
 import { createRule } from '../ruleCreator.ts';
 
 export const noUnsupportedSyntax = createRule({
@@ -29,11 +29,48 @@ export const noUnsupportedSyntax = createRule({
       });
     }
 
+    function checkTypegpuFunction(node: FunctionNode) {
+      if (directives.getEnclosingTypegpuFunction() !== node) {
+        return;
+      }
+      if (node.async) {
+        report(node, 'async function');
+      }
+      if (node.generator) {
+        report(node, 'generator function');
+      }
+      for (const param of node.params) {
+        if (param.type === 'RestElement') {
+          report(param, 'rest parameter');
+        } else if (param.type === 'ArrayPattern') {
+          report(param, 'parameter using array destructuring');
+        } else if (param.type === 'ObjectPattern') {
+          checkDestructuredParam(param);
+        }
+      }
+    }
+
+    function checkDestructuredParam(param: TSESTree.ObjectPattern) {
+      for (const prop of param.properties) {
+        if (prop.type === 'RestElement') {
+          report(prop, 'rest element in destructured parameter');
+          continue;
+        }
+        if (prop.computed || prop.key.type !== 'Identifier') {
+          report(prop, 'non-identifier key in destructured parameter');
+        }
+        if (prop.value.type === 'ObjectPattern' || prop.value.type === 'ArrayPattern') {
+          report(prop, 'nested destructuring in parameter');
+        }
+      }
+    }
+
     return {
       ArrowFunctionExpression(node) {
         if (directives.getDirectiveStack().at(-2)?.directives.includes('use gpu')) {
           report(node, 'arrow function');
         }
+        checkTypegpuFunction(node);
       },
 
       AssignmentExpression(node) {
@@ -96,6 +133,13 @@ export const noUnsupportedSyntax = createRule({
         report(node, 'do-while loop');
       },
 
+      EmptyStatement(node) {
+        if (!directives.getEnclosingTypegpuFunction()) {
+          return;
+        }
+        report(node, 'empty statement');
+      },
+
       ForInStatement(node) {
         if (!directives.getEnclosingTypegpuFunction()) {
           return;
@@ -107,12 +151,21 @@ export const noUnsupportedSyntax = createRule({
         if (directives.getDirectiveStack().at(-2)?.directives.includes('use gpu')) {
           report(node, 'function declaration');
         }
+        checkTypegpuFunction(node);
       },
 
       FunctionExpression(node) {
         if (directives.getDirectiveStack().at(-2)?.directives.includes('use gpu')) {
           report(node, 'function expression');
         }
+        checkTypegpuFunction(node);
+      },
+
+      LabeledStatement(node) {
+        if (!directives.getEnclosingTypegpuFunction()) {
+          return;
+        }
+        report(node, 'labeled statement');
       },
 
       Literal(node) {
