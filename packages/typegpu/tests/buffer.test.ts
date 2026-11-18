@@ -2198,6 +2198,18 @@ describe('TgpuBuffer ($usage after the GPU buffer was created)', () => {
     expect(buffer.usableAsUniform).toBe(false);
   });
 
+  it('skips the check when the wrapped buffer does not report a usage', ({ root }) => {
+    const rawBuffer = {
+      size: 4,
+      getMappedRange: () => new ArrayBuffer(4),
+      mapAsync: () => Promise.resolve(),
+    } as unknown as GPUBuffer;
+    const buffer = root.createBuffer(d.u32, rawBuffer);
+
+    expect(() => buffer.$usage('uniform')).not.toThrow();
+    expect(buffer.usableAsUniform).toBe(true);
+  });
+
   it('checks root.createUniform on a wrapped GPU buffer', ({ root }) => {
     const rawBuffer = root.device.createBuffer({
       size: 4,

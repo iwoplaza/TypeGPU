@@ -372,7 +372,7 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
         (usage === 'index' ? GPUBufferUsage.INDEX : 0) |
         (usage === 'indirect' ? GPUBufferUsage.INDIRECT : 0);
       const raw = this[$soul].raw;
-      if (raw && (raw.usage & flag) !== flag) {
+      if (raw && raw.usage !== undefined && (raw.usage & flag) !== flag) {
         throw new Error(
           this.#ownBuffer
             ? `Cannot add '${usage}' usage to ${this}, as its GPUBuffer has already been created without it. Call .$usage('${usage}') before the buffer is first used.`
