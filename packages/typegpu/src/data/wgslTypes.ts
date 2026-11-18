@@ -707,17 +707,55 @@ export interface U16 extends BaseData {
 }
 
 /**
+ * Call signatures shared by the 2-component vector schemas (`d.vec2f(...)`, `d.vec2b(...)`, ...).
+ */
+type Vec2Constructor<TVec, TComp = number, TVec2 = AnyNumericVec2Instance> = ((
+  x: TComp,
+  y: TComp,
+) => TVec) &
+  ((xy: TComp) => TVec) &
+  (() => TVec) &
+  ((v: TVec2) => TVec);
+
+/**
+ * Call signatures shared by the 3-component vector schemas (`d.vec3f(...)`, `d.vec3b(...)`, ...).
+ */
+type Vec3Constructor<
+  TVec,
+  TComp = number,
+  TVec2 = AnyNumericVec2Instance,
+  TVec3 = AnyNumericVec3Instance,
+> = ((x: TComp, y: TComp, z: TComp) => TVec) &
+  ((xyz: TComp) => TVec) &
+  (() => TVec) &
+  ((v: TVec3) => TVec) &
+  ((v0: TVec2, z: TComp) => TVec) &
+  ((x: TComp, v0: TVec2) => TVec);
+
+/**
+ * Call signatures shared by the 4-component vector schemas (`d.vec4f(...)`, `d.vec4b(...)`, ...).
+ */
+type Vec4Constructor<
+  TVec,
+  TComp = number,
+  TVec2 = AnyNumericVec2Instance,
+  TVec3 = AnyNumericVec3Instance,
+  TVec4 = AnyNumericVec4Instance,
+> = ((x: TComp, y: TComp, z: TComp, w: TComp) => TVec) &
+  ((xyzw: TComp) => TVec) &
+  (() => TVec) &
+  ((v: TVec4) => TVec) &
+  ((v0: TVec3, w: TComp) => TVec) &
+  ((x: TComp, v0: TVec3) => TVec) &
+  ((v0: TVec2, v1: TVec2) => TVec) &
+  ((v0: TVec2, z: TComp, w: TComp) => TVec) &
+  ((x: TComp, v0: TVec2, z: TComp) => TVec) &
+  ((x: TComp, y: TComp, v0: TVec2) => TVec);
+
+/**
  * Type of the `d.vec2f` object/function: vector data type schema/constructor
  */
-export interface Vec2f
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number) => v2f) &
-        ((xy: number) => v2f) &
-        (() => v2f) &
-        ((v: AnyNumericVec2Instance) => v2f)
-    > {
+export interface Vec2f extends BaseData, DualFn<Vec2Constructor<v2f>> {
   readonly type: 'vec2f';
   readonly primitive: F32;
   readonly componentCount: 2;
@@ -734,15 +772,7 @@ export interface Vec2f
 /**
  * Type of the `d.vec2h` object/function: vector data type schema/constructor
  */
-export interface Vec2h
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number) => v2h) &
-        ((xy: number) => v2h) &
-        (() => v2h) &
-        ((v: AnyNumericVec2Instance) => v2h)
-    > {
+export interface Vec2h extends BaseData, DualFn<Vec2Constructor<v2h>> {
   readonly type: 'vec2h';
   readonly primitive: F16;
   readonly componentCount: 2;
@@ -759,15 +789,7 @@ export interface Vec2h
 /**
  * Type of the `d.vec2i` object/function: vector data type schema/constructor
  */
-export interface Vec2i
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number) => v2i) &
-        ((xy: number) => v2i) &
-        (() => v2i) &
-        ((v: AnyNumericVec2Instance) => v2i)
-    > {
+export interface Vec2i extends BaseData, DualFn<Vec2Constructor<v2i>> {
   readonly type: 'vec2i';
   readonly primitive: I32;
   readonly componentCount: 2;
@@ -784,15 +806,7 @@ export interface Vec2i
 /**
  * Type of the `d.vec2u` object/function: vector data type schema/constructor
  */
-export interface Vec2u
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number) => v2u) &
-        ((xy: number) => v2u) &
-        (() => v2u) &
-        ((v: AnyNumericVec2Instance) => v2u)
-    > {
+export interface Vec2u extends BaseData, DualFn<Vec2Constructor<v2u>> {
   readonly type: 'vec2u';
   readonly primitive: U32;
   readonly componentCount: 2;
@@ -810,12 +824,7 @@ export interface Vec2u
  * Type of the `d.vec2b` object/function: vector data type schema/constructor
  * Cannot be used inside buffers as it is not host-shareable.
  */
-export interface Vec2b
-  extends
-    BaseData,
-    DualFn<
-      ((x: boolean, y: boolean) => v2b) & ((xy: boolean) => v2b) & (() => v2b) & ((v: v2b) => v2b)
-    > {
+export interface Vec2b extends BaseData, DualFn<Vec2Constructor<v2b, boolean, v2b>> {
   readonly type: 'vec2<bool>';
   readonly primitive: Bool;
   readonly componentCount: 2;
@@ -829,17 +838,7 @@ export interface Vec2b
 /**
  * Type of the `d.vec3f` object/function: vector data type schema/constructor
  */
-export interface Vec3f
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number, z: number) => v3f) &
-        ((xyz: number) => v3f) &
-        (() => v3f) &
-        ((v: AnyNumericVec3Instance) => v3f) &
-        ((v0: AnyNumericVec2Instance, z: number) => v3f) &
-        ((x: number, v0: AnyNumericVec2Instance) => v3f)
-    > {
+export interface Vec3f extends BaseData, DualFn<Vec3Constructor<v3f>> {
   readonly type: 'vec3f';
   readonly primitive: F32;
   readonly componentCount: 3;
@@ -856,17 +855,7 @@ export interface Vec3f
 /**
  * Type of the `d.vec3h` object/function: vector data type schema/constructor
  */
-export interface Vec3h
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number, z: number) => v3h) &
-        ((xyz: number) => v3h) &
-        (() => v3h) &
-        ((v: AnyNumericVec3Instance) => v3h) &
-        ((v0: AnyNumericVec2Instance, z: number) => v3h) &
-        ((x: number, v0: AnyNumericVec2Instance) => v3h)
-    > {
+export interface Vec3h extends BaseData, DualFn<Vec3Constructor<v3h>> {
   readonly type: 'vec3h';
   readonly primitive: F16;
   readonly componentCount: 3;
@@ -883,17 +872,7 @@ export interface Vec3h
 /**
  * Type of the `d.vec3i` object/function: vector data type schema/constructor
  */
-export interface Vec3i
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number, z: number) => v3i) &
-        ((xyz: number) => v3i) &
-        (() => v3i) &
-        ((v: AnyNumericVec3Instance) => v3i) &
-        ((v0: AnyNumericVec2Instance, z: number) => v3i) &
-        ((x: number, v0: AnyNumericVec2Instance) => v3i)
-    > {
+export interface Vec3i extends BaseData, DualFn<Vec3Constructor<v3i>> {
   readonly type: 'vec3i';
   readonly primitive: I32;
   readonly componentCount: 3;
@@ -910,17 +889,7 @@ export interface Vec3i
 /**
  * Type of the `d.vec3u` object/function: vector data type schema/constructor
  */
-export interface Vec3u
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number, z: number) => v3u) &
-        ((xyz: number) => v3u) &
-        (() => v3u) &
-        ((v: AnyNumericVec3Instance) => v3u) &
-        ((v0: AnyNumericVec2Instance, z: number) => v3u) &
-        ((x: number, v0: AnyNumericVec2Instance) => v3u)
-    > {
+export interface Vec3u extends BaseData, DualFn<Vec3Constructor<v3u>> {
   readonly type: 'vec3u';
   readonly primitive: U32;
   readonly componentCount: 3;
@@ -938,17 +907,7 @@ export interface Vec3u
  * Type of the `d.vec3b` object/function: vector data type schema/constructor
  * Cannot be used inside buffers as it is not host-shareable.
  */
-export interface Vec3b
-  extends
-    BaseData,
-    DualFn<
-      ((x: boolean, y: boolean, z: boolean) => v3b) &
-        ((xyz: boolean) => v3b) &
-        (() => v3b) &
-        ((v: v3b) => v3b) &
-        ((v0: v2b, z: boolean) => v3b) &
-        ((x: boolean, v0: v2b) => v3b)
-    > {
+export interface Vec3b extends BaseData, DualFn<Vec3Constructor<v3b, boolean, v2b, v3b>> {
   readonly type: 'vec3<bool>';
   readonly primitive: Bool;
   readonly componentCount: 3;
@@ -962,21 +921,7 @@ export interface Vec3b
 /**
  * Type of the `d.vec4f` object/function: vector data type schema/constructor
  */
-export interface Vec4f
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number, z: number, w: number) => v4f) &
-        ((xyzw: number) => v4f) &
-        (() => v4f) &
-        ((v: AnyNumericVec4Instance) => v4f) &
-        ((v0: AnyNumericVec3Instance, w: number) => v4f) &
-        ((x: number, v0: AnyNumericVec3Instance) => v4f) &
-        ((v0: AnyNumericVec2Instance, v1: AnyNumericVec2Instance) => v4f) &
-        ((v0: AnyNumericVec2Instance, z: number, w: number) => v4f) &
-        ((x: number, v0: AnyNumericVec2Instance, z: number) => v4f) &
-        ((x: number, y: number, v0: AnyNumericVec2Instance) => v4f)
-    > {
+export interface Vec4f extends BaseData, DualFn<Vec4Constructor<v4f>> {
   readonly type: 'vec4f';
   readonly primitive: F32;
   readonly componentCount: 4;
@@ -993,21 +938,7 @@ export interface Vec4f
 /**
  * Type of the `d.vec4h` object/function: vector data type schema/constructor
  */
-export interface Vec4h
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number, z: number, w: number) => v4h) &
-        ((xyzw: number) => v4h) &
-        (() => v4h) &
-        ((v: AnyNumericVec4Instance) => v4h) &
-        ((v0: AnyNumericVec3Instance, w: number) => v4h) &
-        ((x: number, v0: AnyNumericVec3Instance) => v4h) &
-        ((v0: AnyNumericVec2Instance, v1: AnyNumericVec2Instance) => v4h) &
-        ((v0: AnyNumericVec2Instance, z: number, w: number) => v4h) &
-        ((x: number, v0: AnyNumericVec2Instance, z: number) => v4h) &
-        ((x: number, y: number, v0: AnyNumericVec2Instance) => v4h)
-    > {
+export interface Vec4h extends BaseData, DualFn<Vec4Constructor<v4h>> {
   readonly type: 'vec4h';
   readonly primitive: F16;
   readonly componentCount: 4;
@@ -1024,21 +955,7 @@ export interface Vec4h
 /**
  * Type of the `d.vec4i` object/function: vector data type schema/constructor
  */
-export interface Vec4i
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number, z: number, w: number) => v4i) &
-        ((xyzw: number) => v4i) &
-        (() => v4i) &
-        ((v: AnyNumericVec4Instance) => v4i) &
-        ((v0: AnyNumericVec3Instance, w: number) => v4i) &
-        ((x: number, v0: AnyNumericVec3Instance) => v4i) &
-        ((v0: AnyNumericVec2Instance, v1: AnyNumericVec2Instance) => v4i) &
-        ((v0: AnyNumericVec2Instance, z: number, w: number) => v4i) &
-        ((x: number, v0: AnyNumericVec2Instance, z: number) => v4i) &
-        ((x: number, y: number, v0: AnyNumericVec2Instance) => v4i)
-    > {
+export interface Vec4i extends BaseData, DualFn<Vec4Constructor<v4i>> {
   readonly type: 'vec4i';
   readonly primitive: I32;
   readonly componentCount: 4;
@@ -1055,21 +972,7 @@ export interface Vec4i
 /**
  * Type of the `d.vec4u` object/function: vector data type schema/constructor
  */
-export interface Vec4u
-  extends
-    BaseData,
-    DualFn<
-      ((x: number, y: number, z: number, w: number) => v4u) &
-        ((xyzw: number) => v4u) &
-        (() => v4u) &
-        ((v: AnyNumericVec4Instance) => v4u) &
-        ((v0: AnyNumericVec3Instance, w: number) => v4u) &
-        ((x: number, v0: AnyNumericVec3Instance) => v4u) &
-        ((v0: AnyNumericVec2Instance, v1: AnyNumericVec2Instance) => v4u) &
-        ((v0: AnyNumericVec2Instance, z: number, w: number) => v4u) &
-        ((x: number, v0: AnyNumericVec2Instance, z: number) => v4u) &
-        ((x: number, y: number, v0: AnyNumericVec2Instance) => v4u)
-    > {
+export interface Vec4u extends BaseData, DualFn<Vec4Constructor<v4u>> {
   readonly type: 'vec4u';
   readonly primitive: U32;
   readonly componentCount: 4;
@@ -1087,21 +990,7 @@ export interface Vec4u
  * Type of the `d.vec4b` object/function: vector data type schema/constructor
  * Cannot be used inside buffers as it is not host-shareable.
  */
-export interface Vec4b
-  extends
-    BaseData,
-    DualFn<
-      ((x: boolean, y: boolean, z: boolean, w: boolean) => v4b) &
-        ((xyzw: boolean) => v4b) &
-        (() => v4b) &
-        ((v: v4b) => v4b) &
-        ((v0: v3b, w: boolean) => v4b) &
-        ((x: boolean, v0: v3b) => v4b) &
-        ((v0: v2b, v1: v2b) => v4b) &
-        ((v0: v2b, z: boolean, w: boolean) => v4b) &
-        ((x: boolean, v0: v2b, z: boolean) => v4b) &
-        ((x: boolean, y: boolean, v0: v2b) => v4b)
-    > {
+export interface Vec4b extends BaseData, DualFn<Vec4Constructor<v4b, boolean, v2b, v3b, v4b>> {
   readonly type: 'vec4<bool>';
   readonly primitive: Bool;
   readonly componentCount: 4;
