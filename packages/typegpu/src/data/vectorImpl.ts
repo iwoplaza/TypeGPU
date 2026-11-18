@@ -20,6 +20,10 @@ export abstract class VecBase<S> extends Array implements SelfResolvable {
   abstract get _Vec3(): new (x: S, y: S, z: S) => Vec3<S>;
   abstract get _Vec4(): new (x: S, y: S, z: S, w: S) => Vec4<S>;
 
+  static get [Symbol.species]() {
+    return Array;
+  }
+
   static {
     // Defining 4-length swizzles
     for (let e0 = 0; e0 < 4; e0++) {
