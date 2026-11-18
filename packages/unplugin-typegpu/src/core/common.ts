@@ -1,5 +1,5 @@
 import * as t from '@babel/types';
-import type { NodePath, TraverseOptions } from '@babel/traverse';
+import type { NodePath, Scope, TraverseOptions } from '@babel/traverse';
 import type { FilterPattern } from 'unplugin';
 import MagicString from 'magic-string';
 import { transpileBabelFn, type TranspilationResult } from 'tinyest-for-wgsl';
@@ -91,7 +91,13 @@ export interface TransformMethods {
     path: NodePath<MetadatableFunction>,
     name: string | undefined,
     ast: TranspilationResult,
+    typegpuModule: TypegpuModuleRef | undefined,
   ): void;
+
+  /**
+   * Adds `import * as <name> from 'typegpu';` to the transformed file.
+   */
+  importTypegpuNamespace(this: PluginState, program: NodePath<t.Program>, name: string): void;
 
   wrapInAutoName(this: PluginState, path: NodePath<t.Expression>, name: string): void;
 
@@ -120,7 +126,19 @@ export interface PluginState extends TransformMethods {
   opts: Required<Options>;
 
   inUseGpuScope: boolean;
+
+  /**
+   * How functions in this file refer to the `typegpu` module, `null` if they can't.
+   * Decided when the first function that logs is found.
+   */
+  typegpuModule?: TypegpuModuleRef | null | undefined;
 }
+
+/**
+ * How metadata refers to the `typegpu` module: through a namespace import added by the plugin,
+ * or through `require` in CommonJS files, where adding an `import` would break the file.
+ */
+export type TypegpuModuleRef = { kind: 'import'; name: string } | { kind: 'require' };
 
 export interface NodeLocation {
   start?: number | null;
@@ -138,7 +156,110 @@ export function initPluginState(state: PluginState, methods: TransformMethods): 
   state.tgpuAliases = new Set<string>(state.opts.forceTgpuAlias ? [state.opts.forceTgpuAlias] : []);
   state.autoNamingEnabled = state.opts.autoNamingEnabled ?? true;
   state.inUseGpuScope = false;
+  state.typegpuModule = undefined;
   Object.assign(state, methods);
+}
+
+/**
+ * The `typegpu` export that functions calling `console.*` reference in their metadata,
+ * so that only programs that log from shaders bundle the logging implementation.
+ */
+export const CONSOLE_LOG_EXPORT = 'INTERNAL_consoleLog';
+
+const globalObjects = new Set(['globalThis', 'window', 'self', 'global']);
+
+/**
+ * Whether `node` is `console`, a property of it, or a variable initialized with one of those,
+ * e.g. `const log = console.log;`, `const { log } = console;` or `globalThis.console.log`.
+ */
+function refersToConsole(
+  scope: Scope,
+  node: t.Node | null | undefined,
+  depth = 0,
+  outerProps: string[] = [],
+): boolean {
+  const props = [...outerProps];
+  let root = node;
+  while (t.isMemberExpression(root)) {
+    const prop = root.property;
+    props.unshift(
+      t.isIdentifier(prop) && !root.computed
+        ? prop.name
+        : t.isStringLiteral(prop)
+          ? prop.value
+          : '',
+    );
+    root = root.object;
+  }
+  if (!t.isIdentifier(root)) {
+    return false;
+  }
+  if (root.name === 'console') {
+    return true;
+  }
+
+  const binding = scope.getBinding(root.name);
+  if (!binding) {
+    return globalObjects.has(root.name) && props[0] === 'console';
+  }
+  if (depth < 8 && binding.path.isVariableDeclarator()) {
+    const { id, init } = binding.path.node;
+    // `const { console: c } = globalThis;`
+    const destructuredKey = t.isObjectPattern(id)
+      ? id.properties.find(
+          (p): p is t.ObjectProperty =>
+            t.isObjectProperty(p) && t.isIdentifier(p.value, { name: root.name }),
+        )?.key
+      : undefined;
+    const keyProps = t.isIdentifier(destructuredKey) ? [destructuredKey.name] : [];
+    return refersToConsole(binding.path.scope, init, depth + 1, [...keyProps, ...props]);
+  }
+  return false;
+}
+
+const commonJsGlobals = ['require', 'module', 'exports'];
+
+function chooseTypegpuModuleRef(
+  state: PluginState,
+  program: NodePath<t.Program>,
+): TypegpuModuleRef | null {
+  const hasModuleSyntax = program.node.body.some(
+    (statement) => t.isImportDeclaration(statement) || t.isExportDeclaration(statement),
+  );
+  if (!hasModuleSyntax && commonJsGlobals.some((name) => program.scope.hasGlobal(name))) {
+    return { kind: 'require' };
+  }
+  if (hasModuleSyntax || program.node.sourceType === 'module') {
+    const name = program.scope.generateUid('typegpu');
+    state.importTypegpuNamespace(program, name);
+    return { kind: 'import', name };
+  }
+  // A script without `require`, there's no way to reach `typegpu` from here
+  return null;
+}
+
+/**
+ * If the function refers to `console`, returns how its metadata can refer to the `typegpu` module
+ * (adding an import to the file if needed).
+ */
+function typegpuModuleForConsole(
+  state: PluginState,
+  path: NodePath,
+  ast: TranspilationResult,
+): TypegpuModuleRef | undefined {
+  const usesConsole = Array.from(ast.externalNames.values()).some((chain) => {
+    const [root = '', ...props] = chain.split('.');
+    return refersToConsole(path.scope, t.identifier(root), 0, props);
+  });
+  if (!usesConsole) {
+    return undefined;
+  }
+
+  if (state.typegpuModule === undefined) {
+    const program = path.scope.getProgramParent().path as NodePath<t.Program>;
+    state.typegpuModule = chooseTypegpuModuleRef(state, program);
+  }
+  return state.typegpuModule ?? undefined;
 }
 
 /** Regular expressions used for early pruning (to avoid unnecessary parsing, which is expensive) */
@@ -479,7 +600,7 @@ function functionOnExit(
   if (!ast) {
     throw new Error(`No metadata found for function ${maybeName ?? '<unnamed>'}`);
   }
-  state.assignMetadata(path, maybeName, ast);
+  state.assignMetadata(path, maybeName, ast, typegpuModuleForConsole(state, path, ast));
   path.skip();
 }
 
@@ -602,12 +723,15 @@ export const functionVisitor: TraverseOptions<PluginState> = {
             implementation.type === 'ArrowFunctionExpression') &&
           !containsUseGpuDirective(implementation)
         ) {
+          const implementationPath = path.get('arguments.0') as NodePath<
+            t.ArrowFunctionExpression | t.FunctionDeclaration | t.FunctionExpression
+          >;
+          const ast = transpile(implementation, this.opts.unstable_obfuscate);
           state.assignMetadata(
-            path.get('arguments.0') as NodePath<
-              t.ArrowFunctionExpression | t.FunctionDeclaration | t.FunctionExpression
-            >,
-            getFunctionName(path.get('arguments.0')),
-            transpile(implementation, this.opts.unstable_obfuscate),
+            implementationPath,
+            getFunctionName(implementationPath),
+            ast,
+            typegpuModuleForConsole(state, implementationPath, ast),
           );
         }
       }

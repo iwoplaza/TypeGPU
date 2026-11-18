@@ -1,6 +1,26 @@
 import { describe, expect, vi } from 'vitest';
 import { it } from 'typegpu-testing-utility';
-import { tgpu, d } from 'typegpu';
+import { tgpu, d, type INTERNAL_GlobalExt } from 'typegpu';
+import * as tinyest from 'tinyest';
+
+const NODE = tinyest.NodeTypeCatalog;
+
+/**
+ * Metadata in the shape emitted by `unplugin-typegpu` versions that predate
+ * attaching `consoleLog` support to functions.
+ */
+function withLegacyLoggingMetadata<T extends object>(fn: T): T {
+  ((globalThis as INTERNAL_GlobalExt).__TYPEGPU_META__ ??= new WeakMap()).set(fn, {
+    v: 2,
+    name: 'legacyLog',
+    ast: {
+      params: [],
+      body: [NODE.block, [[NODE.call, 'console.log', [[NODE.numericLiteral, '1']]]]],
+    },
+    externals: { 'console.log': () => console.log },
+  });
+  return fn;
+}
 
 describe('WgslGenerator with console.log', () => {
   it('Parses console.log in a stray function to a comment and warns', () => {
@@ -802,5 +822,43 @@ describe('WgslGenerator with console.log', () => {
         wrappedCallback(id.x, id.y, id.z);
       }"
     `);
+  });
+
+  describe('functions without attached console support', () => {
+    it('can log when another function in the same shader carries support', ({ root }) => {
+      const legacyLog = withLegacyLoggingMetadata(() => {});
+
+      const myPipeline = root.createGuardedComputePipeline(() => {
+        'use gpu';
+        console.log(2);
+        legacyLog();
+      });
+
+      const wgsl = tgpu.resolve([myPipeline.pipeline]);
+      expect(wgsl).not.toContain('/* console.log() */');
+      expect(wgsl).toContain('log1(2i);');
+      expect(wgsl).toMatch(/fn legacyLog\(\) {\s+log2\w*\(1i\);/);
+    });
+
+    it('can log when resolved before the function that carries support', ({ root }) => {
+      using consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const legacyLog = withLegacyLoggingMetadata(() => {});
+      const logs = () => {
+        'use gpu';
+        console.log(2);
+      };
+
+      const myPipeline = root.createGuardedComputePipeline(() => {
+        'use gpu';
+        legacyLog();
+        logs();
+      });
+
+      const wgsl = tgpu.resolve([myPipeline.pipeline]);
+      expect(wgsl).not.toContain('/* console.log() */');
+      expect(wgsl).toMatch(/fn legacyLog\(\) {\s+log1\w*\(1i\);/);
+      expect(wgsl).toMatch(/fn logs\(\) {\s+log2\w*\(2i\);/);
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
   });
 });

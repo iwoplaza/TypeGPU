@@ -43,7 +43,9 @@ import {
   type TgpuBindGroupLayout,
   type TgpuLayoutEntry,
 } from './tgpuBindGroupLayout.ts';
-import { LogGeneratorImpl, LogGeneratorNullImpl } from './tgsl/consoleLog/logGenerator.ts';
+import { fallbackLogSnippet } from './tgsl/consoleLog/fallback.ts';
+import { getLogSupport } from './tgsl/consoleLog/registry.ts';
+import { logger } from './tgpuLogger.ts';
 import type { LogGenerator, LogResources, SupportedLogOp } from './tgsl/consoleLog/types.ts';
 import { getBestConversion } from './tgsl/conversion.ts';
 import { coerceToSnippet, concretize, numericLiteralToSnippet } from './tgsl/generationHelpers.ts';
@@ -444,7 +446,8 @@ export class ResolutionCtxImpl implements ResolutionCtx {
    * The set is NOT cleared after the resolution finishes.
    */
   readonly #startedFunctionResolves: WeakSet<object> = new WeakSet();
-  readonly #logGenerator: LogGenerator;
+  readonly #root: ExperimentalTgpuRoot | undefined;
+  #logGenerator: LogGenerator | undefined;
 
   readonly gen: ShaderGenerator;
 
@@ -482,7 +485,7 @@ export class ResolutionCtxImpl implements ResolutionCtx {
 
   constructor(opts: ResolutionCtxImplOptions) {
     this.enableExtensions = opts.enableExtensions;
-    this.#logGenerator = opts.root ? new LogGeneratorImpl(opts.root) : new LogGeneratorNullImpl();
+    this.#root = opts.root;
     this.#namespaceInternal = opts.namespace[$internal];
     this.gen = opts.shaderGenerator ?? new WgslGenerator();
     this.gen.initGenerator(this);
@@ -629,11 +632,27 @@ export class ResolutionCtxImpl implements ResolutionCtx {
   }
 
   generateLog(op: SupportedLogOp, args: readonly Snippet[]): Snippet {
-    return this.#logGenerator.generateLog(this, op, args);
+    if (this.#root && !this.#logGenerator) {
+      this.#logGenerator = getLogSupport()?.createGenerator(this.#root);
+    }
+
+    if (this.#logGenerator) {
+      return this.#logGenerator.generateLog(this, op, args);
+    }
+
+    if (this.#root) {
+      logger.warn(
+        'fallback',
+        "Shader 'console' support is not included in this program. Make sure functions that log are transformed by an up-to-date 'unplugin-typegpu', and that they call 'console' methods directly.",
+      );
+    } else {
+      logger.warn('fallback', "'console.log' is only supported when resolving pipelines.");
+    }
+    return fallbackLogSnippet;
   }
 
   get logResources(): LogResources | undefined {
-    return this.#logGenerator.logResources;
+    return this.#logGenerator?.logResources;
   }
 
   resolveFunction(options: ResolveFunctionOptions): { code: string; returnType: BaseData } {

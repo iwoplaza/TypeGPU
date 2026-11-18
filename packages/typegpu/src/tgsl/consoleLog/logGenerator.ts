@@ -21,12 +21,16 @@ import { $internal } from '../../shared/symbols.ts';
 import { logger } from '../../tgpuLogger.ts';
 import { convertToCommonType } from '../conversion.ts';
 import { concretizeSnippet } from '../generationHelpers.ts';
+import { logDataFromGPU } from './deserializers.ts';
+import { fallbackLogSnippet } from './fallback.ts';
+import { registerLogSupport } from './registry.ts';
 import { createLoggingFunction } from './serializers.ts';
 import {
   type LogGenerator,
   type LogGeneratorOptions,
   type LogMeta,
   type LogResources,
+  type LogSupport,
   type SerializedLogCallData,
   type SupportedLogOp,
 } from './types.ts';
@@ -36,18 +40,6 @@ const defaultOptions: Required<LogGeneratorOptions> = {
   logSizeLimit: 252,
   messagePrefix: ' GPU ',
 };
-
-const fallbackSnippet = snip('/* console.log() */', Void, /* origin */ 'runtime');
-
-export class LogGeneratorNullImpl implements LogGenerator {
-  get logResources(): undefined {
-    return undefined;
-  }
-  generateLog(): Snippet {
-    logger.warn('fallback', "'console.log' is only supported when resolving pipelines.");
-    return fallbackSnippet;
-  }
-}
 
 export class LogGeneratorImpl implements LogGenerator {
   #options: Required<LogGeneratorOptions>;
@@ -82,7 +74,7 @@ export class LogGeneratorImpl implements LogGenerator {
   generateLog(ctx: ResolutionCtx, op: SupportedLogOp, args: Snippet[]): Snippet {
     if (shaderStageSlot.$ === 'vertex') {
       logger.warn('suspicious', `'console' operations are not supported in vertex shaders.`);
-      return fallbackSnippet;
+      return fallbackLogSnippet;
     }
 
     const id = this.#firstUnusedId++;
@@ -128,13 +120,24 @@ export class LogGeneratorImpl implements LogGenerator {
   }
 
   get logResources(): LogResources | undefined {
-    return this.#firstUnusedId === 1
-      ? undefined
-      : {
-          dataBuffer: this.#dataBuffer,
-          indexBuffer: this.#indexBuffer,
-          options: this.#options,
-          logIdToMeta: this.#logIdToMeta,
-        };
+    if (this.#firstUnusedId === 1) {
+      return undefined;
+    }
+
+    const resources: LogResources = {
+      dataBuffer: this.#dataBuffer,
+      indexBuffer: this.#indexBuffer,
+      options: this.#options,
+      logIdToMeta: this.#logIdToMeta,
+      drain: () => logDataFromGPU(resources),
+    };
+    return resources;
   }
 }
+
+// Registering as soon as this is evaluated makes logging work in every function of the program,
+// no matter which function carries the reference or in which order they are resolved.
+// Marked pure so that bundlers can drop it when nothing references it.
+export const consoleLogSupport: LogSupport = /*#__PURE__*/ registerLogSupport({
+  createGenerator: (root) => new LogGeneratorImpl(root),
+});

@@ -178,6 +178,9 @@ export type { Namespace } from './core/resolve/namespace.ts';
 // Exported for being able to track use of these global extensions easier,
 // and to establish a solid contract between tooling using them.
 export type { INTERNAL_GlobalExt } from './shared/meta.ts';
+// Referenced by `unplugin-typegpu` from functions that call `console.*`,
+// so that programs that never log don't bundle the logging implementation.
+export { consoleLogSupport as INTERNAL_consoleLog } from './tgsl/consoleLog/logGenerator.ts';
 
 /** @deprecated Use TgpuRenderPipeline.Descriptor */
 export type TgpuRenderPipelineDescriptor =
