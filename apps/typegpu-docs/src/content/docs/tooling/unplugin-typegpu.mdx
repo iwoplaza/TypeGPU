@@ -182,6 +182,14 @@ interface Options {
   autoNamingEnabled?: boolean;
 
   /**
+   * Obfuscate the generated AST.
+   * This results in obfuscation of the generated WGSL, and in smaller bundle sizes.
+   *
+   * @default false
+   */
+  unstable_obfuscate?: boolean;
+
+  /**
    * Skipping files that don't contain 'typegpu', 'tgpu' or 'use gpu'.
    * In case this early pruning hinders transformation, you
    * can disable it.
@@ -197,6 +205,9 @@ or [enforce](https://vite.dev/guide/api-plugin.html#plugin-ordering) the order i
 
 The custom _forceTgpuAlias_ option allows specifying the name of _tgpu_ object imported from `typegpu`.
 It is only useful in a handful of custom scenarios, when the name cannot be retrieved by the plugin automatically from the import statement.
+
+The experimental _unstable_obfuscate_ option shortens the identifiers saved by the plugin, see [Minifying & Obfuscating Shaders](/TypeGPU/advanced/minifying-shaders).
+It cannot be combined with auto-naming, so it requires setting `autoNamingEnabled: false` (the plugin throws otherwise).
 
 ## Further reading
 

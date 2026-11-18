@@ -26,7 +26,7 @@ You can also choose a template and optional TypeGPU add-ons explicitly:
 npx typegpu@latest my-app --yes --template vite-react --addons @typegpu/sdf,@typegpu/noise
 ```
 
-Available templates: `vite-bare`, `vite-complex`, `vite-react`, `expo-bare`.
+Available templates: `vite-bare`, `vite-complex`, `vite-react`, `nextjs-bare`, `waku-bare`, `expo-bare`.
 
 ## Enhancing
 Run inside the root of an existing project:
