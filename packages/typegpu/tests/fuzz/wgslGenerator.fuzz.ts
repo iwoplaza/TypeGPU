@@ -182,13 +182,20 @@ function resolveProgram(program: Program): { wgsl: string } | Exclude<Outcome, {
 }
 
 /** Validates many shaders with one `naga` process, returns the error message per index. */
+// Every batch carries one shader that must be rejected and one that must be accepted,
+// so a validator that stays silent or rejects everything cannot pass for a clean run.
+const INVALID_CANARY = 'canary-invalid';
+const VALID_CANARY = 'canary-valid';
+
 function validate(shaders: Map<number, string>): Map<number, string> {
   const dir = mkdtempSync(join(tmpdir(), 'tgpu-fuzz-'));
   try {
     for (const [i, wgsl] of shaders) {
       writeFileSync(join(dir, `${i}.wgsl`), wgsl);
     }
-    const files = [...shaders.keys()].map((i) => `${i}.wgsl`);
+    writeFileSync(join(dir, `${INVALID_CANARY}.wgsl`), 'fn canary() -> i32 { return true; }\n');
+    writeFileSync(join(dir, `${VALID_CANARY}.wgsl`), 'fn canary() -> i32 { return 1; }\n');
+    const files = [...shaders.keys(), INVALID_CANARY, VALID_CANARY].map((name) => `${name}.wgsl`);
     const result = spawnSync('naga', ['--bulk-validate', ...files], {
       cwd: dir,
       encoding: 'utf8',
@@ -198,25 +205,28 @@ function validate(shaders: Map<number, string>): Map<number, string> {
     if (result.error) {
       throw new Error(`Running naga failed: ${result.error.message}`);
     }
-    const errors = new Map<number, string>();
+    const errorsByName = new Map<string, string>();
     const [body = '', failedList = ''] = output.split(
       /^Validation failed for the following inputs:$/m,
     );
     const parts = body.split(/^Error validating (\S+)\.wgsl:$/m);
     for (let j = 1; j < parts.length; j += 2) {
-      errors.set(Number(parts[j]), (parts[j + 1] ?? '').trim());
+      errorsByName.set(parts[j] as string, (parts[j + 1] ?? '').trim());
     }
     const failed = failedList.match(/\S+(?=\.wgsl)/g) ?? [];
     const consistent =
-      result.status === (errors.size ? 1 : 0) &&
-      failed.length === errors.size &&
-      failed.every((name) => errors.has(Number(name)));
+      result.status === 1 &&
+      failed.length === errorsByName.size &&
+      failed.every((name) => errorsByName.has(name)) &&
+      errorsByName.has(INVALID_CANARY) &&
+      !errorsByName.has(VALID_CANARY);
     if (!consistent) {
       throw new Error(
-        `Unexpected naga output (exit status ${result.status}, signal ${result.signal}, ${errors.size} errors parsed, ${failed.length} inputs listed as failed):\n${output.slice(0, 4000)}`,
+        `Unexpected naga output (exit status ${result.status}, signal ${result.signal}, ${errorsByName.size} errors parsed, ${failed.length} inputs listed as failed):\n${output.slice(0, 4000)}`,
       );
     }
-    return errors;
+    errorsByName.delete(INVALID_CANARY);
+    return new Map([...errorsByName].map(([name, message]) => [Number(name), message]));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
