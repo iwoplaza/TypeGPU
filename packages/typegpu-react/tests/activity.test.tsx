@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
-import React, { Activity, Suspense } from 'react';
+import React, { Activity, Suspense, useEffect, useLayoutEffect } from 'react';
 import { d, type TgpuBuffer, type TgpuRoot } from 'typegpu';
 import { afterEach, beforeEach, describe, expect, vi } from 'vitest';
 import { Root, useBuffer, useMirroredUniform, useRoot } from '@typegpu/react';
@@ -35,7 +35,7 @@ describe('<Activity>', () => {
     vi.useRealTimers();
   });
 
-  it('recreates buffers that were destroyed while hidden', ({ root }) => {
+  it('keeps buffers alive while hidden', ({ root }) => {
     using createBufferSpy = vi.spyOn(root, 'createBuffer');
     let latest: TgpuBuffer<d.F32> | undefined;
 
@@ -59,18 +59,16 @@ describe('<Activity>', () => {
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    // Hidden subtrees don't hold on to their buffers
-    expect(first?.destroyed).toBe(true);
+    expect(first?.destroyed).toBe(false);
 
     rerender(ui('visible'));
     act(() => {
       vi.advanceTimersByTime(1000);
     });
 
-    expect(latest).not.toBe(first);
+    expect(latest).toBe(first);
     expect(latest?.destroyed).toBe(false);
-    // The recreated buffer starts from the initial value again
-    expect(createBufferSpy).toHaveBeenLastCalledWith(d.f32, 1);
+    expect(createBufferSpy).toHaveBeenCalledTimes(1);
   });
 
   it('keeps buffers that were hidden only briefly', ({ root }) => {
@@ -105,12 +103,11 @@ describe('<Activity>', () => {
     expect(latest?.destroyed).toBe(false);
   });
 
-  it('recreates mirrored uniforms with the latest value', ({ root }) => {
+  it('writes the latest value to mirrored uniforms when revealed', ({ root }) => {
     using createUniformSpy = vi.spyOn(root, 'createUniform');
-    let latest: TgpuBuffer<d.F32> | undefined;
 
     function Child({ value }: { value: number }) {
-      latest = useMirroredUniform(d.f32, value)[$buffer];
+      useMirroredUniform(d.f32, value);
       return null;
     }
 
@@ -123,6 +120,9 @@ describe('<Activity>', () => {
     );
 
     const { rerender } = render(ui('visible', 1));
+    const uniform = createUniformSpy.mock.results[0]?.value as { write(value: number): void };
+    using writeSpy = vi.spyOn(uniform, 'write');
+
     rerender(ui('hidden', 2));
     act(() => {
       vi.advanceTimersByTime(1000);
@@ -132,8 +132,78 @@ describe('<Activity>', () => {
       vi.advanceTimersByTime(1000);
     });
 
+    expect(createUniformSpy).toHaveBeenCalledTimes(1);
+    expect(writeSpy).toHaveBeenLastCalledWith(3);
+  });
+
+  it('never hands a destroyed buffer to effects of a revealed subtree', ({ root }) => {
+    const errors: unknown[] = [];
+    const used: TgpuBuffer<d.F32>[] = [];
+    const tryWrite = (buffer: TgpuBuffer<d.F32>) => {
+      used.push(buffer);
+      try {
+        buffer.write(2);
+      } catch (error) {
+        errors.push(error);
+      }
+    };
+
+    function Writer({ buffer }: { buffer: TgpuBuffer<d.F32> }) {
+      useLayoutEffect(() => tryWrite(buffer));
+      useEffect(() => tryWrite(buffer));
+      return null;
+    }
+
+    function Child() {
+      const buffer = useBuffer(d.f32, { initial: 1 });
+      return <Writer buffer={buffer} />;
+    }
+
+    // Stable, like in tab or route caches, so React doesn't re-render it when revealed
+    const child = <Child />;
+    const ui = (mode: Mode) => (
+      <Root root={root}>
+        <Activity mode={mode}>{child}</Activity>
+      </Root>
+    );
+
+    const { rerender } = render(ui('visible'));
+    rerender(ui('hidden'));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    used.length = 0;
+    rerender(ui('visible'));
+
+    expect(used.length).toBeGreaterThan(0);
+    expect(errors).toStrictEqual([]);
+    expect(used.every((buffer) => !buffer.destroyed)).toBe(true);
+  });
+
+  it('destroys buffers of a subtree that unmounts while hidden', ({ root }) => {
+    let latest: TgpuBuffer<d.F32> | undefined;
+
+    function Child() {
+      latest = useBuffer(d.f32, { initial: 1 });
+      return null;
+    }
+
+    const ui = (mode: Mode, mounted: boolean) => (
+      <Root root={root}>{mounted && <Activity mode={mode}>{<Child />}</Activity>}</Root>
+    );
+
+    const { rerender } = render(ui('visible', true));
+    rerender(ui('hidden', true));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(latest?.destroyed).toBe(false);
-    expect(createUniformSpy).toHaveBeenLastCalledWith(d.f32, 3);
+
+    rerender(ui('hidden', false));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(latest?.destroyed).toBe(true);
   });
 
   it('keeps the root of a <Root> provider that was hidden', async ({ navigator, adapter }) => {

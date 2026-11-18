@@ -424,9 +424,9 @@ const primaryColor = useMirroredUniform(d.vec3f, d.vec3f(...theme.primaryColor))
 ```
 
 :::note
-A component hidden by `<Activity mode="hidden">` releases its buffers after a short delay, the same way an unmounted one does.
-When it becomes visible again, its buffers get recreated: `initial` is applied and `onInit` is called again, and `useMirroredUniform`
-starts from the latest value. Anything written to the previous buffers (e.g. with `.write()` or by a compute shader) is lost.
+A component hidden by `<Activity mode="hidden">` keeps its buffers, along with their contents, until it becomes visible again
+or unmounts. A hidden subtree keeps holding on to that GPU memory, the buffers are only destroyed once the component unmounts.
+`useMirroredUniform` writes the latest value when the component becomes visible again.
 :::
 
 ## useBindGroup
