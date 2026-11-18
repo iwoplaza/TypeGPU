@@ -177,7 +177,7 @@ function operatorToType<
     return bool;
   }
 
-  if (op === '=') {
+  if (op === '=' || (op === '%' && !wgsl.isVec(lhs) && wgsl.isVec(rhs))) {
     return rhs;
   }
 
@@ -801,6 +801,12 @@ export class WgslGenerator implements ShaderGenerator {
         }
         convRhs = tryConvertSnippet(this.ctx, rhsExpr, rhsTarget, false);
         convLhs = lhsExpr;
+      } else if (op === '%' && wgsl.isVec(lhsExpr.dataType) && !wgsl.isVec(rhsExpr.dataType)) {
+        convLhs = lhsExpr;
+        convRhs = tryConvertSnippet(this.ctx, rhsExpr, lhsExpr.dataType.primitive);
+      } else if (op === '%' && wgsl.isVec(rhsExpr.dataType) && !wgsl.isVec(lhsExpr.dataType)) {
+        convLhs = tryConvertSnippet(this.ctx, lhsExpr, rhsExpr.dataType.primitive);
+        convRhs = rhsExpr;
       } else {
         const forcedType = exprType === NODE.assignmentExpr ? [lhsExpr.dataType] : undefined;
         [convLhs, convRhs] = convertToCommonType(this.ctx, [lhsExpr, rhsExpr], forcedType) ?? [

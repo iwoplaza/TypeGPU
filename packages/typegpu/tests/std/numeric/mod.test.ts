@@ -249,3 +249,116 @@ describe('mod parseResolved test', () => {
     `);
   });
 });
+
+describe('% operator with a scalar and a vector', () => {
+  it('gives the vector type in both operand orders', () => {
+    const scalarVec = tgpu.fn(
+      [d.f32, d.vec3f],
+      d.vec3f,
+    )((a, b) => {
+      'use gpu';
+      return a % b;
+    });
+    const vecScalar = tgpu.fn(
+      [d.vec3f, d.f32],
+      d.vec3f,
+    )((a, b) => {
+      'use gpu';
+      return a % b;
+    });
+
+    expect(tgpu.resolve([scalarVec, vecScalar])).toMatchInlineSnapshot(`
+      "fn scalarVec(a: f32, b: vec3f) -> vec3f {
+        return (a % b);
+      }
+
+      fn vecScalar(a: vec3f, b: f32) -> vec3f {
+        return (a % b);
+      }"
+    `);
+  });
+
+  it('infers the vector type in shell-less functions', () => {
+    const scalarVec = (a: number, b: d.v2i) => {
+      'use gpu';
+      return a % b;
+    };
+    const vecScalar = (a: d.v4u, b: number) => {
+      'use gpu';
+      return a % b;
+    };
+    const main = () => {
+      'use gpu';
+      const x = scalarVec(d.i32(7), d.vec2i(2, 3));
+      const y = vecScalar(d.vec4u(5, 6, 7, 8), d.u32(3));
+      return d.vec4i(x, d.vec2i(y.xy));
+    };
+
+    expect(scalarVec(7, d.vec2i(2, 3))).toStrictEqual(d.vec2i(1, 1));
+    expect(vecScalar(d.vec4u(5, 6, 7, 8), 3)).toStrictEqual(d.vec4u(2, 0, 1, 2));
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn scalarVec(a: i32, b: vec2i) -> vec2i {
+        return (a % b);
+      }
+
+      fn vecScalar(a: vec4u, b: u32) -> vec4u {
+        return (a % b);
+      }
+
+      fn main() -> vec4i {
+        let x = scalarVec(7i, vec2i(2, 3));
+        let y = vecScalar(vec4u(5, 6, 7, 8), 3u);
+        return vec4i(x, vec2i(y.xy));
+      }"
+    `);
+  });
+
+  it('converts the scalar to the component type of the vector', () => {
+    const f = () => {
+      'use gpu';
+      const v = d.vec3i(1, 2, 3);
+      let s = d.i32(2);
+      return d.vec3i(5 % v) + d.vec3i(v % 2) + d.vec3i(s % d.vec3f(v));
+    };
+
+    expect(f()).toStrictEqual(d.vec3i(1, 1, 5));
+    expect(tgpu.resolve([f])).toMatchInlineSnapshot(`
+      "fn f() -> vec3i {
+        let v = vec3i(1, 2, 3);
+        let s = 2i;
+        return (((5i % v) + (v % 2i)) + vec3i((f32(s) % vec3f(v))));
+      }"
+    `);
+  });
+
+  it('keeps the left operand type for mismatched vectors', () => {
+    const vecVecI = () => {
+      'use gpu';
+      const a = d.vec3i(1, 2, 3);
+      const b = d.vec4i(4, 5, 6, 7);
+      // @ts-ignore
+      return a % b;
+    };
+    const vecVecF = () => {
+      'use gpu';
+      const a = d.vec3i(1, 2, 3);
+      const b = d.vec3f(4, 5, 6);
+      // @ts-ignore
+      return a % b;
+    };
+
+    expect(tgpu.resolve([vecVecI, vecVecF])).toMatchInlineSnapshot(`
+      "fn vecVecI() -> vec3i {
+        let a = vec3i(1, 2, 3);
+        let b = vec4i(4, 5, 6, 7);
+        return (a % b);
+      }
+
+      fn vecVecF() -> vec3i {
+        let a = vec3i(1, 2, 3);
+        let b = vec3f(4, 5, 6);
+        return (a % b);
+      }"
+    `);
+  });
+});
