@@ -93,7 +93,7 @@ describe('radix sort', () => {
   });
 
   it('emits no warnings for any key type', ({ root }) => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    using warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     for (const keyType of [d.u32, d.i32, d.f32] as const) {
       const data = root.createBuffer(d.arrayOf(keyType, 512)).$usage('storage');
@@ -101,7 +101,6 @@ describe('radix sort', () => {
     }
 
     expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
   it('extracts digits of every key type', () => {

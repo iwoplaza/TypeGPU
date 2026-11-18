@@ -8,7 +8,7 @@ const add = { operation: std.add, identityElement: 0 };
 
 describe('prefix scan', () => {
   it('emits no warnings for any element type', ({ root }) => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    using warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     for (const dataType of [d.u32, d.i32, d.f32] as const) {
       const buffer = root.createBuffer(d.arrayOf(dataType, 4096)).$usage('storage');
@@ -17,7 +17,6 @@ describe('prefix scan', () => {
     }
 
     expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
   it('types the workgroup memory and layouts after the element type', () => {
