@@ -90,6 +90,19 @@ const cases = {
     `,
     expected: 'vec2f(4, 10)',
   },
+  'vectors that only come from a std function': {
+    code: `
+      import { std } from 'typegpu';
+      const f = (a, b) => {
+        'use gpu';
+        return a + b * 2;
+      };
+      // two f16 ones
+      const v = std.unpack2x16float(0x3c003c00);
+      console.log(String(f(v, v)));
+    `,
+    expected: 'vec2f(3, 3)',
+  },
 };
 
 describe.each(Object.keys(bundlers) as (keyof typeof bundlers)[])(
