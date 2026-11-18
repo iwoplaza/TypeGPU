@@ -79,6 +79,96 @@ export function normalizedFormatCases() {
         65535,
       ]);
     });
+
+    it('clamps out-of-range values when writing', () => {
+      const scalar = new ArrayBuffer(2);
+      writeToArrayBuffer(scalar, d.unorm16, 1.01);
+      expect([...new Uint16Array(scalar)]).toStrictEqual([65535]);
+      writeToArrayBuffer(scalar, d.unorm16, -0.01);
+      expect([...new Uint16Array(scalar)]).toStrictEqual([0]);
+
+      const pair = new ArrayBuffer(4);
+      writeToArrayBuffer(pair, d.unorm16x2, d.vec2f(1.01, -0.01));
+      expect([...new Uint16Array(pair)]).toStrictEqual([65535, 0]);
+
+      const quad = new ArrayBuffer(8);
+      writeToArrayBuffer(quad, d.unorm16x4, d.vec4f(1.01, -0.01, 2, -1));
+      expect([...new Uint16Array(quad)]).toStrictEqual([65535, 0, 65535, 0]);
+    });
+  });
+
+  describe('snorm8', () => {
+    it('reads the endpoints, clamping the most negative value to -1', () => {
+      const buffer = new Int8Array([-128, -127, 0, 127]).buffer;
+
+      expect(readFromArrayBuffer(buffer, d.snorm8)).toBe(-1);
+      expect(readFromArrayBuffer(buffer.slice(1), d.snorm8)).toBe(-1);
+      expect(readFromArrayBuffer(buffer.slice(3), d.snorm8)).toBe(1);
+      expect(readFromArrayBuffer(buffer, d.snorm8x2)).toStrictEqual(d.vec2f(-1, -1));
+      expect(readFromArrayBuffer(buffer, d.snorm8x4)).toStrictEqual(d.vec4f(-1, -1, 0, 1));
+    });
+
+    it('clamps out-of-range values when writing', () => {
+      const scalar = new ArrayBuffer(1);
+      writeToArrayBuffer(scalar, d.snorm8, 1.01);
+      expect([...new Int8Array(scalar)]).toStrictEqual([127]);
+      writeToArrayBuffer(scalar, d.snorm8, -1.01);
+      expect([...new Int8Array(scalar)]).toStrictEqual([-127]);
+
+      const pair = new ArrayBuffer(2);
+      writeToArrayBuffer(pair, d.snorm8x2, d.vec2f(1.01, -1.01));
+      expect([...new Int8Array(pair)]).toStrictEqual([127, -127]);
+
+      const quad = new ArrayBuffer(4);
+      writeToArrayBuffer(quad, d.snorm8x4, d.vec4f(1.01, -1.01, 2, -2));
+      expect([...new Int8Array(quad)]).toStrictEqual([127, -127, 127, -127]);
+    });
+  });
+
+  describe('snorm16', () => {
+    it('reads the endpoints, clamping the most negative value to -1', () => {
+      const buffer = new Int16Array([-32768, -32767, 0, 32767]).buffer;
+
+      expect(readFromArrayBuffer(buffer, d.snorm16)).toBe(-1);
+      expect(readFromArrayBuffer(buffer.slice(2), d.snorm16)).toBe(-1);
+      expect(readFromArrayBuffer(buffer.slice(6), d.snorm16)).toBe(1);
+      expect(readFromArrayBuffer(buffer, d.snorm16x2)).toStrictEqual(d.vec2f(-1, -1));
+      expect(readFromArrayBuffer(buffer, d.snorm16x4)).toStrictEqual(d.vec4f(-1, -1, 0, 1));
+    });
+
+    it('clamps out-of-range values when writing', () => {
+      const scalar = new ArrayBuffer(2);
+      writeToArrayBuffer(scalar, d.snorm16, 1.01);
+      expect([...new Int16Array(scalar)]).toStrictEqual([32767]);
+      writeToArrayBuffer(scalar, d.snorm16, -1.01);
+      expect([...new Int16Array(scalar)]).toStrictEqual([-32767]);
+
+      const pair = new ArrayBuffer(4);
+      writeToArrayBuffer(pair, d.snorm16x2, d.vec2f(1.01, -1.01));
+      expect([...new Int16Array(pair)]).toStrictEqual([32767, -32767]);
+
+      const quad = new ArrayBuffer(8);
+      writeToArrayBuffer(quad, d.snorm16x4, d.vec4f(1.01, -1.01, 2, -2));
+      expect([...new Int16Array(quad)]).toStrictEqual([32767, -32767, 32767, -32767]);
+    });
+  });
+
+  describe('unorm8', () => {
+    it('clamps out-of-range values when writing', () => {
+      const scalar = new ArrayBuffer(1);
+      writeToArrayBuffer(scalar, d.unorm8, 1.01);
+      expect([...new Uint8Array(scalar)]).toStrictEqual([255]);
+      writeToArrayBuffer(scalar, d.unorm8, -0.01);
+      expect([...new Uint8Array(scalar)]).toStrictEqual([0]);
+
+      const pair = new ArrayBuffer(2);
+      writeToArrayBuffer(pair, d.unorm8x2, d.vec2f(1.01, -0.01));
+      expect([...new Uint8Array(pair)]).toStrictEqual([255, 0]);
+
+      const quad = new ArrayBuffer(4);
+      writeToArrayBuffer(quad, d.unorm8x4, d.vec4f(1.01, -0.01, 2, -1));
+      expect([...new Uint8Array(quad)]).toStrictEqual([255, 0, 255, 0]);
+    });
   });
 
   describe('unorm8x4_bgra', () => {
@@ -88,6 +178,14 @@ export function normalizedFormatCases() {
       writeToArrayBuffer(buffer, d.unorm8x4_bgra, d.vec4f(0.25, 0.5, 0.75, 1));
 
       expect([...new Uint8Array(buffer)]).toStrictEqual([191, 128, 64, 255]);
+    });
+
+    it('clamps out-of-range values when writing', () => {
+      const buffer = new ArrayBuffer(4);
+
+      writeToArrayBuffer(buffer, d.unorm8x4_bgra, d.vec4f(1.01, -0.01, 2, -1));
+
+      expect([...new Uint8Array(buffer)]).toStrictEqual([255, 0, 255, 0]);
     });
   });
 }

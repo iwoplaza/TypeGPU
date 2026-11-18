@@ -134,18 +134,18 @@ const primitiveToWriteFunction = {
  * based on the `Channel Formats` table https://www.w3.org/TR/WGSL/#texel-formats
  */
 const vertexFormatValueTransform = {
-  unorm8: (value: string) => `Math.round(${value} * 255)`,
-  unorm8x2: (value: string) => `Math.round(${value} * 255)`,
-  unorm8x4: (value: string) => `Math.round(${value} * 255)`,
-  snorm8: (value: string) => `Math.round(${value} * 127)`,
-  snorm8x2: (value: string) => `Math.round(${value} * 127)`,
-  snorm8x4: (value: string) => `Math.round(${value} * 127)`,
-  unorm16: (value: string) => `Math.round(${value} * 65535)`,
-  unorm16x2: (value: string) => `Math.round(${value} * 65535)`,
-  unorm16x4: (value: string) => `Math.round(${value} * 65535)`,
-  snorm16: (value: string) => `Math.round(${value} * 32767)`,
-  snorm16x2: (value: string) => `Math.round(${value} * 32767)`,
-  snorm16x4: (value: string) => `Math.round(${value} * 32767)`,
+  unorm8: (value: string) => `Math.round(Math.max(0, Math.min(1, ${value})) * 255)`,
+  unorm8x2: (value: string) => `Math.round(Math.max(0, Math.min(1, ${value})) * 255)`,
+  unorm8x4: (value: string) => `Math.round(Math.max(0, Math.min(1, ${value})) * 255)`,
+  snorm8: (value: string) => `Math.round(Math.max(-1, Math.min(1, ${value})) * 127)`,
+  snorm8x2: (value: string) => `Math.round(Math.max(-1, Math.min(1, ${value})) * 127)`,
+  snorm8x4: (value: string) => `Math.round(Math.max(-1, Math.min(1, ${value})) * 127)`,
+  unorm16: (value: string) => `Math.round(Math.max(0, Math.min(1, ${value})) * 65535)`,
+  unorm16x2: (value: string) => `Math.round(Math.max(0, Math.min(1, ${value})) * 65535)`,
+  unorm16x4: (value: string) => `Math.round(Math.max(0, Math.min(1, ${value})) * 65535)`,
+  snorm16: (value: string) => `Math.round(Math.max(-1, Math.min(1, ${value})) * 32767)`,
+  snorm16x2: (value: string) => `Math.round(Math.max(-1, Math.min(1, ${value})) * 32767)`,
+  snorm16x4: (value: string) => `Math.round(Math.max(-1, Math.min(1, ${value})) * 32767)`,
 } as const;
 
 const specialPackedFormats = {
@@ -161,7 +161,7 @@ const specialPackedFormats = {
       return bgraComponents
         .map(
           (c, idx) =>
-            `output.setUint8((${offsetExpr} + ${idx}), Math.round(${valueExpr}.${c} * 255), littleEndian);\n`,
+            `output.setUint8((${offsetExpr} + ${idx}), Math.round(Math.max(0, Math.min(1, ${valueExpr}.${c})) * 255), littleEndian);\n`,
         )
         .join('');
     },
