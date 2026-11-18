@@ -60,9 +60,7 @@ describe('useBuffer', () => {
 
     expect(createBufferSpy).toHaveBeenCalledTimes(2);
     expect(createBufferSpy).toHaveBeenCalledWith(d.vec2f, d.vec2f(1, 2));
-    // Destroyed only after the new one has been committed, and the cleanup delay has passed
-    expect(destroyBufferSpy).not.toHaveBeenCalled();
-    vi.runAllTimers();
+    // Destroyed as soon as the new one has been committed
     expect(destroyBufferSpy).toHaveBeenCalledTimes(1);
   });
 

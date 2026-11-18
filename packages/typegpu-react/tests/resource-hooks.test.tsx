@@ -113,7 +113,7 @@ describe.each(hookCases)('$name', (hook) => {
     expect(tracker.alive()).toHaveLength(0);
   });
 
-  it('destroys the previous buffer only after the schema change commits', ({ root }) => {
+  it('destroys the previous buffer once the schema change commits', ({ root }) => {
     using tracker = trackBuffers(root, hook);
     let committed: unknown;
     const onCommit = (resource: unknown) => {
@@ -132,7 +132,6 @@ describe.each(hookCases)('$name', (hook) => {
         <User schema={d.vec2f} onCommit={onCommit} />
       </Root>,
     );
-    vi.advanceTimersByTime(5000);
 
     expect(first.destroyed).toBe(true);
     expect(hook.bufferOf(committed).destroyed).toBe(false);
@@ -155,7 +154,7 @@ describe.each(hookCases)('$name', (hook) => {
       return null;
     }
 
-    const { rerender } = render(
+    const { rerender, unmount } = render(
       <Root root={root}>
         <Suspense fallback={null}>
           <Suspending schema={d.f32} suspend={false} />
@@ -179,12 +178,19 @@ describe.each(hookCases)('$name', (hook) => {
 
     expect(hook.bufferOf(committed)).toBe(first);
     expect(first.destroyed).toBe(false);
-    // The buffer created for the render that never committed is not leaked
-    expect(tracker.alive()).toEqual([first]);
+    // The render may still commit, so its buffer stays around until the component is done with it
+    expect(tracker.alive()).toHaveLength(2);
+
+    unmount();
+    vi.advanceTimersByTime(5000);
+    expect(tracker.alive()).toHaveLength(0);
   });
 
-  it('does not leak buffers from renders discarded by a suspending sibling', async ({ root }) => {
+  it('destroys the committed buffer of a tree that mounted after a sibling suspended', async ({
+    root,
+  }) => {
     using tracker = trackBuffers(root, hook);
+    let committed: unknown;
     let resolve = () => {};
     const promise = new Promise<void>((r) => {
       resolve = r;
@@ -199,7 +205,12 @@ describe.each(hookCases)('$name', (hook) => {
       render(
         <Root root={root}>
           <Suspense fallback={null}>
-            <User schema={d.f32} />
+            <User
+              schema={d.f32}
+              onCommit={(resource) => {
+                committed = resource;
+              }}
+            />
             <Suspender />
           </Suspense>
         </Root>,
@@ -210,14 +221,16 @@ describe.each(hookCases)('$name', (hook) => {
       resolve();
     });
     vi.advanceTimersByTime(5000);
-    expect(tracker.alive()).toHaveLength(1);
+    expect(hook.bufferOf(committed).destroyed).toBe(false);
 
     unmount();
     vi.advanceTimersByTime(5000);
-    expect(tracker.alive()).toHaveLength(0);
+    expect(hook.bufferOf(committed).destroyed).toBe(true);
+    // Buffers from the attempts React threw away before the first commit are left to the
+    // garbage collector. The component never mounted, so nothing would tell us to destroy them.
   });
 
-  it('replaces a buffer that was destroyed before its render committed', ({ root }) => {
+  it('hands a live buffer to effects when the commit takes long', ({ root }) => {
     using tracker = trackBuffers(root, hook);
     let committed: unknown;
 
@@ -241,9 +254,50 @@ describe.each(hookCases)('$name', (hook) => {
       </Root>,
     );
 
-    expect(tracker.buffers()).toHaveLength(2);
+    expect(tracker.buffers()).toHaveLength(1);
     expect(hook.bufferOf(committed).destroyed).toBe(false);
-    expect(tracker.alive()).toEqual([hook.bufferOf(committed)]);
+  });
+
+  it('reuses the buffer of a schema change that stayed suspended for a while', async ({ root }) => {
+    using tracker = trackBuffers(root, hook);
+    const seen: TgpuBuffer<d.AnyData>[] = [];
+    let resolve = () => {};
+    const promise = new Promise<void>((r) => {
+      resolve = r;
+    });
+
+    function Suspender({ suspend }: { suspend: boolean }) {
+      if (suspend) {
+        use(promise);
+      }
+      return null;
+    }
+
+    const tree = (schema: Schema, suspend: boolean) => (
+      <Root root={root}>
+        <Suspense fallback={null}>
+          <User schema={schema} onCommit={(resource) => seen.push(hook.bufferOf(resource))} />
+          <Suspender suspend={suspend} />
+        </Suspense>
+      </Root>
+    );
+
+    const { rerender } = await act(async () => render(tree(d.f32, false)));
+    await act(async () => {
+      startTransition(() => rerender(tree(d.vec2f, true)));
+    });
+    vi.advanceTimersByTime(5000);
+    await act(async () => {
+      resolve();
+    });
+
+    const last = seen.at(-1);
+    expect(last?.dataType).toBe(d.vec2f);
+    expect(seen.every((buffer) => buffer === seen[0] || buffer === last)).toBe(true);
+    expect(seen.some((buffer) => buffer.destroyed && buffer === last)).toBe(false);
+    // One for `d.f32`, one for `d.vec2f`, the retry after the promise resolved reused it
+    expect(tracker.buffers()).toHaveLength(2);
+    expect(tracker.alive()).toEqual([last]);
   });
 
   it('does not leak buffers in StrictMode', ({ root }) => {
@@ -269,6 +323,44 @@ describe.each(hookCases)('$name', (hook) => {
     unmount();
     vi.advanceTimersByTime(5000);
     expect(tracker.alive()).toHaveLength(0);
+  });
+});
+
+describe('useBuffer schema changes', () => {
+  it('keeps at most two buffers alive while the schema changes every frame', ({ root }) => {
+    vi.useFakeTimers();
+    using createBufferSpy = vi.spyOn(root, 'createBuffer');
+    let peak = 0;
+    const alive = () =>
+      createBufferSpy.mock.results.filter(
+        (result) => !(result.value as TgpuBuffer<d.AnyData>).destroyed,
+      ).length;
+
+    function Resizable({ size }: { size: number }) {
+      useBuffer(d.arrayOf(d.f32, size));
+      peak = Math.max(peak, alive());
+      return null;
+    }
+
+    const { rerender } = render(
+      <Root root={root}>
+        <Resizable size={1} />
+      </Root>,
+    );
+    for (let size = 2; size <= 20; size++) {
+      vi.advanceTimersByTime(16);
+      rerender(
+        <Root root={root}>
+          <Resizable size={size} />
+        </Root>,
+      );
+      peak = Math.max(peak, alive());
+    }
+    vi.useRealTimers();
+
+    expect(createBufferSpy).toHaveBeenCalledTimes(20);
+    expect(peak).toBeLessThanOrEqual(2);
+    expect(alive()).toBe(1);
   });
 });
 

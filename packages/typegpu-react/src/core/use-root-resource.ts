@@ -9,12 +9,6 @@ import { useRoot } from './root-context.tsx';
  */
 const RELEASE_DELAY_MS = 200;
 
-/**
- * How long a resource created during render waits for an effect to claim it. If the render
- * that created it never commits (it was discarded, or is suspended), it gets destroyed.
- */
-const UNCLAIMED_DELAY_MS = 1000;
-
 interface ResourceEntry<TSchema, TResource> {
   readonly root: TgpuRoot;
   readonly schema: TSchema;
@@ -27,24 +21,29 @@ interface ResourceEntry<TSchema, TResource> {
 interface ResourceCache<TSchema, TResource> {
   /** The entry claimed by the last effect that ran */
   committed: ResourceEntry<TSchema, TResource> | undefined;
-  /** The entry created by the latest render, not yet claimed by an effect */
-  pending: ResourceEntry<TSchema, TResource> | undefined;
+  /** Every entry that hasn't been destroyed yet, including ones from renders that never committed */
+  live: Set<ResourceEntry<TSchema, TResource>>;
 }
 
-function scheduleDestroy<TResource>(entry: ResourceEntry<unknown, TResource>, delay: number) {
+function destroyEntry<TResource>(
+  cache: ResourceCache<unknown, TResource>,
+  entry: ResourceEntry<unknown, TResource>,
+) {
   clearTimeout(entry.timeout);
-  entry.timeout = setTimeout(() => {
-    entry.destroyed = true;
-    entry.destroy(entry.resource);
-  }, delay);
+  cache.live.delete(entry);
+  entry.destroyed = true;
+  entry.destroy(entry.resource);
 }
 
 /**
  * Creates a resource tied to the current root and a schema, recreating it when either
  * changes (schemas are compared structurally).
  *
- * Resources are only destroyed once React is done with them: after the effect that
- * claimed them is cleaned up, or when the render that created them never commits.
+ * Resources are only destroyed once React is done with them: when an effect claims a newer one,
+ * or after the effect that claimed them is cleaned up and not set up again.
+ * Resources created by renders that never commit are destroyed along with the others, unless the
+ * component never mounted at all, then they're left to the garbage collector. A timer can't tell
+ * a discarded render apart from one that's just slow to commit.
  *
  * @returns The resource, and the schema it was created with.
  */
@@ -56,7 +55,7 @@ export function useRootResource<TSchema, TResource>(
   const root = useRoot();
   const [cache] = useState<ResourceCache<TSchema, TResource>>(() => ({
     committed: undefined,
-    pending: undefined,
+    live: new Set(),
   }));
   const [, rerender] = useReducer((epoch: number) => epoch + 1, 0);
 
@@ -66,11 +65,7 @@ export function useRootResource<TSchema, TResource>(
     entry.root === root &&
     d.schemasEqualStructurally(entry.schema as d.AnyData, schema as d.AnyData);
 
-  let entry = matches(cache.committed)
-    ? cache.committed
-    : matches(cache.pending)
-      ? cache.pending
-      : undefined;
+  let entry = matches(cache.committed) ? cache.committed : [...cache.live].find(matches);
 
   if (!entry) {
     entry = {
@@ -81,30 +76,31 @@ export function useRootResource<TSchema, TResource>(
       destroyed: false,
       timeout: undefined,
     };
-    cache.pending = entry;
-  }
-
-  if (entry === cache.pending) {
-    // Rescheduled on every render that uses it, the effect cancels it once it commits
-    scheduleDestroy(entry, UNCLAIMED_DELAY_MS);
+    cache.live.add(entry);
   }
 
   const current = entry;
   useEffect(() => {
     if (current.destroyed) {
-      // It took longer to commit than we were willing to wait, rendering again with a fresh one
+      // Released while the component was hidden (e.g. by <Activity>), rendering again with a fresh one
       rerender();
       return;
     }
 
     clearTimeout(current.timeout);
     cache.committed = current;
-    if (cache.pending === current) {
-      cache.pending = undefined;
+    for (const other of cache.live) {
+      if (other !== current) {
+        // Superseded by `current`, or created by a render that never committed
+        destroyEntry(cache, other);
+      }
     }
 
     return () => {
-      scheduleDestroy(current, RELEASE_DELAY_MS);
+      for (const live of cache.live) {
+        clearTimeout(live.timeout);
+        live.timeout = setTimeout(() => destroyEntry(cache, live), RELEASE_DELAY_MS);
+      }
     };
   }, [cache, current]);
 
