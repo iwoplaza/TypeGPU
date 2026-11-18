@@ -6,6 +6,7 @@ import {
   type WgslTexture,
   type WgslTextureProps,
 } from '../../data/texture.ts';
+import { inCodegenMode } from '../../execMode.ts';
 import type { StorageFlag } from '../../extension.ts';
 import { type ResolvedSnippet, snip } from '../../data/snippet.ts';
 import type { F32 } from '../../data/wgslTypes.ts';
@@ -19,12 +20,20 @@ import {
   type ViewDimensionToDimension,
 } from './textureFormats.ts';
 import type { TgpuDeviceOwningSoul, TgpuSoul } from '../../shared/soul.ts';
-import { $gpuValueOf, $internal, $repr, $resolve, $soul } from '../../shared/symbols.ts';
+import {
+  $gpuValueOf,
+  $internal,
+  $ownSnippet,
+  $comptimeValueOf,
+  $repr,
+  $resolve,
+  $soul,
+} from '../../shared/symbols.ts';
 import type { Default, TypedArray, UnionToIntersection } from '../../shared/utilityTypes.ts';
 import type { LayoutMembership } from '../../tgpuBindGroupLayout.ts';
-import type { ResolutionCtx, SelfResolvable } from '../../types.ts';
+import { type ResolutionCtx, runtimeOnly, type SelfResolvable } from '../../types.ts';
 import type { ExperimentalTgpuRoot } from '../root/rootTypes.ts';
-import { makeDereferenceable } from '../../tgsl/makeDereferenceable.ts';
+import { valueProxyHandler } from '../valueProxyUtils.ts';
 import type { TextureProps } from './textureProps.ts';
 import type {
   AllowedUsages,
@@ -755,25 +764,37 @@ class TgpuFixedTextureViewImpl<T extends WgslTexture | WgslStorageTexture>
     return this;
   }
 
-  // prototype properties
-  declare readonly [$gpuValueOf]: Infer<T>;
-  declare readonly $: Infer<T>;
+  // Created once, since shader code can access a view many times
+  #valueProxy: Infer<T> | undefined;
 
-  static {
-    makeDereferenceable(TgpuFixedTextureViewImpl.prototype, {
-      codegenMode: {
-        getBaseSnippet(trackingProxy) {
-          return snip(trackingProxy, this.schema, /* origin */ 'handle', false);
+  get [$gpuValueOf](): Infer<T> {
+    if (this.#valueProxy) {
+      return this.#valueProxy;
+    }
+    const schema = this.schema;
+    this.#valueProxy = new Proxy(
+      {
+        [$internal]: true,
+        get [$ownSnippet]() {
+          return snip(this, schema, /* origin */ 'handle', false);
         },
+        [$comptimeValueOf]: runtimeOnly,
+        [$resolve]: (ctx) => ctx.resolve(this),
+        toString: () => `${this.toString()}.$`,
       },
-      normalMode: {
-        get() {
-          throw new Error(
-            'Direct access to texture view values is possible only as part of a compute dispatch or draw call. Try .read() or .write() instead',
-          );
-        },
-      },
-    });
+      valueProxyHandler,
+    ) as unknown as Infer<T>;
+    return this.#valueProxy;
+  }
+
+  get $(): Infer<T> {
+    if (inCodegenMode()) {
+      return this[$gpuValueOf];
+    }
+
+    throw new Error(
+      'Direct access to texture view values is possible only as part of a compute dispatch or draw call. Try .read() or .write() instead',
+    );
   }
 
   get size(): number[] {
@@ -843,27 +864,39 @@ export class TgpuLaidOutTextureViewImpl<T extends WgslTexture | WgslStorageTextu
     return snip(id, this.schema, /* origin */ 'handle');
   }
 
-  // prototype properties
-  declare readonly [$gpuValueOf]: Infer<T>;
-  declare readonly $: Infer<T>;
+  // Created once, since shader code can access a view many times
+  #valueProxy: Infer<T> | undefined;
 
-  static {
-    makeDereferenceable(TgpuLaidOutTextureViewImpl.prototype, {
-      codegenMode: {
-        getBaseSnippet(trackingProxy) {
-          return snip(trackingProxy, this.schema, /* origin */ 'handle', false);
+  get [$gpuValueOf](): Infer<T> {
+    if (this.#valueProxy) {
+      return this.#valueProxy;
+    }
+    const schema = this.schema;
+    this.#valueProxy = new Proxy(
+      {
+        [$internal]: true,
+        get [$ownSnippet]() {
+          return snip(this, schema, /* origin */ 'handle', false);
         },
+        [$comptimeValueOf]: runtimeOnly,
+        [$resolve]: (ctx) => ctx.resolve(this),
+        toString: () => `${this.toString()}.$`,
       },
-      normalMode: {
-        get() {
-          throw new Error(
-            `Accessed view '${
-              getName(this) ?? '<unnamed>'
-            }' outside of codegen mode. Direct access to texture views values is possible only as part of a compute dispatch or draw call. Try .read() or .write() instead`,
-          );
-        },
-      },
-    });
+      valueProxyHandler,
+    ) as unknown as Infer<T>;
+    return this.#valueProxy;
+  }
+
+  get $(): Infer<T> {
+    if (inCodegenMode()) {
+      return this[$gpuValueOf];
+    }
+
+    throw new Error(
+      `Accessed view '${
+        getName(this) ?? '<unnamed>'
+      }' outside of codegen mode. Direct access to texture views values is possible only as part of a compute dispatch or draw call. Try .read() or .write() instead`,
+    );
   }
 
   $name(label: string): this {
