@@ -7,6 +7,7 @@ import {
 } from 'typed-binary';
 import type { Infer, InferInput, InferRecord } from '../shared/repr.ts';
 import type { AnyConcreteData, AnyData, Disarray, LooseDecorated, Unstruct } from './dataTypes.ts';
+import { isDisarray } from './dataTypes.ts';
 import { mat2x2f, mat3x3f, mat4x4f } from './matrix.ts';
 import { offsetsForProps } from './offsets.ts';
 import { sizeOf } from './sizeOf.ts';
@@ -31,6 +32,7 @@ import { getCompiledWriter } from './compiledIO.ts';
 import { getName } from '../shared/meta.ts';
 import { logger } from '../tgpuLogger.ts';
 import { readFloat16, writeFloat16 } from './float16Conversion.ts';
+import { roundUp } from '../mathUtils.ts';
 
 type DataWriter<TSchema extends wgsl.BaseData> = (
   output: ISerialOutput,
@@ -790,6 +792,10 @@ export function calculateOffsets<T extends wgsl.BaseData>(
   if (wgsl.isWgslArray(schema) && Array.isArray(data)) {
     const arrayData = data as unknown[];
     naturalSize = arrayData.length * strideOf(schema);
+  } else if (isDisarray(schema) && Array.isArray(data)) {
+    const arrayData = data as unknown[];
+    // Disarray strides don't have to be a multiple of 4, but uploads do
+    naturalSize = roundUp(arrayData.length * strideOf(schema), 4);
   } else if (ArrayBuffer.isView(data) || data instanceof ArrayBuffer) {
     naturalSize = data.byteLength;
   }

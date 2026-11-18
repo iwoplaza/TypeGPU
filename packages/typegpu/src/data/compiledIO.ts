@@ -168,6 +168,18 @@ const specialPackedFormats = {
   },
 } as const;
 
+function isLeafElement(node: wgsl.BaseData): boolean {
+  if (wgsl.isAtomic(node) || wgsl.isDecorated(node) || isLooseDecorated(node)) {
+    return isLeafElement(node.inner);
+  }
+  return !(
+    wgsl.isWgslStruct(node) ||
+    isUnstruct(node) ||
+    wgsl.isWgslArray(node) ||
+    isDisarray(node)
+  );
+}
+
 export function buildWriter(
   node: wgsl.BaseData,
   offsetExpr: string,
@@ -216,17 +228,28 @@ export function buildWriter(
       let code = `if (ArrayBuffer.isView(${valueExpr})) {\n`;
       code += `  new Uint8Array(output.buffer).set(new Uint8Array(${valueExpr}.buffer, ${valueExpr}.byteOffset, ${copyLen}), output.byteOffset + (${offsetExpr}));\n`;
       code += `} else {\n`;
-      code += `for (let ${loopVar} = 0; ${loopVar} < ${node.elementCount}; ${loopVar}++) {\n`;
-      if (partial) {
-        code += `if ((${offsetExpr} + ${loopVar} * ${elementSize}) >= endOffset) return;\n`;
+      const loop = (end: string) => {
+        let loopCode = `for (let ${loopVar} = 0; ${loopVar} < ${end}; ${loopVar}++) {\n`;
+        if (partial) {
+          loopCode += `if ((${offsetExpr} + ${loopVar} * ${elementSize}) >= endOffset) return;\n`;
+        }
+        loopCode += go(
+          node.elementType,
+          `(${offsetExpr} + ${loopVar} * ${elementSize})`,
+          `${valueExpr}[${loopVar}]`,
+          depth + 1,
+        );
+        loopCode += '}\n';
+        return loopCode;
+      };
+
+      if (isLeafElement(node.elementType)) {
+        // A constant bound is measurably faster for small inner arrays, so it gets its own loop
+        code += `if (${valueExpr}.length >= ${node.elementCount}) {\n${loop(String(node.elementCount))}} else {\n${loop(`${valueExpr}.length`)}}\n`;
+      } else {
+        code += `const ${loopVar}End = Math.min(${node.elementCount}, ${valueExpr}.length);\n`;
+        code += loop(`${loopVar}End`);
       }
-      code += go(
-        node.elementType,
-        `(${offsetExpr} + ${loopVar} * ${elementSize})`,
-        `${valueExpr}[${loopVar}]`,
-        depth + 1,
-      );
-      code += '}\n';
       code += '}\n';
       return code;
     }

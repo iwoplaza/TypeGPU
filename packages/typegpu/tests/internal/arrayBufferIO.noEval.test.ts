@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect } from 'vitest';
 import { d, writeToArrayBuffer, setGlobalJITPreference } from 'typegpu';
 import { it } from 'typegpu-testing-utility';
+import { shortArrayWriteCases } from './shortArrayWriteCases.ts';
 
 beforeAll(() => {
   setGlobalJITPreference('disabled');
@@ -194,4 +195,6 @@ describe('arrayBufferIO', () => {
       expect([...new Uint32Array(buffer)]).toStrictEqual([1, 0, 0, 0, 2, 3, 4, 0, 5]);
     });
   });
+
+  shortArrayWriteCases();
 });

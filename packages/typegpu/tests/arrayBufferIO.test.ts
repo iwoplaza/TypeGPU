@@ -1,6 +1,7 @@
 import { describe, expect } from 'vitest';
 import { d, patchArrayBuffer, readFromArrayBuffer, writeToArrayBuffer } from 'typegpu';
 import { it } from 'typegpu-testing-utility';
+import { shortArrayWriteCases } from './internal/shortArrayWriteCases.ts';
 
 describe('arrayBufferIO', () => {
   describe('write', () => {
@@ -132,6 +133,8 @@ describe('arrayBufferIO', () => {
       expect(results).toStrictEqual(boids);
     });
   });
+
+  shortArrayWriteCases();
 
   describe('patch', () => {
     it('works', () => {
