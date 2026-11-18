@@ -94,7 +94,7 @@ describe('atomics in bind group layouts', () => {
 describe('atomics in variables and constants', () => {
   it('rejects atomics in private variables', () => {
     expect(() => tgpu.privateVar(d.atomic(d.u32))).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Cannot create a private variable with schema {"type":"atomic"}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
+      `[Error: Cannot create a private variable with schema atomic<u32>, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
     );
     expect(() => tgpu.privateVar(Counter)).toThrow(/contains atomics/);
     expect(() => tgpu.privateVar(d.arrayOf(d.atomic(d.i32), 4))).toThrow(/contains atomics/);
@@ -102,7 +102,7 @@ describe('atomics in variables and constants', () => {
 
   it('rejects atomics in constants', () => {
     expect(() => tgpu.const(d.atomic(d.u32), 1 as never)).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Cannot create a constant with schema {"type":"atomic"}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
+      `[Error: Cannot create a constant with schema atomic<u32>, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
     );
     expect(() => tgpu.const(Counter, { counter: 0 } as never)).toThrow(/contains atomics/);
   });

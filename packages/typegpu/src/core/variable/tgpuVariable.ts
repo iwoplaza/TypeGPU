@@ -9,7 +9,6 @@ import { makeResolvable } from '../../tgsl/makeResolvable.ts';
 import type { TgpuNamable } from '../../shared/meta.ts';
 import { getName, setName } from '../../shared/meta.ts';
 import type { InferGPU } from '../../shared/repr.ts';
-import { safeStringify } from '../../shared/stringify.ts';
 import type { TgpuSoul } from '../../shared/soul.ts';
 import { $gpuValueOf, $internal, $soul } from '../../shared/symbols.ts';
 
@@ -161,7 +160,7 @@ class TgpuVarImpl<TScope extends VariableScope, TDataType extends BaseData> impl
   constructor(scope: TScope, dataType: TDataType, initialValue?: InferGPU<TDataType>) {
     if (scope === 'private' && containsAtomic(dataType)) {
       throw new Error(
-        `Cannot create a private variable with schema ${safeStringify(dataType)}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.`,
+        `Cannot create a private variable with schema ${String(dataType)}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.`,
       );
     }
     this[$soul] = {
