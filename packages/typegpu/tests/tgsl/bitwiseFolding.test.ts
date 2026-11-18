@@ -1,6 +1,6 @@
 import { describe, expect } from 'vitest';
 import { it } from 'typegpu-testing-utility';
-import { tgpu, d } from 'typegpu';
+import { tgpu, d, std } from 'typegpu';
 
 describe('bitwise operators on compile-time known values', () => {
   it('folds abstract operands with 32-bit JS semantics', () => {
@@ -60,34 +60,165 @@ describe('bitwise operators on compile-time known values', () => {
     `);
   });
 
-  it('gives `>>>` results that do not fit an i32 the u32 type', () => {
-    const typed = () => {
-      'use gpu';
-      return d.u32(-1 >>> 0);
-    };
-    const untyped = () => {
-      'use gpu';
-      return -1 >>> 0;
-    };
-    const small = () => {
-      'use gpu';
-      return -1 >>> 28;
+  it('keeps `>>>` results abstract, like the equivalent literal', () => {
+    const resolveOrError = (fn: () => unknown) => {
+      try {
+        return tgpu.resolve([fn]);
+      } catch (error) {
+        return `throws: ${(error as Error).message}`;
+      }
     };
 
-    expect(typed()).toBe(4294967295);
-    expect(untyped()).toBe(4294967295);
-    expect(small()).toBe(15);
-    expect(tgpu.resolve([typed, untyped, small])).toMatchInlineSnapshot(`
-      "fn typed() -> u32 {
-        return 4294967295u;
+    const pairs: [string, () => unknown, () => unknown][] = [
+      [
+        'u32 cast',
+        () => {
+          'use gpu';
+          return d.u32(4294967295);
+        },
+        () => {
+          'use gpu';
+          return d.u32(-1 >>> 0);
+        },
+      ],
+      [
+        'i32 cast',
+        () => {
+          'use gpu';
+          return d.i32(4294967295);
+        },
+        () => {
+          'use gpu';
+          return d.i32(-1 >>> 0);
+        },
+      ],
+      [
+        'untyped const',
+        () => {
+          'use gpu';
+          const c = 4294967295;
+          return d.u32(c);
+        },
+        () => {
+          'use gpu';
+          const c = -1 >>> 0;
+          return d.u32(c);
+        },
+      ],
+      [
+        'abstract multiplication',
+        () => {
+          'use gpu';
+          return 4294967295 * 2;
+        },
+        () => {
+          'use gpu';
+          return (-1 >>> 0) * 2;
+        },
+      ],
+      [
+        'i32 addition',
+        () => {
+          'use gpu';
+          const x = d.i32(1);
+          return x + 4294967295;
+        },
+        () => {
+          'use gpu';
+          const x = d.i32(1);
+          return x + (-1 >>> 0);
+        },
+      ],
+      [
+        'runtime i32 addition',
+        () => {
+          'use gpu';
+          let x = d.i32(1);
+          return x + 4294967295;
+        },
+        () => {
+          'use gpu';
+          let x = d.i32(1);
+          return x + (-1 >>> 0);
+        },
+      ],
+      [
+        'runtime u32 multiplication',
+        () => {
+          'use gpu';
+          let x = d.u32(1);
+          return x * 4294967295;
+        },
+        () => {
+          'use gpu';
+          let x = d.u32(1);
+          return x * (-1 >>> 0);
+        },
+      ],
+      [
+        'std.max',
+        () => {
+          'use gpu';
+          return std.max(4294967295, 5);
+        },
+        () => {
+          'use gpu';
+          return std.max(-1 >>> 0, 5);
+        },
+      ],
+      [
+        'return value',
+        () => {
+          'use gpu';
+          return 4294967295;
+        },
+        () => {
+          'use gpu';
+          return -1 >>> 0;
+        },
+      ],
+    ];
+
+    for (const [position, literal, folded] of pairs) {
+      expect(resolveOrError(folded), position).toBe(resolveOrError(literal));
+    }
+  });
+
+  it('does not fold results equal to -2147483648', () => {
+    const shl = () => {
+      'use gpu';
+      return d.i32(-1) << 31;
+    };
+    const xor = () => {
+      'use gpu';
+      return d.i32(0x7fffffff) ^ -1;
+    };
+    const and = () => {
+      'use gpu';
+      return d.i32(-2147483647) & -2;
+    };
+    const nested = () => {
+      'use gpu';
+      let x = d.i32(1);
+      return x ^ (0x7fffffff ^ -1);
+    };
+
+    expect(tgpu.resolve([shl, xor, and, nested])).toMatchInlineSnapshot(`
+      "fn shl() -> i32 {
+        return (-1i << 31u);
       }
 
-      fn untyped() -> u32 {
-        return 4294967295u;
+      fn xor() -> i32 {
+        return (2147483647i ^ -1i);
       }
 
-      fn small() -> i32 {
-        return 15;
+      fn and() -> i32 {
+        return (-2147483647i & -2i);
+      }
+
+      fn nested() -> i32 {
+        let x = 1i;
+        return (x ^ i32((2147483647 ^ -1)));
       }"
     `);
   });
