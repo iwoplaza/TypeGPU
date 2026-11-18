@@ -27,15 +27,14 @@ describe('unary operators', () => {
     `);
   });
 
-  it('drops unary plus on numeric scalars and vectors', () => {
+  it('drops unary plus on numeric scalars', () => {
     const fn = tgpu.fn(
-      [d.f32, d.u32, d.vec3f],
+      [d.f32, d.u32],
       d.f32,
-    )((a, b, v) => {
+    )((a, b) => {
       'use gpu';
       const x = +a;
       const y = +b;
-      const w = +v;
       let l = d.f32(1);
       l = +l;
       const k = +1;
@@ -43,15 +42,27 @@ describe('unary operators', () => {
     });
 
     expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
-      "fn fn_1(a: f32, b: u32, v: vec3f) -> f32 {
+      "fn fn_1(a: f32, b: u32) -> f32 {
         let x = a;
         let y = b;
-        let w = v;
         var l = 1f;
         l = l;
         const k = 1;
         return a;
       }"
+    `);
+  });
+
+  it('rejects unary plus on vectors, which would be NaN on the CPU', () => {
+    const fn = tgpu.fn([d.vec3f])((v) => {
+      'use gpu';
+      const w = +v;
+    });
+
+    expect(() => tgpu.resolve([fn])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:fn: Unary operator + requires a numeric scalar. Got 'v' of type vec3f.]
     `);
   });
 
@@ -64,7 +75,7 @@ describe('unary operators', () => {
     expect(() => tgpu.resolve([fn])).toThrowErrorMatchingInlineSnapshot(`
       [Error: Resolution of the following tree failed:
       - <root>
-      - fn:fn: Unary operator + requires a numeric operand. Got 'b' of type bool.]
+      - fn:fn: Unary operator + requires a numeric scalar. Got 'b' of type bool.]
     `);
   });
 

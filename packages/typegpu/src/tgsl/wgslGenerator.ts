@@ -217,9 +217,10 @@ const unaryOpCodeToCodegen = {
     }
 
     const type = argExpr.dataType;
-    if (!wgsl.isNumericSchema(type) && !(wgsl.isVec(type) && !wgsl.isVecBool(type))) {
+    // Vectors are left out on purpose, JS turns them into NaN
+    if (!wgsl.isNumericSchema(type)) {
       throw new WgslTypeError(
-        `Unary operator + requires a numeric operand. Got '${stringifySnippet(argExpr)}' of type ${String(type)}.`,
+        `Unary operator + requires a numeric scalar. Got '${stringifySnippet(argExpr)}' of type ${String(type)}.`,
       );
     }
 
