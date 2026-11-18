@@ -290,6 +290,23 @@ describe('TgpuTexture', () => {
       .$usage('storage');
   });
 
+  it('updates the label of an already created texture when renamed', ({ root, device }) => {
+    const texture = root.createTexture({ size: [1, 1], format: 'rgba8unorm' });
+
+    const rawTexture = root.unwrap(texture);
+    texture.$name('myTexture');
+
+    expect(rawTexture.label).toBe('myTexture');
+    expect(device.mock.createTexture).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create the texture when named before use', ({ root, device }) => {
+    const texture = root.createTexture({ size: [1, 1], format: 'rgba8unorm' }).$name('myTexture');
+
+    expect(device.mock.createTexture).not.toHaveBeenCalled();
+    expect(root.unwrap(texture).label).toBe('myTexture');
+  });
+
   it('creates namable views', ({ root }) => {
     const texture = root
       .createTexture({

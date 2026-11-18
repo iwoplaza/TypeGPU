@@ -364,6 +364,10 @@ class TgpuTextureImpl<TProps extends TextureProps> implements TgpuTexture<TProps
 
   $name(label: string) {
     setName(this, label);
+    const raw = this[$soul].raw;
+    if (raw) {
+      raw.label = label;
+    }
     return this;
   }
 
