@@ -1457,3 +1457,61 @@ describe('GlslGenerator - GL syntax', () => {
     });
   });
 });
+
+describe('GlslGenerator - fragment builtin outputs', () => {
+  it('writes the fragDepth builtin to gl_FragDepth', () => {
+    const fragFn = tgpu.fragmentFn({
+      out: { color: d.vec4f, depth: d.builtin.fragDepth },
+    })(() => {
+      'use gpu';
+      return { color: d.vec4f(1, 0, 0, 1), depth: d.f32(0.5) };
+    });
+
+    const result = tgpu.resolve([fragFn], dualGlOptions().fragment);
+    expect(result).not.toContain('vary_depth');
+    expect(result).toMatchInlineSnapshot(`
+      "layout(location=0) out vec4 vary_color;
+
+      void main() {
+        {
+          vary_color = vec4(1, 0, 0, 1);
+          gl_FragDepth = 0.5;
+          return;
+        }
+      }"
+    `);
+  });
+
+  it('throws for a sampleMask output', () => {
+    const fragFn = tgpu.fragmentFn({
+      out: { color: d.vec4f, mask: d.builtin.sampleMask },
+    })(() => {
+      'use gpu';
+      return { color: d.vec4f(1, 0, 0, 1), mask: d.u32(1) };
+    });
+
+    expect(() => tgpu.resolve([fragFn], dualGlOptions().fragment))
+      .toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fragmentFn:fragFn: The 'sample_mask' builtin is not supported by the WebGL fallback, GLSL ES 3.00 has no equivalent]
+    `);
+  });
+
+  it.each([
+    ['sampleIndex', d.builtin.sampleIndex],
+    ['sampleMask', d.builtin.sampleMask],
+  ] as const)('throws for a %s input', (_, builtin) => {
+    const fragFn = tgpu.fragmentFn({
+      in: { value: builtin },
+      out: d.vec4f,
+    })(({ value }) => {
+      'use gpu';
+      return d.vec4f(d.f32(value), 0, 0, 1);
+    });
+
+    expect(() => tgpu.resolve([fragFn], dualGlOptions().fragment)).toThrow(
+      'is not supported by the WebGL fallback',
+    );
+  });
+});

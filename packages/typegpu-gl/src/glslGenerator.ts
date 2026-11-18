@@ -348,8 +348,12 @@ function glslInputForBuiltin(
   } else if (functionType === 'fragment') {
     if (builtinKind === 'position') return 'gl_FragCoord';
     if (builtinKind === 'front_facing') return 'gl_FrontFacing';
-    if (builtinKind === 'sample_index') return 'uint(gl_SampleID)';
-    if (builtinKind === 'sample_mask') return 'uint(gl_SampleMaskIn[0])';
+    if (builtinKind === 'sample_index' || builtinKind === 'sample_mask') {
+      // gl_SampleID and gl_SampleMaskIn need OES_sample_variables, which WebGL 2 does not expose
+      throw new Error(
+        `The '${builtinKind}' builtin is not supported by the WebGL fallback, GLSL ES 3.00 has no equivalent`,
+      );
+    }
   }
   return undefined;
 }
@@ -1243,13 +1247,24 @@ The generated shader will omit it, so its runtime side effects will not occur.`)
     for (const { prop, rhsStr, dataType } of resolved) {
       let name: string | undefined = entryFnState.structPropToVarMap[prop];
       if (name === undefined) {
-        const isPosition =
-          prop === '$position' ||
-          (expectedReturnType &&
-            d.isWgslStruct(expectedReturnType) &&
-            expectedReturnType.propTypes[prop] === d.builtin.position);
-        if (isPosition) {
+        const propType = autoStruct
+          ? autoStruct.accessProp(prop)?.type
+          : expectedReturnType && d.isWgslStruct(expectedReturnType)
+            ? expectedReturnType.propTypes[prop]
+            : undefined;
+        const builtinKind = propType && getBuiltinKindFromDecorated(propType);
+
+        if (builtinKind === 'sample_mask') {
+          // gl_SampleMask needs OES_sample_variables, which WebGL 2 does not expose
+          throw new Error(
+            `The 'sample_mask' builtin is not supported by the WebGL fallback, GLSL ES 3.00 has no equivalent`,
+          );
+        }
+
+        if (prop === '$position' || builtinKind === 'position') {
           name = 'gl_Position';
+        } else if (builtinKind === 'frag_depth') {
+          name = 'gl_FragDepth';
         } else {
           name = this.ctx.makeUniqueIdentifier(`vary_${prop}`, 'global');
           entryFnState.outVars.push({
