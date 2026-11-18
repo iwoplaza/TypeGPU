@@ -1457,3 +1457,198 @@ describe('GlslGenerator - GL syntax', () => {
     });
   });
 });
+
+describe('GlslGenerator - builtins named differently in GLSL', () => {
+  it('renames builtins that have an exact GLSL ES 3.00 equivalent', () => {
+    const foo = tgpu.fn(
+      [d.f32, d.u32, d.vec2f, d.vec3f],
+      d.f32,
+    )((f, u, v2, v3) => {
+      'use gpu';
+      const angle = std.atan2(f, 2);
+      const facing = std.faceForward(v3, v3, v3);
+      const rounded = std.round(f);
+      const half = std.pack2x16float(v2);
+      const unorm = std.pack2x16unorm(v2);
+      const snorm = std.pack2x16snorm(v2);
+      const unpacked =
+        std.unpack2x16float(u) + std.unpack2x16unorm(half) + std.unpack2x16snorm(unorm + snorm);
+      const derivatives = std.dpdxCoarse(f) + std.dpdyCoarse(f) + std.fwidthCoarse(f);
+      return angle + facing.x + rounded + unpacked.x + derivatives + std.fma(f, 2, 3);
+    });
+
+    expect(tgpu.resolve([foo], glOptions())).toMatchInlineSnapshot(`
+      "float foo(float f, uint u, vec2 v2, vec3 v3) {
+        float angle = atan(f, 2.0);
+        vec3 facing = faceforward(v3, v3, v3);
+        float rounded = roundEven(f);
+        uint half_1 = packHalf2x16(v2);
+        uint unorm_1 = packUnorm2x16(v2);
+        uint snorm_1 = packSnorm2x16(v2);
+        vec2 unpacked = ((unpackHalf2x16(u) + unpackUnorm2x16(half_1)) + unpackSnorm2x16((unorm_1 + snorm_1)));
+        float derivatives = ((dFdx(f) + dFdy(f)) + fwidth(f));
+        return (((((angle + facing.x) + rounded) + unpacked.x) + derivatives) + ((f * 2.0) + 3.0));
+      }"
+    `);
+  });
+
+  it.each([
+    [
+      'countLeadingZeros',
+      (u: number) => {
+        'use gpu';
+        return std.countLeadingZeros(u);
+      },
+    ],
+    [
+      'countOneBits',
+      (u: number) => {
+        'use gpu';
+        return std.countOneBits(u);
+      },
+    ],
+    [
+      'countTrailingZeros',
+      (u: number) => {
+        'use gpu';
+        return std.countTrailingZeros(u);
+      },
+    ],
+    [
+      'firstLeadingBit',
+      (u: number) => {
+        'use gpu';
+        return std.firstLeadingBit(u);
+      },
+    ],
+    [
+      'firstTrailingBit',
+      (u: number) => {
+        'use gpu';
+        return std.firstTrailingBit(u);
+      },
+    ],
+    [
+      'reverseBits',
+      (u: number) => {
+        'use gpu';
+        return std.reverseBits(u);
+      },
+    ],
+    [
+      'extractBits',
+      (u: number) => {
+        'use gpu';
+        return std.extractBits(u, 1, 2);
+      },
+    ],
+    [
+      'insertBits',
+      (u: number) => {
+        'use gpu';
+        return std.insertBits(u, u, 1, 2);
+      },
+    ],
+    [
+      'dot4I8Packed',
+      (u: number) => {
+        'use gpu';
+        return std.dot4I8Packed(u, u);
+      },
+    ],
+    [
+      'dot4U8Packed',
+      (u: number) => {
+        'use gpu';
+        return std.dot4U8Packed(u, u);
+      },
+    ],
+  ])('throws for %s(), which has no GLSL ES 3.00 equivalent', (name, call) => {
+    const foo = tgpu.fn([d.u32])((u) => {
+      'use gpu';
+      call(u);
+    });
+
+    expect(() => tgpu.resolve([foo], glOptions())).toThrow(
+      `std.${name}() is not supported by the WebGL fallback, GLSL ES 3.00 has no equivalent built-in function`,
+    );
+  });
+
+  it.each([
+    [
+      'ldexp',
+      (f: number) => {
+        'use gpu';
+        return std.ldexp(f, 2);
+      },
+    ],
+    [
+      'frexp',
+      (f: number) => {
+        'use gpu';
+        return std.frexp(f).fract;
+      },
+    ],
+    [
+      'modf',
+      (f: number) => {
+        'use gpu';
+        return std.modf(f).fract;
+      },
+    ],
+    [
+      'quantizeToF16',
+      (f: number) => {
+        'use gpu';
+        return std.quantizeToF16(f);
+      },
+    ],
+    [
+      'dpdxFine',
+      (f: number) => {
+        'use gpu';
+        return std.dpdxFine(f);
+      },
+    ],
+    [
+      'dpdyFine',
+      (f: number) => {
+        'use gpu';
+        return std.dpdyFine(f);
+      },
+    ],
+    [
+      'fwidthFine',
+      (f: number) => {
+        'use gpu';
+        return std.fwidthFine(f);
+      },
+    ],
+  ])('throws for %s(), which has no GLSL ES 3.00 equivalent', (name, call) => {
+    const foo = tgpu.fn([d.f32])((f) => {
+      'use gpu';
+      call(f);
+    });
+
+    expect(() => tgpu.resolve([foo], glOptions())).toThrow(
+      `std.${name}() is not supported by the WebGL fallback, GLSL ES 3.00 has no equivalent built-in function`,
+    );
+  });
+
+  it('explains which builtin is not supported', () => {
+    const foo = tgpu.fn(
+      [d.u32],
+      d.u32,
+    )((u) => {
+      'use gpu';
+      return std.countOneBits(u);
+    });
+
+    expect(() => tgpu.resolve([foo], glOptions())).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:foo
+      - fn:countOneBits: std.countOneBits() is not supported by the WebGL fallback, GLSL ES 3.00 has no equivalent built-in function]
+    `);
+  });
+});

@@ -1,5 +1,4 @@
 import { dualImpl } from '../core/function/dualImpl.ts';
-import { stitch } from '../core/resolve/stitch.ts';
 import { f32 } from '../data/numeric.ts';
 import { vec2f, vec3f, vec4f } from '../data/vector.ts';
 import type { AnyFloat32VecInstance } from '../data/wgslTypes.ts';
@@ -24,7 +23,7 @@ export const dpdxCoarse = dualImpl<DerivativeSignature>({
   name: 'dpdxCoarse',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`dpdxCoarse(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('dpdxCoarse', [], [value]),
   sideEffects: false,
 });
 
@@ -32,7 +31,7 @@ export const dpdxFine = dualImpl<DerivativeSignature>({
   name: 'dpdxFine',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`dpdxFine(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('dpdxFine', [], [value]),
   sideEffects: false,
 });
 
@@ -48,7 +47,7 @@ export const dpdyCoarse = dualImpl<DerivativeSignature>({
   name: 'dpdyCoarse',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`dpdyCoarse(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('dpdyCoarse', [], [value]),
   sideEffects: false,
 });
 
@@ -56,7 +55,7 @@ export const dpdyFine = dualImpl<DerivativeSignature>({
   name: 'dpdyFine',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`dpdyFine(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('dpdyFine', [], [value]),
   sideEffects: false,
 });
 
@@ -72,7 +71,7 @@ export const fwidthCoarse = dualImpl<DerivativeSignature>({
   name: 'fwidthCoarse',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`fwidthCoarse(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('fwidthCoarse', [], [value]),
   sideEffects: false,
 });
 
@@ -80,6 +79,6 @@ export const fwidthFine = dualImpl<DerivativeSignature>({
   name: 'fwidthFine',
   normalImpl: derivativeNormalError,
   signature: derivativeSignature,
-  codegenImpl: (_ctx, [value]) => stitch`fwidthFine(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('fwidthFine', [], [value]),
   sideEffects: false,
 });

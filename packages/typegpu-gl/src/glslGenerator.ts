@@ -507,6 +507,54 @@ const HELPERS = {
 };
 
 /**
+ * WGSL builtins that GLSL ES 3.00 has under a different name, with the same behavior.
+ */
+const builtinRenames: Record<string, string> = {
+  inverseSqrt: 'inversesqrt',
+  dpdx: 'dFdx',
+  dpdy: 'dFdy',
+  // GLSL ES 3.00 lets the implementation choose between fine and coarse derivatives,
+  // which is all that the coarse variants promise.
+  dpdxCoarse: 'dFdx',
+  dpdyCoarse: 'dFdy',
+  fwidthCoarse: 'fwidth',
+  atan2: 'atan',
+  faceForward: 'faceforward',
+  // WGSL rounds halfway cases to even, GLSL's `round` leaves them up to the implementation
+  round: 'roundEven',
+  pack2x16float: 'packHalf2x16',
+  unpack2x16float: 'unpackHalf2x16',
+  pack2x16unorm: 'packUnorm2x16',
+  unpack2x16unorm: 'unpackUnorm2x16',
+  pack2x16snorm: 'packSnorm2x16',
+  unpack2x16snorm: 'unpackSnorm2x16',
+};
+
+/**
+ * WGSL builtins without an equivalent in GLSL ES 3.00
+ * (most of them arrived in GLSL ES 3.10).
+ */
+const unsupportedBuiltins = new Set([
+  'countLeadingZeros',
+  'countOneBits',
+  'countTrailingZeros',
+  'firstLeadingBit',
+  'firstTrailingBit',
+  'reverseBits',
+  'extractBits',
+  'insertBits',
+  'dot4I8Packed',
+  'dot4U8Packed',
+  'ldexp',
+  'frexp',
+  'modf',
+  'quantizeToF16',
+  'dpdxFine',
+  'dpdyFine',
+  'fwidthFine',
+]);
+
+/**
  * A GLSL ES 3.0 shader generator that extends WgslGenerator.
  * Overrides `dataType` to emit GLSL type names instead of WGSL ones,
  * and overrides variable declaration emission to use `type name = rhs` syntax.
@@ -703,14 +751,21 @@ export class GlslGenerator extends WgslGenerator {
     templateParams: readonly Snippet[],
     args: readonly Snippet[],
   ): string {
-    if (name === 'inverseSqrt') {
-      return super.emitCall('inversesqrt', templateParams, args);
+    const glslName = builtinRenames[name];
+    if (glslName) {
+      return super.emitCall(glslName, templateParams, args);
     }
-    if (name === 'dpdx') {
-      return super.emitCall('dFdx', templateParams, args);
+    if (unsupportedBuiltins.has(name)) {
+      throw new Error(
+        `std.${name}() is not supported by the WebGL fallback, GLSL ES 3.00 has no equivalent built-in function`,
+      );
     }
-    if (name === 'dpdy') {
-      return super.emitCall('dFdy', templateParams, args);
+    if (name === 'fma') {
+      const [a, b, c] = args;
+      if (!a || !b || !c) {
+        throw new Error(`Invalid number of arguments for 'fma'`);
+      }
+      return this.emitBinaryOp(snip(this.emitBinaryOp(a, '*', b), a.dataType, 'runtime'), '+', c);
     }
     if (
       name === 'pack4x8unorm' ||

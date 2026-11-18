@@ -1,6 +1,5 @@
 import * as TB from 'typed-binary';
 import { dualImpl } from '../core/function/dualImpl.ts';
-import { stitch } from '../core/resolve/stitch.ts';
 import { u32 } from '../data/numeric.ts';
 import { clampScalar } from '../data/numberOps.ts';
 import { vec2f, vec4f, vec4i, vec4u } from '../data/vector.ts';
@@ -37,7 +36,7 @@ export const unpack2x16float = dualImpl({
     return vec2f(readFloat16(reader), readFloat16(reader));
   },
   signature: { argTypes: [u32], returnType: vec2f },
-  codegenImpl: (_ctx, [e]) => stitch`unpack2x16float(${e})`,
+  codegenImpl: (ctx, [e]) => ctx.gen.emitCall('unpack2x16float', [], [e]),
   sideEffects: false,
 });
 
@@ -53,7 +52,7 @@ export const pack2x16float = dualImpl({
       writeFloat16(writer, e.y);
     }),
   signature: { argTypes: [vec2f], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack2x16float(${e})`,
+  codegenImpl: (ctx, [e]) => ctx.gen.emitCall('pack2x16float', [], [e]),
   sideEffects: false,
 });
 
@@ -72,7 +71,7 @@ export const pack2x16snorm = dualImpl({
     });
   },
   signature: { argTypes: [vec2f], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack2x16snorm(${e})`,
+  codegenImpl: (ctx, [e]) => ctx.gen.emitCall('pack2x16snorm', [], [e]),
   sideEffects: false,
 });
 
@@ -91,7 +90,7 @@ export const pack2x16unorm = dualImpl({
     });
   },
   signature: { argTypes: [vec2f], returnType: u32 },
-  codegenImpl: (_ctx, [e]) => stitch`pack2x16unorm(${e})`,
+  codegenImpl: (ctx, [e]) => ctx.gen.emitCall('pack2x16unorm', [], [e]),
   sideEffects: false,
 });
 
@@ -179,7 +178,7 @@ export const unpack2x16snorm = dualImpl({
     );
   },
   signature: { argTypes: [u32], returnType: vec2f },
-  codegenImpl: (_ctx, [e]) => stitch`unpack2x16snorm(${e})`,
+  codegenImpl: (ctx, [e]) => ctx.gen.emitCall('unpack2x16snorm', [], [e]),
   sideEffects: false,
 });
 
@@ -194,7 +193,7 @@ export const unpack2x16unorm = dualImpl({
     return vec2f(reader.readUint16() / 65535, reader.readUint16() / 65535);
   },
   signature: { argTypes: [u32], returnType: vec2f },
-  codegenImpl: (_ctx, [e]) => stitch`unpack2x16unorm(${e})`,
+  codegenImpl: (ctx, [e]) => ctx.gen.emitCall('unpack2x16unorm', [], [e]),
   sideEffects: false,
 });
 

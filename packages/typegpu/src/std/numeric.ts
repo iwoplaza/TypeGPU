@@ -243,7 +243,7 @@ export const atan2 = dualImpl({
   name: 'atan2',
   signature: unifyRestrictedSignature(anyFloat),
   normalImpl: cpuAtan2,
-  codegenImpl: (_ctx, [y, x]) => stitch`atan2(${y}, ${x})`,
+  codegenImpl: (ctx, [y, x]) => ctx.gen.emitCall('atan2', [], [y, x]),
   sideEffects: false,
 });
 
@@ -319,7 +319,7 @@ export const countLeadingZeros = dualImpl<typeof cpuCountLeadingZeros>({
   signature: unifyRestrictedSignature(anyConcreteInteger),
   normalImpl:
     'CPU implementation for countLeadingZeros not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [value]) => stitch`countLeadingZeros(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('countLeadingZeros', [], [value]),
   sideEffects: false,
 });
 
@@ -334,7 +334,7 @@ export const countOneBits = dualImpl<typeof cpuCountOneBits>({
   signature: unifyRestrictedSignature(anyConcreteInteger),
   normalImpl:
     'CPU implementation for countOneBits not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [value]) => stitch`countOneBits(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('countOneBits', [], [value]),
   sideEffects: false,
 });
 
@@ -349,7 +349,7 @@ export const countTrailingZeros = dualImpl<typeof cpuCountTrailingZeros>({
   signature: unifyRestrictedSignature(anyConcreteInteger),
   normalImpl:
     'CPU implementation for countTrailingZeros not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [value]) => stitch`countTrailingZeros(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('countTrailingZeros', [], [value]),
   sideEffects: false,
 });
 
@@ -447,7 +447,7 @@ export const dot4U8Packed = dualImpl<(e1: number, e2: number) => number>({
   signature: { argTypes: [u32, u32], returnType: u32 },
   normalImpl:
     'CPU implementation for dot4U8Packed not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [e1, e2]) => stitch`dot4U8Packed(${e1}, ${e2})`,
+  codegenImpl: (ctx, [e1, e2]) => ctx.gen.emitCall('dot4U8Packed', [], [e1, e2]),
   sideEffects: false,
 });
 
@@ -456,7 +456,7 @@ export const dot4I8Packed = dualImpl<(e1: number, e2: number) => number>({
   signature: { argTypes: [u32, u32], returnType: i32 },
   normalImpl:
     'CPU implementation for dot4I8Packed not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [e1, e2]) => stitch`dot4I8Packed(${e1}, ${e2})`,
+  codegenImpl: (ctx, [e1, e2]) => ctx.gen.emitCall('dot4I8Packed', [], [e1, e2]),
   sideEffects: false,
 });
 
@@ -514,7 +514,7 @@ export const extractBits = dualImpl<typeof cpuExtractBits>({
   },
   normalImpl:
     'CPU implementation for extractBits not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [e, offset, count]) => stitch`extractBits(${e}, ${offset}, ${count})`,
+  codegenImpl: (ctx, [e, offset, count]) => ctx.gen.emitCall('extractBits', [], [e, offset, count]),
   sideEffects: false,
 });
 
@@ -523,7 +523,7 @@ export const faceForward = dualImpl<<T extends AnyFloatVecInstance>(e1: T, e2: T
   signature: unifyRestrictedSignature(anyFloatVec),
   normalImpl:
     'CPU implementation for faceForward not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [e1, e2, e3]) => stitch`faceForward(${e1}, ${e2}, ${e3})`,
+  codegenImpl: (ctx, [e1, e2, e3]) => ctx.gen.emitCall('faceForward', [], [e1, e2, e3]),
   sideEffects: false,
 });
 
@@ -538,7 +538,7 @@ export const firstLeadingBit = dualImpl<typeof cpuFirstLeadingBit>({
   signature: unaryIdentitySignature,
   normalImpl:
     'CPU implementation for firstLeadingBit not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [value]) => stitch`firstLeadingBit(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('firstLeadingBit', [], [value]),
   sideEffects: false,
 });
 
@@ -553,7 +553,7 @@ export const firstTrailingBit = dualImpl<typeof cpuFirstTrailingBit>({
   signature: unifyRestrictedSignature(anyConcreteInteger),
   normalImpl:
     'CPU implementation for firstTrailingBit not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [value]) => stitch`firstTrailingBit(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('firstTrailingBit', [], [value]),
   sideEffects: false,
 });
 
@@ -589,7 +589,7 @@ export const fma = dualImpl({
   name: 'fma',
   signature: unifyRestrictedSignature(anyFloat),
   normalImpl: cpuFma,
-  codegenImpl: (_ctx, [e1, e2, e3]) => stitch`fma(${e1}, ${e2}, ${e3})`,
+  codegenImpl: (ctx, [e1, e2, e3]) => ctx.gen.emitCall('fma', [], [e1, e2, e3]),
   sideEffects: false,
 });
 
@@ -638,7 +638,7 @@ export const frexp = dualImpl<FrexpOverload>({
 
     return { argTypes: [value], returnType };
   },
-  codegenImpl: (_ctx, [value]) => stitch`frexp(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('frexp', [], [value]),
   sideEffects: false,
 });
 
@@ -672,8 +672,8 @@ export const insertBits = dualImpl<typeof cpuInsertBits>({
   },
   normalImpl:
     'CPU implementation for insertBits not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [e, newbits, offset, count]) =>
-    stitch`insertBits(${e}, ${newbits}, ${offset}, ${count})`,
+  codegenImpl: (ctx, [e, newbits, offset, count]) =>
+    ctx.gen.emitCall('insertBits', [], [e, newbits, offset, count]),
   sideEffects: false,
 });
 
@@ -734,7 +734,7 @@ export const ldexp = dualImpl<typeof cpuLdexp>({
   },
   normalImpl:
     'CPU implementation for ldexp not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [e1, e2]) => stitch`ldexp(${e1}, ${e2})`,
+  codegenImpl: (ctx, [e1, e2]) => ctx.gen.emitCall('ldexp', [], [e1, e2]),
   sideEffects: false,
 });
 
@@ -905,7 +905,7 @@ export const modf: ModfOverload = dualImpl<typeof cpuModf>({
   },
   normalImpl:
     'CPU implementation for modf not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [value]) => stitch`modf(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('modf', [], [value]),
   sideEffects: false,
 });
 
@@ -1001,7 +1001,7 @@ export const quantizeToF16 = dualImpl<typeof cpuQuantizeToF16>({
   },
   normalImpl:
     'CPU implementation for quantizeToF16 not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [value]) => stitch`quantizeToF16(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('quantizeToF16', [], [value]),
   sideEffects: false,
 });
 
@@ -1068,7 +1068,7 @@ export const reverseBits = dualImpl<typeof cpuReverseBits>({
   signature: unifyRestrictedSignature(anyConcreteInteger),
   normalImpl:
     'CPU implementation for reverseBits not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
-  codegenImpl: (_ctx, [value]) => stitch`reverseBits(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('reverseBits', [], [value]),
   sideEffects: false,
 });
 
@@ -1095,7 +1095,7 @@ export const round = dualImpl({
   name: 'round',
   signature: unifyRestrictedSignature(anyFloat),
   normalImpl: cpuRound,
-  codegenImpl: (_ctx, [value]) => stitch`round(${value})`,
+  codegenImpl: (ctx, [value]) => ctx.gen.emitCall('round', [], [value]),
   sideEffects: false,
 });
 
