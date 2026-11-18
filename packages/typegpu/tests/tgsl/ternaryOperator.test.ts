@@ -269,7 +269,7 @@ describe('ternary operator', () => {
 
     expect(tgpu.resolve([myFn])).toMatchInlineSnapshot(`
       "fn myFn(isCustom: bool) -> u32 {
-        return select(0u, (1u << 20u), isCustom);
+        return select(0u, 1048576u, isCustom);
       }"
     `);
   });

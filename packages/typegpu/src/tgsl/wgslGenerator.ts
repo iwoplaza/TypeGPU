@@ -2,7 +2,7 @@ import * as tinyest from 'tinyest';
 import { stitch } from '../core/resolve/stitch.ts';
 import { arrayOf } from '../data/array.ts';
 import { type AnyData, UnknownData, unptr } from '../data/dataTypes.ts';
-import { bool, i32, u32 } from '../data/numeric.ts';
+import { abstractInt, bool, i32, u32 } from '../data/numeric.ts';
 import { vec2u, vec3u, vec4u } from '../data/vector.ts';
 import {
   fallthroughCopyOrigin,
@@ -220,6 +220,77 @@ const binaryOpCodeToCodegen = {
   '/': div[$gpuCallable].bind(div),
   '**': powOperator[$gpuCallable].bind(powOperator),
 } satisfies Partial<Record<tinyest.BinaryOperator, (...args: never[]) => unknown>>;
+
+function isFoldableBitwiseOperand(type: wgsl.BaseData | UnknownData): type is wgsl.BaseData {
+  return wgsl.isAbstract(type) || type === i32 || type === u32;
+}
+
+/**
+ * Folds bitwise and shift operators on compile-time known numbers with JS semantics
+ * (32-bit wrapping), instead of leaving them to WGSL's 64-bit abstract integer rules.
+ */
+function tryFoldBitwiseOp(lhs: Snippet, op: string, rhs: Snippet): Snippet | undefined {
+  const left = asComptime(lhs)?.value;
+  const right = asComptime(rhs)?.value;
+  const lhsType = lhs.dataType;
+  const rhsType = rhs.dataType;
+  if (
+    typeof left !== 'number' ||
+    typeof right !== 'number' ||
+    !isFoldableBitwiseOperand(lhsType) ||
+    !isFoldableBitwiseOperand(rhsType)
+  ) {
+    return undefined;
+  }
+
+  let resultType: wgsl.BaseData;
+  if (bitShiftOps.includes(op)) {
+    if ((op === '>>>' && lhsType === i32) || (op === '>>' && lhsType === u32)) {
+      return undefined;
+    }
+    resultType = wgsl.isAbstract(lhsType) ? abstractInt : lhsType;
+  } else if (wgsl.isAbstract(lhsType) && wgsl.isAbstract(rhsType)) {
+    resultType = abstractInt;
+  } else if (wgsl.isAbstract(lhsType) || wgsl.isAbstract(rhsType) || lhsType === rhsType) {
+    resultType = wgsl.isAbstract(lhsType) ? rhsType : lhsType;
+  } else {
+    return undefined;
+  }
+
+  let value: number;
+  switch (op) {
+    case '&':
+      value = left & right;
+      break;
+    case '|':
+      value = left | right;
+      break;
+    case '^':
+      value = left ^ right;
+      break;
+    case '<<':
+      value = left << right;
+      break;
+    case '>>':
+      value = left >> right;
+      break;
+    case '>>>':
+      value = left >>> right;
+      break;
+    default:
+      return undefined;
+  }
+
+  if (resultType === u32) {
+    value >>>= 0;
+  } else if (resultType === abstractInt && value > 2 ** 31 - 1) {
+    // Only `>>>` gets here. Its result does not fit an `i32`, which is what an abstract integer
+    // becomes by default, so we give it the only concrete type that can hold it.
+    resultType = u32;
+  }
+
+  return snip(value, resultType, /* origin */ 'constant', /* possibleSideEffects */ false);
+}
 
 const usageToVarTemplateMap: Record<VariableScope | BindableBufferUsage | 'immediate', string> = {
   private: 'private',
@@ -763,6 +834,11 @@ export class WgslGenerator implements ShaderGenerator {
       const codegen = binaryOpCodeToCodegen[op as keyof typeof binaryOpCodeToCodegen];
       if (codegen) {
         return codegen(this.ctx, [lhsExpr, rhsExpr]);
+      }
+
+      const folded = exprType === NODE.binaryExpr && tryFoldBitwiseOp(lhsExpr, op, rhsExpr);
+      if (folded) {
+        return folded;
       }
 
       let convLhs: Snippet;
