@@ -1568,17 +1568,17 @@ export function isVecInstance(value: unknown): value is AnyVecInstance {
   return typeof v?.kind === 'string' && v.kind.startsWith('vec') && isMarkedInternal(v);
 }
 
-export function isVec2(value: unknown): value is Vec2f | Vec2h | Vec2i | Vec2u {
+export function isVec2(value: unknown): value is Vec2f | Vec2h | Vec2i | Vec2u | Vec2b {
   const v = value as AnyWgslData | undefined;
   return typeof v?.type === 'string' && v.type.startsWith('vec2') && isMarkedInternal(v);
 }
 
-export function isVec3(value: unknown): value is Vec3f | Vec3h | Vec3i | Vec3u {
+export function isVec3(value: unknown): value is Vec3f | Vec3h | Vec3i | Vec3u | Vec3b {
   const v = value as AnyWgslData | undefined;
   return typeof v?.type === 'string' && v.type.startsWith('vec3') && isMarkedInternal(v);
 }
 
-export function isVec4(value: unknown): value is Vec4f | Vec4h | Vec4i | Vec4u {
+export function isVec4(value: unknown): value is Vec4f | Vec4h | Vec4i | Vec4u | Vec4b {
   const v = value as AnyWgslData | undefined;
   return typeof v?.type === 'string' && v.type.startsWith('vec4') && isMarkedInternal(v);
 }
