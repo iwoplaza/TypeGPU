@@ -45,7 +45,6 @@
     "typegpu": "workspace:*",
     "typegpu-testing-utility": "workspace:*",
     "typescript": "catalog:types",
-    "unbuild": "catalog:build",
     "unplugin-typegpu": "workspace:*"
   },
   "peerDependencies": {

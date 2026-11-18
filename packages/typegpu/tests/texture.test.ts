@@ -135,6 +135,18 @@ describe('TgpuTexture', () => {
     >();
   });
 
+  it('infers the same literal types through the deprecated unstable createTexture', ({ root }) => {
+    const texture = root['~unstable'].createTexture({
+      size: [512, 512],
+      format: 'rgba8unorm',
+      mipLevelCount: 2,
+    });
+
+    expectTypeOf(texture).toEqualTypeOf<
+      TgpuTexture<{ size: [512, 512]; format: 'rgba8unorm'; mipLevelCount: 2 }>
+    >();
+  });
+
   it('embeds a non-default sampleCount in the type', ({ root }) => {
     const texture = root.createTexture({
       size: [512, 512],

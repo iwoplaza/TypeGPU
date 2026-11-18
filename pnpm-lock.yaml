@@ -613,9 +613,6 @@ importers:
       glob:
         specifier: ^11.1.0
         version: 11.1.0
-      remeda:
-        specifier: ^2.21.2
-        version: 2.21.2
       typegpu:
         specifier: workspace:^
         version: link:../typegpu
@@ -858,9 +855,6 @@ importers:
       typescript:
         specifier: npm:tsover@^6.0.2
         version: tsover@6.0.2
-      unbuild:
-        specifier: catalog:build
-        version: 3.5.0(tsover@6.0.2)
       unplugin-typegpu:
         specifier: workspace:*
         version: link:../unplugin-typegpu

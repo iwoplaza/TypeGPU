@@ -267,7 +267,7 @@ function resolveStruct(ctx: ResolutionCtx, struct: d.WgslStruct) {
 struct ${id} {
 ${Object.entries(struct.propTypes)
   .map(
-    ([prop, type]) => `  ${ctx.resolve(type).value} ${prop}${resolveArraySizeSuffix(ctx, type)};\n`,
+    ([prop, type]) => `  ${ctx.resolve(type).value} ${prop}${resolveArraySizeSuffix(type)};\n`,
   )
   .join('')}\
 };`);
@@ -290,7 +290,7 @@ function correspondingBooleanVectorSchema(dataType: d.BaseData) {
   );
 }
 
-function resolveArraySizeSuffix(ctx: ResolutionCtx, schema: d.BaseData | UnknownData) {
+function resolveArraySizeSuffix(schema: d.BaseData | UnknownData) {
   let suffix = '';
   let current = schema;
   while (typeof current !== 'symbol' && current.type === 'array') {
@@ -561,7 +561,7 @@ export class GlslGenerator extends WgslGenerator {
     const typeStr = this.ctx.resolve(options.dataType).value;
 
     this.ctx.addDeclaration(
-      `const ${typeStr} ${options.id}${resolveArraySizeSuffix(this.ctx, options.dataType)} = ${initStr};`,
+      `const ${typeStr} ${options.id}${resolveArraySizeSuffix(options.dataType)} = ${initStr};`,
     );
 
     return snip(options.id, options.dataType, 'constant-immutable-def');
@@ -596,7 +596,7 @@ export class GlslGenerator extends WgslGenerator {
       throw new Error(`Cannot define a '${options.dataType.type}' handle when generating GLSL.`);
     }
 
-    let pre = `${this.ctx.resolve(options.dataType).value} ${options.id}${resolveArraySizeSuffix(this.ctx, options.dataType)}`;
+    let pre = `${this.ctx.resolve(options.dataType).value} ${options.id}${resolveArraySizeSuffix(options.dataType)}`;
 
     if (options.scope === 'private') {
       // Nothing to add
@@ -913,7 +913,7 @@ export class GlslGenerator extends WgslGenerator {
       const resolvedArgs = completeArgs.map((arg) => this.ctx.resolveSnippet(arg).value).join(', ');
 
       return withValue(
-        `${element}${resolveArraySizeSuffix(this.ctx, schema)}(${resolvedArgs})`,
+        `${element}${resolveArraySizeSuffix(schema)}(${resolvedArgs})`,
         superSnippet,
       );
     }
@@ -952,7 +952,7 @@ export class GlslGenerator extends WgslGenerator {
     }
 
     const glslTypeName = this.ctx.resolve(dataType).value;
-    return `${this.ctx.pre}${glslTypeName} ${name}${resolveArraySizeSuffix(this.ctx, dataType)} = ${rhsStr};`;
+    return `${this.ctx.pre}${glslTypeName} ${name}${resolveArraySizeSuffix(dataType)} = ${rhsStr};`;
   }
 
   override _emitSwitchStatement(
