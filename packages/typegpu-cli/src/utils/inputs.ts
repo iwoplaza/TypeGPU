@@ -21,7 +21,7 @@ export function isValidProjectPath(
   pathImpl: path.PlatformPath = path,
 ) {
   const name = pathImpl.basename(pathImpl.resolve(cwd, projectDir));
-  return name.length > 0 && isValidProjectDirectory(name);
+  return name.length > 0 && name === name.trim() && isValidProjectDirectory(name);
 }
 
 export function isValidPackageName(packageName: string) {

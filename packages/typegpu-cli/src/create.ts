@@ -39,6 +39,11 @@ function getDefaultPackageName(cwd: string, projectName: string) {
   return isValidPackageName(candidate) ? candidate : undefined;
 }
 
+// Double quotes are understood by POSIX shells, cmd.exe and PowerShell alike
+function quoteForShell(arg: string) {
+  return /^[\w@%+=:,./\\-]+$/.test(arg) ? arg : `"${arg}"`;
+}
+
 async function promptProjectTemplate(): Promise<ProjectTemplate> {
   const projectTemplate = await p.select({
     message: 'Select a template:',
@@ -130,7 +135,7 @@ export async function createProject(cwd: string, options?: CreateProjectOptions)
   const steps: string[] = [];
   const shouldCd = (!shouldInstall && !!installCmd) || !!runCmd || !!cdPath;
   if (shouldCd && cdPath) {
-    steps.push(`   cd ${cdPath}`);
+    steps.push(`   cd ${quoteForShell(cdPath)}`);
   }
   if (!shouldInstall && installCmd) {
     steps.push(`   ${installCmd.command} ${installCmd.args.join(' ')}`);

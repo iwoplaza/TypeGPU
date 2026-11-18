@@ -53,7 +53,7 @@ describe('prepareDirectory', () => {
 });
 
 describe('createProject', () => {
-  it.each(['my app', 'my<app', 'parent/my app'])(
+  it.each(['my app', 'my<app', 'parent/my app', '  my-app', 'my-app '])(
     'rejects an invalid project directory (%s)',
     async (projectDir) => {
       vi.spyOn(process, 'exit').mockImplementation((code) => {
@@ -101,6 +101,22 @@ describe('createProject', () => {
     expect(pkg.name).toBe('my-app');
     expect(fs.readdirSync(cwd)).toStrictEqual([]);
   });
+
+  it.each([
+    ['my-app', 'cd my-app'],
+    [path.join('Parent Dir', 'my-app'), `cd "${path.join('Parent Dir', 'my-app')}"`],
+  ])('prints a cd hint that works in a shell for %s', async (projectDir, hint) => {
+    const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    await createProject(cwd, {
+      projectDir,
+      nonInteractive: true,
+      addons: [],
+      packageManager: 'npm',
+    });
+
+    expect(write.mock.calls.join('')).toContain(`   ${hint}\n`);
+  });
 });
 
 describe('isValidProjectPath', () => {
@@ -118,7 +134,10 @@ describe('isValidProjectPath', () => {
     },
   );
 
-  it.each(['my app', 'sub/my app', 'my<app', 'my:app', '/'])('rejects %s', (projectDir) => {
-    expect(isValidProjectPath('/work', projectDir)).toBe(false);
-  });
+  it.each(['my app', 'sub/my app', 'my<app', 'my:app', '/', '  my-app', 'sub/my-app '])(
+    'rejects %s',
+    (projectDir) => {
+      expect(isValidProjectPath('/work', projectDir)).toBe(false);
+    },
+  );
 });
