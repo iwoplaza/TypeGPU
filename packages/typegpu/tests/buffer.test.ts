@@ -2141,3 +2141,82 @@ describe('Uniform alignment', () => {
     `);
   });
 });
+
+describe('TgpuBuffer ($usage after the GPU buffer was created)', () => {
+  it('throws when adding a usage to an already created buffer', ({ root, device }) => {
+    const buffer = root.createBuffer(d.arrayOf(d.f32, 4)).$name('positions');
+    buffer.write([1, 2, 3, 4]);
+
+    expect(device.mock.createBuffer.mock.calls[0]?.[0].usage).toBe(
+      GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    );
+    expect(() => buffer.$usage('vertex')).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot add 'vertex' usage to buffer:positions, as its GPUBuffer has already been created without it. Call .$usage('vertex') before the buffer is first used.]`,
+    );
+    expect(buffer.usableAsVertex).toBe(false);
+  });
+
+  it('throws when unwrapping created the buffer', ({ root }) => {
+    const buffer = root.createBuffer(d.u32);
+    root.unwrap(buffer);
+
+    expect(() => buffer.$usage('storage')).toThrow();
+    expect(buffer.usableAsStorage).toBe(false);
+  });
+
+  it('allows repeating usages the buffer already has', ({ root, device }) => {
+    const buffer = root.createBuffer(d.arrayOf(d.f32, 4)).$usage('storage', 'vertex');
+    root.unwrap(buffer);
+
+    expect(() => buffer.$usage('vertex')).not.toThrow();
+    expect(() => buffer.$usage('storage', 'vertex')).not.toThrow();
+    expect(device.mock.createBuffer).toHaveBeenCalledOnce();
+  });
+
+  it('throws when adding flags to an already created buffer', ({ root }) => {
+    const buffer = root.createBuffer(d.u32).$name('counter');
+    root.unwrap(buffer);
+
+    expect(() => buffer.$addFlags(GPUBufferUsage.QUERY_RESOLVE)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot add flags to buffer:counter, as its GPUBuffer has already been created without them. Call .$addFlags(...) before the buffer is first used.]`,
+    );
+    expect(() => buffer.$addFlags(GPUBufferUsage.COPY_DST)).not.toThrow();
+  });
+
+  it('checks usages of a wrapped GPU buffer against its flags', ({ root }) => {
+    const rawBuffer = root.device.createBuffer({
+      size: 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    const buffer = root.createBuffer(d.u32, rawBuffer).$name('external');
+
+    expect(() => buffer.$usage('storage')).not.toThrow();
+    expect(buffer.usableAsStorage).toBe(true);
+    expect(() => buffer.$usage('uniform')).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot use buffer:external as 'uniform', as the GPUBuffer it wraps was not created with that usage.]`,
+    );
+    expect(buffer.usableAsUniform).toBe(false);
+  });
+
+  it('skips the check when the wrapped buffer does not report a usage', ({ root }) => {
+    const rawBuffer = {
+      size: 4,
+      getMappedRange: () => new ArrayBuffer(4),
+      mapAsync: () => Promise.resolve(),
+    } as unknown as GPUBuffer;
+    const buffer = root.createBuffer(d.u32, rawBuffer);
+
+    expect(() => buffer.$usage('uniform')).not.toThrow();
+    expect(buffer.usableAsUniform).toBe(true);
+  });
+
+  it('checks root.createUniform on a wrapped GPU buffer', ({ root }) => {
+    const rawBuffer = root.device.createBuffer({
+      size: 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    expect(() => root.createUniform(d.u32, rawBuffer)).toThrow();
+    expect(() => root.createMutable(d.u32, rawBuffer)).not.toThrow();
+  });
+});
