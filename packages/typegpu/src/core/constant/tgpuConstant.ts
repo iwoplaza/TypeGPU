@@ -3,6 +3,7 @@ import { snip } from '../../data/snippet.ts';
 import { type AnyWgslData, type BaseData, type WgslArray } from '../../data/wgslTypes.ts';
 import { makeDereferenceable } from '../../tgsl/makeDereferenceable.ts';
 import { makeResolvable } from '../../tgsl/makeResolvable.ts';
+import { cpuCopy } from '../../std/copy.ts';
 import type { TgpuNamable } from '../../shared/meta.ts';
 import { getName, setName } from '../../shared/meta.ts';
 import type { InferGPU } from '../../shared/repr.ts';
@@ -142,7 +143,7 @@ class TgpuConstImpl<TDataType extends BaseData> implements TgpuConst<TDataType> 
       dataType,
       value:
         value && typeof value === 'object'
-          ? (deepFreeze(value) as DeepReadonly<InferGPU<TDataType>>)
+          ? (deepFreeze(cpuCopy(value)) as DeepReadonly<InferGPU<TDataType>>)
           : (value as DeepReadonly<InferGPU<TDataType>>),
       label: undefined,
     };
