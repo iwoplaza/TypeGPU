@@ -9,7 +9,7 @@ import { pmFromUserAgent, pmInstall } from './utils/pm.ts';
 import { cancelExit, confirmStep, failAndExit, rgbText } from './utils/prompts.ts';
 import { askForWebgpuTypes, setupWebgpuTypes } from './steps/webgpu-types.ts';
 import { addTypegpuPkgs, askForPkgs, ensureTypegpu, setupTypegpu } from './steps/typegpu.ts';
-import { askForVite, setupVite } from './steps/vite.ts';
+import { askForVite, manualSetupMessage, setupVite } from './steps/vite.ts';
 import { addAgentSkills, askForAgentSkills } from './steps/skills.ts';
 import type { EnhanceProjectOptions } from './options.ts';
 
@@ -22,19 +22,20 @@ async function runViteFlow(
   options?: EnhanceProjectOptions,
 ) {
   await askForWebgpuTypes(cwd, pm, pkg);
-  await askForVite(cwd, pm, pkg);
+  const viteConfigLeftToDo = await askForVite(cwd, pm, pkg);
 
   if (options?.addons.length) {
     setupTypegpu(pm, pkg);
     addTypegpuPkgs(pm, pkg, options.addons);
   } else {
     if (!(await ensureTypegpu(pm, pkg))) {
-      return;
+      return viteConfigLeftToDo;
     }
     await askForPkgs(pm, pkg);
   }
 
   await askForAgentSkills(pm);
+  return viteConfigLeftToDo;
 }
 
 async function runNonInteractiveEnhance(
@@ -44,10 +45,18 @@ async function runNonInteractiveEnhance(
   options: EnhanceProjectOptions,
 ) {
   setupWebgpuTypes(cwd, pm, pkg);
-  await setupVite(cwd, pm, pkg, { createConfigIfMissing: true });
+  const viteConfigLeftToDo = await setupVite(cwd, pm, pkg, { createConfigIfMissing: true });
   setupTypegpu(pm, pkg);
   addTypegpuPkgs(pm, pkg, options.addons);
   addAgentSkills(pm, { nonInteractive: true });
+  return viteConfigLeftToDo;
+}
+
+function outro(viteConfigLeftToDo: string | undefined) {
+  if (viteConfigLeftToDo) {
+    p.note(manualSetupMessage(viteConfigLeftToDo), 'Left to do');
+  }
+  p.outro('Done! Get ready for a shaderful experience.');
 }
 
 export async function enhanceProject(cwd: string, options?: EnhanceProjectOptions) {
@@ -75,8 +84,7 @@ export async function enhanceProject(cwd: string, options?: EnhanceProjectOption
   }
 
   if (options?.nonInteractive) {
-    await runNonInteractiveEnhance(cwd, pmAgent, pkg, options);
-    p.outro('Done! Get ready for a shaderful experience.');
+    outro(await runNonInteractiveEnhance(cwd, pmAgent, pkg, options));
     return;
   }
 
@@ -88,9 +96,10 @@ export async function enhanceProject(cwd: string, options?: EnhanceProjectOption
     cancelExit();
   }
 
+  let viteConfigLeftToDo: string | undefined;
   switch (projectKind) {
     case 'vite':
-      await runViteFlow(cwd, pmAgent, pkg, options);
+      viteConfigLeftToDo = await runViteFlow(cwd, pmAgent, pkg, options);
       break;
     default:
       failAndExit('Unsupported project kind.');
@@ -100,5 +109,5 @@ export async function enhanceProject(cwd: string, options?: EnhanceProjectOption
     pmInstall(pmAgent);
   }
 
-  p.outro('Done! Get ready for a shaderful experience.');
+  outro(viteConfigLeftToDo);
 }
