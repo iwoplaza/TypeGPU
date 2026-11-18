@@ -37,6 +37,8 @@ class TgpuLazyImpl<out T> implements TgpuLazy<T> {
 
   // prototype properties
   declare resourceType: 'lazy';
+  declare readonly [$gpuValueOf]: GPUValueOf<T>;
+  declare readonly $: GPUValueOf<T>;
 
   static {
     TgpuLazyImpl.prototype.resourceType = 'lazy';
@@ -68,18 +70,6 @@ class TgpuLazyImpl<out T> implements TgpuLazy<T> {
       compute,
     };
     this[$providing] = providing;
-  }
-
-  get [$gpuValueOf](): GPUValueOf<T> {
-    const ctx = getResolutionCtx();
-    if (!ctx) {
-      throw new Error(`Cannot access tgpu.lazy's value outside of resolution.`);
-    }
-    return getGpuValueRecursively(ctx.unwrap(this));
-  }
-
-  get $(): GPUValueOf<T> {
-    return this[$gpuValueOf];
   }
 
   #getValue() {
