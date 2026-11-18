@@ -104,6 +104,16 @@ export type vecIToVecU<T extends AnyIntegerVecInstance> = T extends v2i | v2u
     ? v3u
     : v4u;
 
+/**
+ * Exponentiation of float vectors, e.g. `v ** d.vec3f(2)`.
+ *
+ * @privateRemarks
+ * Assigned to `VecBase` along with the infix notation.
+ */
+export interface vecPowNotation<T extends vecBase> {
+  [Symbol.operatorStarStar](lhs: T, rhs: T): T;
+}
+
 export interface vecBitShiftNotation<T extends AnyIntegerVecInstance> {
   bitShiftLeft(rhs: vecIToVecU<T> | number): T;
   bitShiftRight(rhs: vecIToVecU<T> | number): T;
@@ -257,7 +267,8 @@ export interface vecBase extends vecInfixNotation<vecBase> {
  * Interface representing its WGSL vector type counterpart: vec2f or vec2<f32>.
  * A vector with 2 elements of type f32
  */
-export interface v2f extends Tuple2<number>, Swizzle2<v2f, v3f, v4f>, vecInfixNotation<v2f> {
+export interface v2f
+  extends Tuple2<number>, Swizzle2<v2f, v3f, v4f>, vecInfixNotation<v2f>, vecPowNotation<v2f> {
   readonly [$internal]: true;
   /** use to distinguish between vectors of the same size on the type level */
   readonly kind: 'vec2f';
@@ -271,7 +282,8 @@ export interface v2f extends Tuple2<number>, Swizzle2<v2f, v3f, v4f>, vecInfixNo
  * Interface representing its WGSL vector type counterpart: vec2h or vec2<f16>.
  * A vector with 2 elements of type f16
  */
-export interface v2h extends Tuple2<number>, Swizzle2<v2h, v3h, v4h>, vecInfixNotation<v2h> {
+export interface v2h
+  extends Tuple2<number>, Swizzle2<v2h, v3h, v4h>, vecInfixNotation<v2h>, vecPowNotation<v2h> {
   readonly [$internal]: true;
   /** use to distinguish between vectors of the same size on the type level */
   readonly kind: 'vec2h';
@@ -329,7 +341,8 @@ export interface v2b extends Tuple2<boolean>, Swizzle2<v2b, v3b, v4b> {
  * Interface representing its WGSL vector type counterpart: vec3f or vec3<f32>.
  * A vector with 3 elements of type f32
  */
-export interface v3f extends Tuple3<number>, Swizzle3<v2f, v3f, v4f>, vecInfixNotation<v3f> {
+export interface v3f
+  extends Tuple3<number>, Swizzle3<v2f, v3f, v4f>, vecInfixNotation<v3f>, vecPowNotation<v3f> {
   readonly [$internal]: true;
   /** use to distinguish between vectors of the same size on the type level */
   readonly kind: 'vec3f';
@@ -345,7 +358,8 @@ export interface v3f extends Tuple3<number>, Swizzle3<v2f, v3f, v4f>, vecInfixNo
  * Interface representing its WGSL vector type counterpart: vec3h or vec3<f16>.
  * A vector with 3 elements of type f16
  */
-export interface v3h extends Tuple3<number>, Swizzle3<v2h, v3h, v4h>, vecInfixNotation<v3h> {
+export interface v3h
+  extends Tuple3<number>, Swizzle3<v2h, v3h, v4h>, vecInfixNotation<v3h>, vecPowNotation<v3h> {
   readonly [$internal]: true;
   /** use to distinguish between vectors of the same size on the type level */
   readonly kind: 'vec3h';
@@ -411,7 +425,8 @@ export interface v3b extends Tuple3<boolean>, Swizzle3<v2b, v3b, v4b> {
  * Interface representing its WGSL vector type counterpart: vec4f or vec4<f32>.
  * A vector with 4 elements of type f32
  */
-export interface v4f extends Tuple4<number>, Swizzle4<v2f, v3f, v4f>, vecInfixNotation<v4f> {
+export interface v4f
+  extends Tuple4<number>, Swizzle4<v2f, v3f, v4f>, vecInfixNotation<v4f>, vecPowNotation<v4f> {
   readonly [$internal]: true;
   /** use to distinguish between vectors of the same size on the type level */
   readonly kind: 'vec4f';
@@ -429,7 +444,8 @@ export interface v4f extends Tuple4<number>, Swizzle4<v2f, v3f, v4f>, vecInfixNo
  * Interface representing its WGSL vector type counterpart: vec4h or vec4<f16>.
  * A vector with 4 elements of type f16
  */
-export interface v4h extends Tuple4<number>, Swizzle4<v2h, v3h, v4h>, vecInfixNotation<v4h> {
+export interface v4h
+  extends Tuple4<number>, Swizzle4<v2h, v3h, v4h>, vecInfixNotation<v4h>, vecPowNotation<v4h> {
   readonly [$internal]: true;
   /** use to distinguish between vectors of the same size on the type level */
   readonly kind: 'vec4h';

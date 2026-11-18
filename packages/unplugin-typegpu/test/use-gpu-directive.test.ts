@@ -758,6 +758,37 @@ describe('transforms numeric operations', () => {
   });
 });
 
+describe('transforms the ** operator', () => {
+  const code = `\
+    const main = (a, b) => {
+      'use gpu';
+      let c = a ** b;
+      c **= 2;
+      return c;
+    };
+
+    console.log(main);
+  `;
+
+  test('babel', () => {
+    const output = babelTransform(code);
+    expect(output).toContain('let c = __tsover_pow(a, b);');
+    expect(output).not.toContain('a ** b');
+    // `**=` is not supported by the shader generator, so it is left as is
+    expect(output).toContain('c **= 2;');
+    expect(output).not.toContain('__tsover_pow(c, 2)');
+  });
+
+  test('rollup', async () => {
+    const output = await rollupTransform(code);
+    expect(output).toContain('let c = __tsover_pow(a, b);');
+    expect(output).not.toContain('a ** b');
+    // `**=` is not supported by the shader generator, so it is left as is
+    expect(output).toContain('c **= 2;');
+    expect(output).not.toContain('__tsover_pow(c, 2)');
+  });
+});
+
 describe('hoists global function statements marked with "use gpu"', () => {
   const code = `\
     console.log(add, mul);
