@@ -138,11 +138,11 @@ const anyConcreteIntegerVec = [vec2i, vec3i, vec4i, vec2u, vec3u, vec4u];
 const anyConcreteInteger = [...anyConcreteIntegerPrimitive, ...anyConcreteIntegerVec];
 
 /**
- * Plain numbers carry no type information, so negative scalars are treated
- * as `i32`, and all other scalars as `u32`.
+ * Plain numbers carry no type information, so scalars are treated like abstract integers
+ * in WGSL: as `i32`, unless they only fit in `u32`.
  */
 const isSignedInteger = (value: AnyIntegerVecInstance | number): boolean =>
-  typeof value === 'number' ? value < 0 : value.kind.endsWith('i');
+  typeof value === 'number' ? value < 2 ** 31 : value.kind.endsWith('i');
 
 // std
 
@@ -684,7 +684,7 @@ function cpuInsertBits<T extends AnyIntegerVecInstance | number>(
 ): T {
   assertKind([e, newbits], integerKind);
   assertEqualKinds(e, newbits);
-  const signed = isSignedInteger(e) || isSignedInteger(newbits);
+  const signed = isSignedInteger(e) && isSignedInteger(newbits);
   return generalizeFn((a, b) => insertBitsScalar(a, b, offset, count, signed), [e, newbits]);
 }
 

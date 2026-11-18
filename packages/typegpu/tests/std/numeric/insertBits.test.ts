@@ -32,7 +32,8 @@ describe('insertBits', () => {
   it('clamps offset and count to the bit width', () => {
     expect(std.insertBits(0x12345678, 0xffffffff, 32, 4)).toBe(0x12345678);
     expect(std.insertBits(0x12345678, 0xffffffff, 40, 4)).toBe(0x12345678);
-    expect(std.insertBits(0, 0xff, 28, 8)).toBe(0xf0000000);
+    expect(std.insertBits(0, 0xff, 28, 8)).toBe(-0x10000000);
+    expect(std.insertBits(0x80000000, 0xff, 28, 8)).toBe(0xf0000000);
     expect(std.insertBits(d.vec2i(0, 0), d.vec2i(0xff, 0x7), 28, 8)).toStrictEqual(
       d.vec2i(-0x10000000, 0x70000000),
     );

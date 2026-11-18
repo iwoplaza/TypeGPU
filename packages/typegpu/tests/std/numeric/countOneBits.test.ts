@@ -11,6 +11,11 @@ describe('countOneBits', () => {
     expect(std.countOneBits(-0x80000000)).toBe(1);
   });
 
+  it('truncates non-integer scalars like an integer cast', () => {
+    expect(std.countOneBits(1.5)).toBe(1);
+    expect(std.countOneBits(7.9)).toBe(3);
+  });
+
   it('works component-wise on vectors', () => {
     expect(std.countOneBits(d.vec2u(0, 0xffffffff))).toStrictEqual(d.vec2u(0, 32));
     expect(std.countOneBits(d.vec3i(-1, 5, -2))).toStrictEqual(d.vec3i(32, 2, 31));

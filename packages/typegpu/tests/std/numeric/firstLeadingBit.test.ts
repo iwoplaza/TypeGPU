@@ -3,10 +3,8 @@ import { d, std, tgpu } from 'typegpu';
 
 describe('firstLeadingBit', () => {
   it('finds the most significant 1 bit of unsigned values', () => {
-    expect(std.firstLeadingBit(0)).toBe(0xffffffff);
-    expect(std.firstLeadingBit(1)).toBe(0);
-    expect(std.firstLeadingBit(0x00f00000)).toBe(23);
     expect(std.firstLeadingBit(0x80000000)).toBe(31);
+    expect(std.firstLeadingBit(0xffffffff)).toBe(31);
     expect(std.firstLeadingBit(d.vec2u(0, 0xffffffff))).toStrictEqual(d.vec2u(0xffffffff, 31));
     expect(std.firstLeadingBit(d.vec3u(2, 3, 4))).toStrictEqual(d.vec3u(1, 1, 2));
     expect(std.firstLeadingBit(d.vec4u(0, 1, 0x40000000, 0x80000000))).toStrictEqual(
@@ -15,6 +13,10 @@ describe('firstLeadingBit', () => {
   });
 
   it('finds the most significant bit different from the sign bit of signed values', () => {
+    expect(std.firstLeadingBit(0)).toBe(-1);
+    expect(std.firstLeadingBit(d.i32(0))).toBe(-1);
+    expect(std.firstLeadingBit(1)).toBe(0);
+    expect(std.firstLeadingBit(0x00f00000)).toBe(23);
     expect(std.firstLeadingBit(-1)).toBe(-1);
     expect(std.firstLeadingBit(-2)).toBe(0);
     expect(std.firstLeadingBit(-8)).toBe(2);

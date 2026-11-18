@@ -3,7 +3,6 @@ import { d, std, tgpu } from 'typegpu';
 
 describe('extractBits', () => {
   it('extracts bits of unsigned values without sign extension', () => {
-    expect(std.extractBits(0xf0, 4, 4)).toBe(0xf);
     expect(std.extractBits(0xffffffff, 0, 32)).toBe(0xffffffff);
     expect(std.extractBits(0x80000000, 31, 1)).toBe(1);
     expect(std.extractBits(d.vec2u(0xf0, 0xabcd), 4, 8)).toStrictEqual(d.vec2u(0xf, 0xbc));
@@ -12,6 +11,8 @@ describe('extractBits', () => {
   });
 
   it('extracts bits of signed values with sign extension', () => {
+    expect(std.extractBits(0xf0, 4, 4)).toBe(-1);
+    expect(std.extractBits(0x70, 4, 4)).toBe(7);
     expect(std.extractBits(-1, 4, 4)).toBe(-1);
     expect(std.extractBits(-0x80000000, 28, 4)).toBe(-8);
     expect(std.extractBits(d.vec2i(0xf0, 0x70), 4, 4)).toStrictEqual(d.vec2i(-1, 7));
@@ -29,6 +30,19 @@ describe('extractBits', () => {
     expect(std.extractBits(0xffffffff, 40, 4)).toBe(0);
     expect(std.extractBits(0xf0000000, 28, 8)).toBe(0xf);
     expect(std.extractBits(d.vec2i(-0x80000000, 0x70000000), 28, 8)).toStrictEqual(d.vec2i(-8, 7));
+  });
+
+  it('treats scalars like abstract integers, so the CPU agrees with the GPU', () => {
+    const f = tgpu.fn(
+      [],
+      d.i32,
+    )(() => {
+      'use gpu';
+      return std.extractBits(0xf0, 4, 4);
+    });
+
+    expect(f()).toBe(-1);
+    expect(tgpu.resolve([f])).toContain('extractBits(240i, 4u, 4u)');
   });
 
   it('is not folded at compile time', () => {

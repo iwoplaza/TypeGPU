@@ -10,6 +10,13 @@ describe('countTrailingZeros', () => {
     expect(std.countTrailingZeros(-8)).toBe(3);
   });
 
+  it('wraps and truncates scalars like an integer cast', () => {
+    expect(std.countTrailingZeros(2 ** 32)).toBe(32);
+    expect(std.countTrailingZeros(2 ** 32 + 4)).toBe(2);
+    expect(std.countTrailingZeros(0.5)).toBe(32);
+    expect(std.countTrailingZeros(8.9)).toBe(3);
+  });
+
   it('works component-wise on vectors', () => {
     expect(std.countTrailingZeros(d.vec2u(0, 0x80000000))).toStrictEqual(d.vec2u(32, 31));
     expect(std.countTrailingZeros(d.vec3i(-0x80000000, 0, 12))).toStrictEqual(d.vec3i(31, 32, 2));

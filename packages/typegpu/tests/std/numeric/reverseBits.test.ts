@@ -4,7 +4,9 @@ import { d, std, tgpu } from 'typegpu';
 describe('reverseBits', () => {
   it('reverses bits of scalars', () => {
     expect(std.reverseBits(0)).toBe(0);
-    expect(std.reverseBits(1)).toBe(0x80000000);
+    expect(std.reverseBits(1)).toBe(-0x80000000);
+    expect(std.reverseBits(d.i32(1))).toBe(-0x80000000);
+    expect(std.reverseBits(0x80000000)).toBe(1);
     expect(std.reverseBits(0xf0000000)).toBe(0xf);
     expect(std.reverseBits(0x12345678)).toBe(0x1e6a2c48);
     expect(std.reverseBits(-2)).toBe(0x7fffffff);

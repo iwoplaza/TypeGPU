@@ -3,11 +3,16 @@ import { d, std, tgpu } from 'typegpu';
 
 describe('firstTrailingBit', () => {
   it('finds the least significant 1 bit of scalars', () => {
-    expect(std.firstTrailingBit(0)).toBe(0xffffffff);
+    expect(std.firstTrailingBit(0)).toBe(-1);
     expect(std.firstTrailingBit(1)).toBe(0);
     expect(std.firstTrailingBit(8)).toBe(3);
     expect(std.firstTrailingBit(0x80000000)).toBe(31);
     expect(std.firstTrailingBit(-8)).toBe(3);
+  });
+
+  it('truncates non-integer scalars like an integer cast', () => {
+    expect(std.firstTrailingBit(0.5)).toBe(-1);
+    expect(std.firstTrailingBit(8.9)).toBe(3);
   });
 
   it('works component-wise on vectors', () => {

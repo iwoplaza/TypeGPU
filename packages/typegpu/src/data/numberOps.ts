@@ -38,19 +38,23 @@ export const countOneBitsScalar = (e: number): number => {
   return count;
 };
 
-export const countTrailingZerosScalar = (e: number): number =>
-  e === 0 ? 32 : 31 - Math.clz32(e & -e);
+export const countTrailingZerosScalar = (e: number): number => {
+  const v = e | 0;
+  return v === 0 ? 32 : 31 - Math.clz32(v & -v);
+};
 
 export const firstLeadingBitScalar = (e: number, signed: boolean): number => {
   if (signed) {
-    const v = e < 0 ? ~e : e;
+    const i = e | 0;
+    const v = i < 0 ? ~i : i;
     return v === 0 ? -1 : 31 - Math.clz32(v);
   }
-  return e === 0 ? 0xffffffff : 31 - Math.clz32(e);
+  const v = e >>> 0;
+  return v === 0 ? 0xffffffff : 31 - Math.clz32(v);
 };
 
 export const firstTrailingBitScalar = (e: number, signed: boolean): number => {
-  if (e === 0) {
+  if ((e | 0) === 0) {
     return signed ? -1 : 0xffffffff;
   }
   return countTrailingZerosScalar(e);
