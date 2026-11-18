@@ -1,15 +1,14 @@
-import type { AnyVertexInputBuiltin, AnyVertexOutputBuiltin, OmitBuiltins } from '../../builtin.ts';
-import type { UndecorateRecord } from '../../data/dataTypes.ts';
+import type { AnyVertexInputBuiltin, AnyVertexOutputBuiltin } from '../../builtin.ts';
 import type { ResolvedSnippet } from '../../data/snippet.ts';
 import type { BaseData, Decorated, Interpolate, Location } from '../../data/wgslTypes.ts';
 import { getName, setName, type TgpuNamable } from '../../shared/meta.ts';
 import { $getNameForward, $internal, $resolve } from '../../shared/symbols.ts';
-import type { Prettify } from '../../shared/utilityTypes.ts';
 import type { ResolutionCtx, SelfResolvable } from '../../types.ts';
 import type { _AutoVertexIn, AnyAutoCustoms, AutoVertexOut } from './autoIO.ts';
 import { createFnCore, type FnCore } from './fnCore.ts';
 import type {
   BaseIOData,
+  CleanIO,
   Implementation,
   InferIO,
   IORecord,
@@ -47,13 +46,6 @@ type TgpuVertexFnShellHeader<
   readonly argTypes: [IOLayoutToSchema<VertexIn>] | [];
   readonly entryPoint: 'vertex';
 };
-
-type CleanIO<T> =
-  T extends Record<string, BaseData>
-    ? Prettify<UndecorateRecord<OmitBuiltins<T>>>
-    : Prettify<UndecorateRecord<OmitBuiltins<{ a: T }>>> extends { a: infer Result }
-      ? Result
-      : never;
 
 /**
  * Describes a vertex entry function signature (its arguments, return type and attributes).

@@ -3,7 +3,6 @@ import type {
   AnyFragmentOutputBuiltin,
   OmitBuiltins,
 } from '../../builtin.ts';
-import type { UndecorateRecord } from '../../data/dataTypes.ts';
 import type { InstanceToSchema } from '../../data/instanceToSchema.ts';
 import type { ResolvedSnippet } from '../../data/snippet.ts';
 import type {
@@ -18,12 +17,18 @@ import type {
 } from '../../data/wgslTypes.ts';
 import { getName, isNamable, setName, type TgpuNamable } from '../../shared/meta.ts';
 import { $getNameForward, $internal, $resolve } from '../../shared/symbols.ts';
-import type { Prettify } from '../../shared/utilityTypes.ts';
 import type { ResolutionCtx, SelfResolvable } from '../../types.ts';
 import { addReturnTypeToExternals } from '../resolve/externals.ts';
 import type { AnyAutoCustoms, AutoFragmentIn, AutoFragmentOut } from './autoIO.ts';
 import { createFnCore, type FnCore } from './fnCore.ts';
-import type { BaseIOData, Implementation, InferIO, IOLayout, IORecord } from './fnTypes.ts';
+import type {
+  BaseIOData,
+  CleanIO,
+  Implementation,
+  InferIO,
+  IOLayout,
+  IORecord,
+} from './fnTypes.ts';
 import {
   assertIntegerVaryingsInterpolated,
   createIoSchema,
@@ -60,14 +65,6 @@ type TgpuFragmentFnShellHeader<
   readonly returnType: IOLayoutToSchema<FragmentOut>;
   readonly entryPoint: 'fragment';
 };
-
-type CleanIO<T> =
-  T extends Record<string, BaseData>
-    ? Prettify<UndecorateRecord<OmitBuiltins<T>>>
-    : // a trick to use a non-record type in place of a record parameter
-      Prettify<UndecorateRecord<OmitBuiltins<{ a: T }>>> extends { a: infer Result }
-      ? Result
-      : Record<string, never>;
 
 /**
  * Describes a fragment entry function signature (its arguments, return type and targets).
