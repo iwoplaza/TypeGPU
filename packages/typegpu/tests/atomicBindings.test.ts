@@ -90,3 +90,30 @@ describe('atomics in bind group layouts', () => {
     expect(tgpu.resolve([fn])).toContain('var<storage, read_write> m: Counter;');
   });
 });
+
+describe('atomics in variables and constants', () => {
+  it('rejects atomics in private variables', () => {
+    expect(() => tgpu.privateVar(d.atomic(d.u32))).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot create a private variable with schema atomic<u32>, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
+    );
+    expect(() => tgpu.privateVar(Counter)).toThrow(/contains atomics/);
+    expect(() => tgpu.privateVar(d.arrayOf(d.atomic(d.i32), 4))).toThrow(/contains atomics/);
+  });
+
+  it('rejects atomics in constants', () => {
+    expect(() => tgpu.const(d.atomic(d.u32), 1 as never)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot create a constant with schema atomic<u32>, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
+    );
+    expect(() => tgpu.const(Counter, { counter: 0 } as never)).toThrow(/contains atomics/);
+  });
+
+  it('allows atomics in workgroup variables', () => {
+    const shared = tgpu.workgroupVar(d.arrayOf(Counter, 4));
+
+    const fn = tgpu.fn([])(() => {
+      std.atomicAdd(shared.$[0]!.counter, 1);
+    });
+
+    expect(tgpu.resolve([fn])).toMatch(/var<workgroup> \w+: array<Counter, 4>;/);
+  });
+});

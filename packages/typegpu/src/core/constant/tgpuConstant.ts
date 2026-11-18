@@ -1,3 +1,4 @@
+import { containsAtomic } from '../../data/atomic.ts';
 import { isData, type AnyData } from '../../data/dataTypes.ts';
 import { snip } from '../../data/snippet.ts';
 import { type AnyWgslData, type BaseData, type WgslArray } from '../../data/wgslTypes.ts';
@@ -137,6 +138,11 @@ class TgpuConstImpl<TDataType extends BaseData> implements TgpuConst<TDataType> 
   }
 
   constructor(dataType: TDataType, value: InferGPU<TDataType>) {
+    if (containsAtomic(dataType)) {
+      throw new Error(
+        `Cannot create a constant with schema ${String(dataType)}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.`,
+      );
+    }
     this[$soul] = {
       type: 'const',
       dataType,

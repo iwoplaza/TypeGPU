@@ -1,3 +1,4 @@
+import { containsAtomic } from '../../data/atomic.ts';
 import type { AnyData } from '../../data/dataTypes.ts';
 import { snip } from '../../data/snippet.ts';
 import type { BaseData } from '../../data/wgslTypes.ts';
@@ -157,6 +158,11 @@ class TgpuVarImpl<TScope extends VariableScope, TDataType extends BaseData> impl
   }
 
   constructor(scope: TScope, dataType: TDataType, initialValue?: InferGPU<TDataType>) {
+    if (scope === 'private' && containsAtomic(dataType)) {
+      throw new Error(
+        `Cannot create a private variable with schema ${String(dataType)}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.`,
+      );
+    }
     this[$soul] = {
       type: 'var',
       scope,
