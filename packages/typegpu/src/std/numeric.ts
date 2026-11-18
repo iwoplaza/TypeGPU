@@ -1,7 +1,19 @@
 import { dualImpl, MissingCpuImplError } from '../core/function/dualImpl.ts';
 import { stitch } from '../core/resolve/stitch.ts';
 import { mat2x2f, mat3x3f, mat4x4f } from '../data/matrix.ts';
-import { clampScalar, smoothstepScalar } from '../data/numberOps.ts';
+import {
+  clampScalar,
+  countOneBitsScalar,
+  countTrailingZerosScalar,
+  dot4I8PackedScalar,
+  dot4U8PackedScalar,
+  extractBitsScalar,
+  firstLeadingBitScalar,
+  firstTrailingBitScalar,
+  insertBitsScalar,
+  reverseBitsScalar,
+  smoothstepScalar,
+} from '../data/numberOps.ts';
 import { abstractFloat, abstractInt, f16, f32, i32, u32 } from '../data/numeric.ts';
 import { type Snippet, snip, withValue } from '../data/snippet.ts';
 import { abstruct } from '../data/struct.ts';
@@ -22,6 +34,7 @@ import {
 import { VectorOps } from '../data/vectorOps.ts';
 import {
   floatKind,
+  integerKind,
   matrixKind,
   numericKind,
   signedKind,
@@ -123,6 +136,13 @@ const anyFloat = [...anyFloatPrimitive, ...anyFloatVec];
 const anyConcreteIntegerPrimitive = [i32, u32];
 const anyConcreteIntegerVec = [vec2i, vec3i, vec4i, vec2u, vec3u, vec4u];
 const anyConcreteInteger = [...anyConcreteIntegerPrimitive, ...anyConcreteIntegerVec];
+
+/**
+ * Plain numbers carry no type information, so scalars are treated like abstract integers
+ * in WGSL: as `i32`, unless they only fit in `u32`.
+ */
+const isSignedInteger = (value: AnyIntegerVecInstance | number): boolean =>
+  typeof value === 'number' ? value < 2 ** 31 : value.kind.endsWith('i');
 
 // std
 
@@ -310,45 +330,45 @@ export const cosh = dualImpl({
 
 function cpuCountLeadingZeros(value: number): number;
 function cpuCountLeadingZeros<T extends AnyIntegerVecInstance>(value: T): T;
-function cpuCountLeadingZeros<T extends AnyIntegerVecInstance | number>(_value: T): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+function cpuCountLeadingZeros<T extends AnyIntegerVecInstance | number>(value: T): T {
+  assertKind(value, integerKind);
+  return generalizeFn(Math.clz32, [value]);
 }
 
 export const countLeadingZeros = dualImpl<typeof cpuCountLeadingZeros>({
   name: 'countLeadingZeros',
   signature: unifyRestrictedSignature(anyConcreteInteger),
-  normalImpl:
-    'CPU implementation for countLeadingZeros not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuCountLeadingZeros,
   codegenImpl: (_ctx, [value]) => stitch`countLeadingZeros(${value})`,
   sideEffects: false,
 });
 
 function cpuCountOneBits(value: number): number;
 function cpuCountOneBits<T extends AnyIntegerVecInstance>(value: T): T;
-function cpuCountOneBits<T extends AnyIntegerVecInstance | number>(_value: T): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+function cpuCountOneBits<T extends AnyIntegerVecInstance | number>(value: T): T {
+  assertKind(value, integerKind);
+  return generalizeFn(countOneBitsScalar, [value]);
 }
 
 export const countOneBits = dualImpl<typeof cpuCountOneBits>({
   name: 'countOneBits',
   signature: unifyRestrictedSignature(anyConcreteInteger),
-  normalImpl:
-    'CPU implementation for countOneBits not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuCountOneBits,
   codegenImpl: (_ctx, [value]) => stitch`countOneBits(${value})`,
   sideEffects: false,
 });
 
 function cpuCountTrailingZeros(value: number): number;
 function cpuCountTrailingZeros<T extends AnyIntegerVecInstance>(value: T): T;
-function cpuCountTrailingZeros<T extends AnyIntegerVecInstance | number>(_value: T): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+function cpuCountTrailingZeros<T extends AnyIntegerVecInstance | number>(value: T): T {
+  assertKind(value, integerKind);
+  return generalizeFn(countTrailingZerosScalar, [value]);
 }
 
 export const countTrailingZeros = dualImpl<typeof cpuCountTrailingZeros>({
   name: 'countTrailingZeros',
   signature: unifyRestrictedSignature(anyConcreteInteger),
-  normalImpl:
-    'CPU implementation for countTrailingZeros not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuCountTrailingZeros,
   codegenImpl: (_ctx, [value]) => stitch`countTrailingZeros(${value})`,
   sideEffects: false,
 });
@@ -445,8 +465,7 @@ export const dot = dualImpl({
 export const dot4U8Packed = dualImpl<(e1: number, e2: number) => number>({
   name: 'dot4U8Packed',
   signature: { argTypes: [u32, u32], returnType: u32 },
-  normalImpl:
-    'CPU implementation for dot4U8Packed not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: dot4U8PackedScalar,
   codegenImpl: (_ctx, [e1, e2]) => stitch`dot4U8Packed(${e1}, ${e2})`,
   sideEffects: false,
 });
@@ -454,8 +473,7 @@ export const dot4U8Packed = dualImpl<(e1: number, e2: number) => number>({
 export const dot4I8Packed = dualImpl<(e1: number, e2: number) => number>({
   name: 'dot4I8Packed',
   signature: { argTypes: [u32, u32], returnType: i32 },
-  normalImpl:
-    'CPU implementation for dot4I8Packed not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: dot4I8PackedScalar,
   codegenImpl: (_ctx, [e1, e2]) => stitch`dot4I8Packed(${e1}, ${e2})`,
   sideEffects: false,
 });
@@ -493,11 +511,13 @@ export const exp2 = dualImpl({
 function cpuExtractBits(e: number, offset: number, count: number): number;
 function cpuExtractBits<T extends AnyIntegerVecInstance>(e: T, offset: number, count: number): T;
 function cpuExtractBits<T extends AnyIntegerVecInstance | number>(
-  _e: T,
-  _offset: number,
-  _count: number,
+  e: T,
+  offset: number,
+  count: number,
 ): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+  assertKind(e, integerKind);
+  const signed = isSignedInteger(e);
+  return generalizeFn((v) => extractBitsScalar(v, offset, count, signed), [e]);
 }
 
 export const extractBits = dualImpl<typeof cpuExtractBits>({
@@ -512,8 +532,9 @@ export const extractBits = dualImpl<typeof cpuExtractBits>({
       returnType: argRestricted,
     };
   },
-  normalImpl:
-    'CPU implementation for extractBits not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuExtractBits,
+  // Scalars carry no signedness, so comptime folding could produce a mistyped value
+  noComptime: true,
   codegenImpl: (_ctx, [e, offset, count]) => stitch`extractBits(${e}, ${offset}, ${count})`,
   sideEffects: false,
 });
@@ -529,30 +550,36 @@ export const faceForward = dualImpl<<T extends AnyFloatVecInstance>(e1: T, e2: T
 
 function cpuFirstLeadingBit(value: number): number;
 function cpuFirstLeadingBit<T extends AnyIntegerVecInstance>(value: T): T;
-function cpuFirstLeadingBit<T extends AnyIntegerVecInstance | number>(_value: T): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+function cpuFirstLeadingBit<T extends AnyIntegerVecInstance | number>(value: T): T {
+  assertKind(value, integerKind);
+  const signed = isSignedInteger(value);
+  return generalizeFn((e) => firstLeadingBitScalar(e, signed), [value]);
 }
 
 export const firstLeadingBit = dualImpl<typeof cpuFirstLeadingBit>({
   name: 'firstLeadingBit',
   signature: unaryIdentitySignature,
-  normalImpl:
-    'CPU implementation for firstLeadingBit not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuFirstLeadingBit,
+  // Scalars carry no signedness, so comptime folding could produce a mistyped value
+  noComptime: true,
   codegenImpl: (_ctx, [value]) => stitch`firstLeadingBit(${value})`,
   sideEffects: false,
 });
 
 function cpuFirstTrailingBit(value: number): number;
 function cpuFirstTrailingBit<T extends AnyIntegerVecInstance>(value: T): T;
-function cpuFirstTrailingBit<T extends AnyIntegerVecInstance | number>(_value: T): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+function cpuFirstTrailingBit<T extends AnyIntegerVecInstance | number>(value: T): T {
+  assertKind(value, integerKind);
+  const signed = isSignedInteger(value);
+  return generalizeFn((e) => firstTrailingBitScalar(e, signed), [value]);
 }
 
 export const firstTrailingBit = dualImpl<typeof cpuFirstTrailingBit>({
   name: 'firstTrailingBit',
   signature: unifyRestrictedSignature(anyConcreteInteger),
-  normalImpl:
-    'CPU implementation for firstTrailingBit not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuFirstTrailingBit,
+  // Scalars carry no signedness, so comptime folding could produce a mistyped value
+  noComptime: true,
   codegenImpl: (_ctx, [value]) => stitch`firstTrailingBit(${value})`,
   sideEffects: false,
 });
@@ -650,12 +677,15 @@ function cpuInsertBits<T extends AnyIntegerVecInstance>(
   count: number,
 ): T;
 function cpuInsertBits<T extends AnyIntegerVecInstance | number>(
-  _e: T,
-  _newbits: T,
-  _offset: number,
-  _count: number,
+  e: T,
+  newbits: T,
+  offset: number,
+  count: number,
 ): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+  assertKind([e, newbits], integerKind);
+  assertEqualKinds(e, newbits);
+  const signed = isSignedInteger(e) && isSignedInteger(newbits);
+  return generalizeFn((a, b) => insertBitsScalar(a, b, offset, count, signed), [e, newbits]);
 }
 
 export const insertBits = dualImpl<typeof cpuInsertBits>({
@@ -670,8 +700,9 @@ export const insertBits = dualImpl<typeof cpuInsertBits>({
       returnType: uargs[0],
     };
   },
-  normalImpl:
-    'CPU implementation for insertBits not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuInsertBits,
+  // Scalars carry no signedness, so comptime folding could produce a mistyped value
+  noComptime: true,
   codegenImpl: (_ctx, [e, newbits, offset, count]) =>
     stitch`insertBits(${e}, ${newbits}, ${offset}, ${count})`,
   sideEffects: false,
@@ -1059,15 +1090,18 @@ export const refract = dualImpl<<T extends AnyFloatVecInstance>(e1: T, e2: T, e3
 });
 function cpuReverseBits(value: number): number;
 function cpuReverseBits<T extends AnyIntegerVecInstance>(value: T): T;
-function cpuReverseBits<T extends AnyIntegerVecInstance | number>(_value: T): T {
-  throw new Error('Unreachable code. The function is only used for the type.');
+function cpuReverseBits<T extends AnyIntegerVecInstance | number>(value: T): T {
+  assertKind(value, integerKind);
+  const signed = isSignedInteger(value);
+  return generalizeFn((e) => reverseBitsScalar(e, signed), [value]);
 }
 
 export const reverseBits = dualImpl<typeof cpuReverseBits>({
   name: 'reverseBits',
   signature: unifyRestrictedSignature(anyConcreteInteger),
-  normalImpl:
-    'CPU implementation for reverseBits not implemented yet. Please submit an issue at https://github.com/software-mansion/TypeGPU/issues',
+  normalImpl: cpuReverseBits,
+  // Scalars carry no signedness, so comptime folding could produce a mistyped value
+  noComptime: true,
   codegenImpl: (_ctx, [value]) => stitch`reverseBits(${value})`,
   sideEffects: false,
 });
