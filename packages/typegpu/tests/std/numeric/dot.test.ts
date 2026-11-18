@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { vec2f, vec3f } from 'typegpu/data';
+import { vec2f, vec2i, vec2u, vec3f, vec3i, vec3u, vec4i, vec4u } from 'typegpu/data';
 import { dot } from 'typegpu/std';
 
 describe('dot', () => {
@@ -32,5 +32,20 @@ describe('dot', () => {
     expect(() => dot(1, vec3f())).toThrowErrorMatchingInlineSnapshot(
       `[Error: Unsupported signature. Expected kind to not be scalar, got 'number'.]`,
     );
+  });
+
+  it('wraps dot product of integer vectors like 32-bit integers', () => {
+    expect(dot(vec2i(2147483647, 0), vec2i(2, 0))).toBe(-2);
+    expect(dot(vec3i(2147483647, 0, 0), vec3i(2, 0, 0))).toBe(-2);
+    expect(dot(vec4i(-2147483648, -2147483648, 0, 0), vec4i(1, 1, 0, 0))).toBe(0);
+    expect(dot(vec3i(976936904, 1, 0), vec3i(-1815639172, 1, 0))).toBe(
+      Math.imul(976936904, -1815639172) + 1,
+    );
+  });
+
+  it('wraps dot product of unsigned integer vectors like 32-bit integers', () => {
+    expect(dot(vec2u(0xffffffff, 1), vec2u(2, 1))).toBe(0xffffffff);
+    expect(dot(vec3u(0xffffffff, 0, 0), vec3u(0xffffffff, 0, 0))).toBe(1);
+    expect(dot(vec4u(0x80000000, 0x80000000, 1, 0), vec4u(1, 1, 1, 0))).toBe(1);
   });
 });

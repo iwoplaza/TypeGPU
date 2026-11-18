@@ -18,7 +18,7 @@ import {
   vec4u,
 } from 'typegpu/data';
 import type { m2x2f, m3x3f, m4x4f, v2f, v3f, v4f } from 'typegpu/data';
-import { mul } from 'typegpu/std';
+import { dot, mul } from 'typegpu/std';
 
 describe('mul', () => {
   it('computes product of a number and a number', () => {
@@ -231,9 +231,58 @@ describe('mul', () => {
     const expected = vec4f(190, 486, 782, 1078);
     expect(mul(v, m)).toStrictEqual(expected);
   });
+
+  it('wraps products of integer vectors like 32-bit integers', () => {
+    // The exact products exceed 2^53, so a double-precision product loses the low bits
+    const a = 976936904;
+    const b = -1815639172;
+    const expected = Math.imul(a, b); // -125960992
+
+    expect(mul(vec3i(a), vec3i(b))).toStrictEqual(vec3i(expected));
+    expect(mul(a, vec2i(b))).toStrictEqual(vec2i(expected));
+    expect(mul(vec4i(a), b)).toStrictEqual(vec4i(expected));
+    expect(vec3i(a).mul(vec3i(b))).toStrictEqual(vec3i(expected));
+    expect(vec3i(a).mul(b)).toStrictEqual(vec3i(expected));
+  });
+
+  it('wraps products of unsigned integer vectors like 32-bit integers', () => {
+    expect(mul(vec2u(0xffffffff), vec2u(0xffffffff))).toStrictEqual(vec2u(1));
+    expect(mul(vec3u(0xfffffffe), vec3u(0x80000001))).toStrictEqual(vec3u(0xfffffffe));
+    expect(mul(0xffffffff, vec4u(0xffffffff))).toStrictEqual(vec4u(1));
+    expect(mul(vec4u(0xffffffff), 0xffffffff)).toStrictEqual(vec4u(1));
+    expect(vec2u(0xffffffff).mul(vec2u(0xffffffff))).toStrictEqual(vec2u(1));
+  });
+
+  it('scales integer vectors by a fractional number before truncating', () => {
+    expect(mul(0.5, vec2i(5))).toStrictEqual(vec2i(2));
+    expect(mul(vec3u(5), 1.5)).toStrictEqual(vec3u(7));
+  });
 });
 
 describe('mul (codegen)', () => {
+  it('folds products of integer vectors with 32-bit wrapping', () => {
+    const a = vec3i(976936904, 2, 3);
+    const b = vec3i(-1815639172, 4, 5);
+    const product = () => {
+      'use gpu';
+      return mul(a, b);
+    };
+    const dotProduct = () => {
+      'use gpu';
+      return dot(a, b);
+    };
+
+    expect(tgpu.resolve([product, dotProduct])).toMatchInlineSnapshot(`
+      "fn product() -> vec3i {
+        return vec3i(-125960992, 8, 15);
+      }
+
+      fn dotProduct() -> i32 {
+        return -125960969i;
+      }"
+    `);
+  });
+
   it('coerces scalar to fit vector', () => {
     const foo = () => {
       'use gpu';

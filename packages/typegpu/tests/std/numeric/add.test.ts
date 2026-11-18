@@ -20,6 +20,13 @@ import { add } from 'typegpu/std';
 import { expectDataTypeOf } from '../../utils/parseResolved.ts';
 
 describe('add', () => {
+  it('wraps sums of integer vectors at the extremes', () => {
+    expect(add(vec2i(2147483647), vec2i(1))).toStrictEqual(vec2i(-2147483648));
+    expect(add(vec3i(-2147483648), vec3i(-1))).toStrictEqual(vec3i(2147483647));
+    expect(add(vec4u(0xffffffff), vec4u(1))).toStrictEqual(vec4u(0));
+    expect(add(vec2u(0xffffffff), vec2u(0xffffffff))).toStrictEqual(vec2u(0xfffffffe));
+  });
+
   it('computes sum of two vec2f', () => {
     expect(add(vec2f(0, 0), vec2f(0, 0))).toStrictEqual(vec2f(0, 0));
     expect(add(vec2f(1.2, 0.1), vec2f(1.0, 0.5))).toStrictEqual(vec2f(2.2, 0.6));
