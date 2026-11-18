@@ -220,6 +220,17 @@ class TgpuWebGLRenderPipelineImpl implements TgpuWebGLRenderPipeline {
       const pairedSampler = samplerName ? resourcesByName.get(samplerName) : undefined;
       const sampler = pairedSampler instanceof WebGLSamplerImpl ? pairedSampler : samplers[0];
       const flipName = crossShaderStageState.textureFlipIdentifiers.get(name);
+      const conflicting = this.#textureBindings.find(
+        ({ view }) =>
+          view.texture === resource.texture &&
+          (view.mipLevelRange.base !== resource.mipLevelRange.base ||
+            view.mipLevelRange.max !== resource.mipLevelRange.max),
+      );
+      if (conflicting) {
+        throw new Error(
+          `WebGL fallback does not support sampling different mip level ranges of the same texture in one pipeline ('${getName(conflicting.view) ?? '<unnamed>'}' and '${getName(resource) ?? '<unnamed>'}').`,
+        );
+      }
       this.#textureBindings.push({
         view: resource,
         sampler,
@@ -280,6 +291,10 @@ class TgpuWebGLRenderPipelineImpl implements TgpuWebGLRenderPipeline {
       const binding = this.#textureBindings[unit] as TextureBinding;
       gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, binding.view.texture.raw);
+      // Mip level ranges are texture state in WebGL, so they are set for the view on every draw
+      const { base, max } = binding.view.mipLevelRange;
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, base);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAX_LEVEL, max);
       gl.bindSampler(unit, binding.sampler?.raw ?? null);
       gl.uniform1i(binding.location, unit);
       if (binding.flipLocation !== null) {

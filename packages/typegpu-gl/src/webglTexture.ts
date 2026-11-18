@@ -136,7 +136,7 @@ export class WebGLTextureView {
   readonly resourceType = 'texture-view' as const;
   readonly texture: WebGLTextureImpl;
   readonly schema: d.WgslTexture2d;
-  readonly descriptor: { baseMipLevel?: number };
+  readonly descriptor: { baseMipLevel?: number; mipLevelCount?: number };
 
   declare readonly $: d.texture2d;
 
@@ -189,7 +189,7 @@ export class WebGLTextureView {
   constructor(
     texture: WebGLTextureImpl,
     schema: d.WgslTexture2d = d.texture2d(d.f32),
-    descriptor: { baseMipLevel?: number } = {},
+    descriptor: { baseMipLevel?: number; mipLevelCount?: number } = {},
   ) {
     if (schema.type !== 'texture_2d' || schema.multisampled) {
       throw new Error('WebGL fallback currently supports only non-multisampled 2D texture views.');
@@ -205,6 +205,16 @@ export class WebGLTextureView {
       Math.max(1, Math.floor(this.texture.width / scale)),
       Math.max(1, Math.floor(this.texture.height / scale)),
     ];
+  }
+
+  /**
+   * The range of mip levels visible through this view, as values for
+   * `TEXTURE_BASE_LEVEL` and `TEXTURE_MAX_LEVEL`.
+   */
+  get mipLevelRange(): { base: number; max: number } {
+    const base = this.descriptor.baseMipLevel ?? 0;
+    const count = this.descriptor.mipLevelCount ?? (this.texture.props.mipLevelCount ?? 1) - base;
+    return { base, max: base + count - 1 };
   }
 
   $name(label: string): this {
@@ -294,8 +304,20 @@ export class WebGLTextureImpl {
 
   createView(
     schema?: d.WgslTexture2d | 'render',
-    descriptor: { baseMipLevel?: number } = {},
+    descriptor: { baseMipLevel?: number; mipLevelCount?: number } = {},
   ): WebGLTextureView | WebGLTextureRenderView {
+    const levels = this.props.mipLevelCount ?? 1;
+    const base = descriptor.baseMipLevel ?? 0;
+    if (!Number.isInteger(base) || base < 0 || base >= levels) {
+      throw new Error(`Base mip level ${base} is out of range. Texture has ${levels} mip levels.`);
+    }
+    const count = descriptor.mipLevelCount;
+    if (count !== undefined && (!Number.isInteger(count) || count < 1 || base + count > levels)) {
+      throw new Error(
+        `Mip level count ${count} is out of range for base mip level ${base}. Texture has ${levels} mip levels.`,
+      );
+    }
+
     if (schema === 'render') {
       if (!this.usableAsRender) {
         throw new Error("Texture is not usable as a render target. Add .$usage('render').");
@@ -370,6 +392,13 @@ export class WebGLTextureImpl {
       throw new Error("generateMipmaps requires .$usage('render').");
     }
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.raw);
+    // Sampling through a view might have narrowed the mip level range, which mipmap generation respects
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_BASE_LEVEL, 0);
+    this.gl.texParameteri(
+      this.gl.TEXTURE_2D,
+      this.gl.TEXTURE_MAX_LEVEL,
+      (this.props.mipLevelCount ?? 1) - 1,
+    );
     this.gl.generateMipmap(this.gl.TEXTURE_2D);
     this.gl.bindTexture(this.gl.TEXTURE_2D, null);
   }
