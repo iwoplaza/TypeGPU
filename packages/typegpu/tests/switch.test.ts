@@ -672,7 +672,7 @@ describe(`switch statement in 'use gpu' functions`, () => {
       [Error: Resolution of the following tree failed:
       - <root>
       - fn*:fn
-      - fn*:fn(): Cannot convert 'value' of type 'vec2u' to any of the target types: [i32, u32]]
+      - fn*:fn(): Switch selector 'value' of type 'vec2u' is not an integer. Convert it explicitly, e.g. 'switch (d.i32(value))'.]
     `);
     // TODO(#2909): Decide whether this is a bug or feature.
     // expect(() => tgpu.resolve([fn.with(slot, true)])).toThrowErrorMatchingInlineSnapshot();
@@ -735,6 +735,224 @@ describe(`switch statement in 'use gpu' functions`, () => {
       - <root>
       - fn*:fn
       - fn*:fn(): Cannot convert 'd.vec3f()' of type 'vec3f' to any of the target types: [i32]]
+    `);
+  });
+
+  it('disallows non-integer selectors', () => {
+    const withF32 = tgpu.fn(
+      [d.f32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case 1:
+          return 1;
+      }
+      return 0;
+    });
+    const withF16 = tgpu.fn(
+      [d.f16],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case 1:
+          return 1;
+      }
+      return 0;
+    });
+    const withBool = tgpu.fn(
+      [d.bool],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case true:
+          return 1;
+      }
+      return 0;
+    });
+
+    expect(() => tgpu.resolve([withF32])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:withF32: Switch selector 'x' of type 'f32' is not an integer. Convert it explicitly, e.g. 'switch (d.i32(x))'.]
+    `);
+    expect(() => tgpu.resolve([withF16])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:withF16: Switch selector 'x' of type 'f16' is not an integer. Convert it explicitly, e.g. 'switch (d.i32(x))'.]
+    `);
+    expect(() => tgpu.resolve([withBool])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:withBool: Switch selector 'x' of type 'bool' is not an integer. Convert it explicitly, e.g. 'switch (d.i32(x))'.]
+    `);
+  });
+
+  it('allows explicitly converted selectors', () => {
+    const fn = tgpu.fn(
+      [d.f32],
+      d.i32,
+    )((x) => {
+      switch (d.i32(x)) {
+        case 1:
+          return 1;
+      }
+      return 0;
+    });
+
+    expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+      "fn fn_1(x: f32) -> i32 {
+        switch i32(x) {
+          case 1i: {
+            return 1i;
+          }
+          case default: {
+
+          }
+        }
+        return 0i;
+      }"
+    `);
+  });
+
+  it('disallows non-integer abstract selectors', () => {
+    const limit = tgpu.const(d.i32, 2);
+    const fn = () => {
+      'use gpu';
+      switch (1.5 as number) {
+        case 1:
+          return 1;
+        case limit.$:
+          return 2;
+      }
+      return 0;
+    };
+
+    expect(() => tgpu.resolve([fn])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn*:fn
+      - fn*:fn(): Switch selector '1.5' is not a valid 'i32' value. Convert it explicitly, e.g. 'switch (d.i32(1.5))'.]
+    `);
+  });
+
+  it('allows non-integer comptime selectors that get pruned', () => {
+    const fn = () => {
+      'use gpu';
+      switch (d.f32(1.5)) {
+        case 1:
+          return 1;
+        default:
+          return 0;
+      }
+    };
+
+    expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+      "fn fn_1() -> i32 {
+        {
+          return 0;
+        }
+      }"
+    `);
+  });
+
+  it('disallows cases that can never match the selector', () => {
+    const nonInteger = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case 1.5:
+          return 1;
+      }
+      return 0;
+    });
+    const negativeForU32 = tgpu.fn(
+      [d.u32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case -1:
+          return 1;
+      }
+      return 0;
+    });
+    const tooLargeForU32 = tgpu.fn(
+      [d.u32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case 2 ** 32:
+          return 1;
+      }
+      return 0;
+    });
+    const tooLargeForI32 = tgpu.fn(
+      [d.i32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case d.u32(3000000000):
+          return 1;
+      }
+      return 0;
+    });
+
+    expect(() => tgpu.resolve([nonInteger])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:nonInteger: Case '1.5' can never match a switch selector of type 'i32'.]
+    `);
+    expect(() => tgpu.resolve([negativeForU32])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:negativeForU32: Case '-1' can never match a switch selector of type 'u32'.]
+    `);
+    expect(() => tgpu.resolve([tooLargeForU32])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:tooLargeForU32: Case '2 ** 32' can never match a switch selector of type 'u32'.]
+    `);
+    expect(() => tgpu.resolve([tooLargeForI32])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:tooLargeForI32: Case 'd.u32(3000000000)' can never match a switch selector of type 'i32'.]
+    `);
+  });
+
+  it('allows integer-valued cases of other types', () => {
+    const fn = tgpu.fn(
+      [d.u32],
+      d.i32,
+    )((x) => {
+      switch (x) {
+        case d.f32(1):
+          return 1;
+        case d.i32(2):
+          return 2;
+        case 4294967295:
+          return 3;
+      }
+      return 0;
+    });
+
+    expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+      "fn fn_1(x: u32) -> i32 {
+        switch x {
+          case 1u: {
+            return 1i;
+          }
+          case 2u: {
+            return 2i;
+          }
+          case 4294967295u: {
+            return 3i;
+          }
+          case default: {
+
+          }
+        }
+        return 0i;
+      }"
     `);
   });
 

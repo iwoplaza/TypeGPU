@@ -238,6 +238,22 @@ const functionInitialBlockDepth = 2;
 // Used for switch case.
 const switchDefault = snip('default', UnknownData, 'constant');
 
+const integerSelectorTypes = ['i32', 'u32', 'abstractInt', 'abstractFloat'];
+
+/**
+ * Whether a comptime-known value of a switch selector or case label keeps its JS meaning
+ * once converted to the selector type (JS compares with `===`, so the value has to be
+ * representable as-is).
+ */
+function isExactSwitchValue(value: unknown, type: wgsl.BaseData): boolean {
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    return false;
+  }
+  return type.type === 'u32'
+    ? value >= 0 && value <= 0xffffffff
+    : value >= -0x80000000 && value <= 0x7fffffff;
+}
+
 function schemaWrappingSuggestion(declaration: string, rhs: string, value: unknown): string {
   if (value === null || value === undefined || typeof value === 'string') {
     return '';
@@ -1980,9 +1996,24 @@ ${this.ctx.pre}else ${alternate}`,
       }
 
       // type concretization
+      const discriminantType = unptr(discriminantExpr.dataType);
+      if (
+        discriminantType !== UnknownData &&
+        !integerSelectorTypes.includes(discriminantType.type)
+      ) {
+        throw new WgslTypeError(
+          `Switch selector '${stringifyNode(discriminant)}' of type '${discriminantType.type}' is not an integer. Convert it explicitly, e.g. 'switch (d.i32(${stringifyNode(discriminant)}))'.`,
+        );
+      }
+      const knownSelector = asComptime(discriminantExpr);
       discriminantExpr = tryConvertSnippet(this.ctx, discriminantExpr, [i32, u32]);
       const switchType = discriminantExpr.dataType;
       invariant(switchType !== UnknownData);
+      if (knownSelector && !isExactSwitchValue(knownSelector.value, switchType)) {
+        throw new WgslTypeError(
+          `Switch selector '${stringifyNode(discriminant)}' is not a valid '${switchType.type}' value. Convert it explicitly, e.g. 'switch (d.i32(${stringifyNode(discriminant)}))'.`,
+        );
+      }
       caseExprs = caseExprs.map(([test, consequent]) => {
         // TODO(#3148): Remove this throw.
         if (test !== switchDefault && test.dataType === UnknownData) {
@@ -1990,6 +2021,12 @@ ${this.ctx.pre}else ${alternate}`,
         }
         const convertedTest =
           test === switchDefault ? test : tryConvertSnippet(this.ctx, test, [switchType]);
+        const knownTest = test !== switchDefault && asComptime(test);
+        if (knownTest && !isExactSwitchValue(knownTest.value, switchType)) {
+          throw new WgslTypeError(
+            `Case '${stringifySnippet(test)}' can never match a switch selector of type '${switchType.type}'.`,
+          );
+        }
 
         return [convertedTest, consequent];
       });
