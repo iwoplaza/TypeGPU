@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "resolution-time": "bun procedural.ts",
-    "resolution-time:cold-start": "bun coldStart.ts"
+    "resolution-time:cold-start": "pnpm run --filter tinyest --filter typegpu build && bun coldStart.ts"
   },
   "dependencies": {
     "typegpu": "workspace:*"

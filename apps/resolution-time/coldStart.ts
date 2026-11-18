@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { plugin } from 'bun';
+import typegpuPlugin from 'unplugin-typegpu/bun';
 import type { ProcGenConfig } from './procedural.ts';
 
 export interface ColdStartResult {
@@ -28,11 +30,44 @@ const programConfig: ProcGenConfig = {
   seed: MAX_DEPTH * 2 ** 24,
 };
 
-async function child() {
-  const importStart = performance.now();
-  await import('typegpu');
-  const importMs = performance.now() - importStart;
+const dir = import.meta.dirname ?? '.';
+// In the monorepo, `typegpu` and `tinyest` (which it imports) export their sources, the builds sit next to them
+const typegpuEntry = Bun.resolveSync('typegpu', dir);
+const typegpuDist = resolve(dirname(typegpuEntry), '../dist/index.js');
+const tinyestEntry = Bun.resolveSync('tinyest', dirname(typegpuEntry));
+const tinyestDist = resolve(dirname(tinyestEntry), '../dist/index.js');
 
+function exactPath(path: string) {
+  return new RegExp(`^${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+}
+
+async function child() {
+  // Swaps the package entries for their builds, like for an app that installed them from npm, so
+  // that the import below measures module evaluation only. (`onResolve` doesn't run for bare
+  // specifiers in Bun's runtime plugins, hence `onLoad`.)
+  plugin({
+    name: 'built-packages',
+    setup(build) {
+      build.onLoad({ filter: exactPath(typegpuEntry) }, () => ({
+        contents: `export * from ${JSON.stringify(typegpuDist)}; export { default } from ${JSON.stringify(typegpuDist)};`,
+        loader: 'js',
+      }));
+      build.onLoad({ filter: exactPath(tinyestEntry) }, () => ({
+        contents: `export * from ${JSON.stringify(tinyestDist)};`,
+        loader: 'js',
+      }));
+    },
+  });
+
+  const importStart = performance.now();
+  const typegpu = await import('typegpu');
+  const importMs = performance.now() - importStart;
+  if (typegpu.tgpu !== (await import(typegpuDist)).tgpu) {
+    throw new Error(`typegpu was not loaded from ${typegpuDist}`);
+  }
+
+  // The benchmark program itself still has to go through the build plugin
+  void plugin(typegpuPlugin({ include: /[\\/]resolution-time[\\/]procedural\.ts$/ }));
   const { resolveOnce } = await import('./procedural.ts');
   const first = resolveOnce(programConfig);
   const second = resolveOnce(programConfig);
@@ -54,14 +89,28 @@ function summarize(values: number[]): string {
 }
 
 function parent() {
-  const dir = import.meta.dirname ?? '.';
+  for (const built of [typegpuDist, tinyestDist]) {
+    if (!existsSync(built)) {
+      throw new Error(
+        `${built} is missing, build it first: pnpm --filter tinyest --filter typegpu build`,
+      );
+    }
+  }
+
   const results: ColdStartResult[] = [];
 
   for (let i = 0; i < RUNS; i++) {
-    // a fresh process per sample, run from this directory so bunfig.toml preloads the plugin
+    // A fresh process per sample. It skips bunfig.toml, so that the plugin preloaded there doesn't
+    // transform the library, and registers the plugin itself instead.
     const proc = spawnSync(
       process.execPath,
-      [resolve(dir, 'coldStart.ts'), '--child', '--depth', String(MAX_DEPTH)],
+      [
+        `--config=${resolve(dir, 'bunfig.cold-start.toml')}`,
+        resolve(dir, 'coldStart.ts'),
+        '--child',
+        '--depth',
+        String(MAX_DEPTH),
+      ],
       { cwd: dir, encoding: 'utf8' },
     );
     if (proc.status !== 0) {
