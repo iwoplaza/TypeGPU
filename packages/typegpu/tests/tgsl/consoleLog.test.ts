@@ -668,6 +668,19 @@ describe('WgslGenerator with console.log', () => {
     `);
   });
 
+  it('Measures the log size without padding', ({ root }) => {
+    // sizeOf is 256 bytes, but only 16 * 3 * 4 = 192 bytes are serialized
+    const Points = d.arrayOf(d.vec3f, 16);
+    const fn = tgpu.computeFn({ workgroupSize: [1] })(() => {
+      'use gpu';
+      console.log(Points());
+    });
+
+    const pipeline = root.createComputePipeline({ compute: fn });
+
+    expect(() => tgpu.resolve([pipeline])).not.toThrow();
+  });
+
   it('Throws when using an unsupported feature', ({ root }) => {
     const fn = tgpu.computeFn({
       workgroupSize: [1],
@@ -802,5 +815,44 @@ describe('WgslGenerator with console.log', () => {
         wrappedCallback(id.x, id.y, id.z);
       }"
     `);
+  });
+
+  it('reads back an argument logged after a padded struct', async ({ root, device }) => {
+    using consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const S = d.struct({ a: d.f32, b: d.vec3f });
+
+    const fn = tgpu.computeFn({ workgroupSize: [1] })(() => {
+      'use gpu';
+      console.log(S({ a: 1, b: d.vec3f(2, 3, 4) }), d.u32(7));
+    });
+    const pipeline = root.createComputePipeline({ compute: fn });
+
+    // The struct is serialized as 4 consecutive u32s (a, b.x, b.y, b.z), even though sizeOf(S) is 32 bytes
+    const wgsl = tgpu.resolve([pipeline]);
+    expect(wgsl).toContain('fn SSerializer(arg: S) {\n  compoundSerializer(arg.a, arg.b);\n}');
+    expect(wgsl).toContain(
+      'fn log1serializer(_arg_0: S, _arg_1: u32) {\n  SSerializer(_arg_0);\n  serializeU32(_arg_1);\n}',
+    );
+
+    const logCallSize = 4 + 252; // id + serializedData
+    const f32Bits = (n: number) => new Uint32Array(new Float32Array([n]).buffer)[0] as number;
+    const createBuffer = device.mock.createBuffer.getMockImplementation()!;
+    device.mock.createBuffer.mockImplementation((descriptor) => {
+      const buffer = createBuffer(descriptor);
+      if (descriptor.size === 64 * logCallSize && descriptor.usage & GPUBufferUsage.MAP_READ) {
+        buffer.getMappedRange = vi.fn(() => {
+          const data = new Uint32Array(descriptor.size / 4);
+          data.set([1, f32Bits(1), f32Bits(2), f32Bits(3), f32Bits(4), 7]);
+          return data.buffer;
+        });
+      }
+      return buffer;
+    });
+
+    pipeline.dispatchWorkgroups(1);
+
+    await vi.waitFor(() => expect(consoleLogSpy).toHaveBeenCalled());
+    expect(consoleLogSpy.mock.calls[0]?.slice(3)).toStrictEqual(['7']);
+    expect(consoleLogSpy.mock.calls[0]?.[0]).toContain('{ a: 1, b: vec3f(2, 3, 4) }');
   });
 });

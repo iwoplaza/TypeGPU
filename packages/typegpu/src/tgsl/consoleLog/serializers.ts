@@ -5,7 +5,6 @@ import { privateVar } from '../../core/variable/tgpuVariable.ts';
 import type { AnyData } from '../../data/dataTypes.ts';
 import { mat2x2f, mat3x3f, mat4x4f } from '../../data/matrix.ts';
 import { bool, f16, f32, i32, u32 } from '../../data/numeric.ts';
-import { sizeOf } from '../../data/sizeOf.ts';
 import {
   vec2b,
   vec2f,
@@ -34,6 +33,7 @@ import {
   type WgslArray,
 } from '../../data/wgslTypes.ts';
 import { getName } from '../../shared/meta.ts';
+import { serializedSlotCount } from './serializedLayout.ts';
 import type { LogGeneratorOptions, SerializedLogCallData } from './types.ts';
 
 // --------------
@@ -297,7 +297,10 @@ export function createLoggingFunction(
   indexBuffer: TgpuMutable<Atomic<U32>>,
   logOptions: Required<LogGeneratorOptions>,
 ): TgpuFn {
-  const serializedSize = dataTypes.map(sizeOf).reduce((a, b) => a + b, 0);
+  const serializedSize = dataTypes.reduce(
+    (acc, dataType) => acc + serializedSlotCount(dataType) * 4,
+    0,
+  );
   if (serializedSize > logOptions.logSizeLimit) {
     throw new Error(
       `Logged data needs to fit in ${logOptions.logSizeLimit} bytes (one of the logs requires ${serializedSize} bytes). Consider increasing the limit by passing appropriate options to tgpu.init().`,
