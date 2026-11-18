@@ -2,9 +2,12 @@
  * @vitest-environment jsdom
  */
 
-import { describe, expect } from 'vitest';
+import { describe, expect, vi } from 'vitest';
 import { it } from 'typegpu-testing-utility';
 import { runExampleTest, setupCommonMocks } from './utils/baseTest.ts';
+
+// The plot isn't part of what's tested, and loading the plotting library is slow.
+vi.mock('morphcharts', async () => (await import('./utils/testUtils.ts')).createDeepStubModule());
 
 describe('probability distribution plot example', () => {
   setupCommonMocks();
