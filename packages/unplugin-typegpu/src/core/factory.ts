@@ -110,6 +110,14 @@ function wrapInAutoName(
     .prependRight(path.node.end ?? 0, `, "${name}"))`);
 }
 
+/**
+ * The runtime function is only installed if `tsover-runtime` was evaluated, which a tree-shaken
+ * bundle might not do. Without it, nothing can have overloaded the operator, so the native one is used.
+ */
+function overloadedOperatorCall(runtimeFn: string, operator: string, lhs: string, rhs: string) {
+  return `(globalThis.${runtimeFn} ?? ((a, b) => a ${operator} b))(${lhs}, ${rhs})`;
+}
+
 function replaceWithAssignmentOverload(
   this: UnpluginPluginState,
   path: NodePath<t.AssignmentExpression>,
@@ -117,7 +125,8 @@ function replaceWithAssignmentOverload(
 ): void {
   const lhs = this.slice(path.node.left);
   const rhs = this.slice(path.node.right);
-  this.overwrite(path.node, `${lhs} = ${runtimeFn}(${lhs}, ${rhs})`);
+  const operator = path.node.operator.slice(0, -1);
+  this.overwrite(path.node, `${lhs} = ${overloadedOperatorCall(runtimeFn, operator, lhs, rhs)}`);
 }
 
 function replaceWithBinaryOverload(
@@ -127,7 +136,7 @@ function replaceWithBinaryOverload(
 ): void {
   const lhs = this.slice(path.node.left);
   const rhs = this.slice(path.node.right);
-  this.overwrite(path.node, `${runtimeFn}(${lhs}, ${rhs})`);
+  this.overwrite(path.node, overloadedOperatorCall(runtimeFn, path.node.operator, lhs, rhs));
 }
 
 const NodeUtils = {
