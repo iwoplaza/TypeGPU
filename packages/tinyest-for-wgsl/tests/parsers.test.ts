@@ -561,6 +561,20 @@ describe('legacy transpileFn', () => {
     );
   });
 
+  it('rejects duplicate non-computed object keys', () => {
+    const code = `() => ({
+      field: 1,
+      field: 2,
+    });`;
+
+    expect(() => transpileFn(parseBabel(code))).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Duplicate object property key: 'field'.]`,
+    );
+    expect(() => transpileFn(parseRollup(code))).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Duplicate object property key: 'field'.]`,
+    );
+  });
+
   it('rejects spread elements', () => {
     const code = `() => ({
       ...obj,

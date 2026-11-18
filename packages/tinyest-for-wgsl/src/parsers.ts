@@ -13,6 +13,7 @@ import { tryFindExternalChain } from './externals.ts';
 import {
   acornTranspilers,
   babelTranspilers,
+  buildObjectExpression,
   transpileAcornProperty,
   transpileBabelObjectProperty,
 } from './transpilers.ts';
@@ -59,23 +60,7 @@ function createLegacyTraspilers() {
           : transpileBabelObjectProperty(ctx, prop, transpile);
       });
 
-      if (objectProperties.some((prop) => /* computed */ prop[2])) {
-        return [NODE.objectExpr, objectProperties] as tinyest.ObjectExpression;
-      }
-
-      const obj: Record<string, tinyest.Expression> = {};
-      const seenKeys = new Set<string>();
-
-      for (const prop of objectProperties) {
-        const key = prop[0] as string;
-        if (seenKeys.has(key)) {
-          throw new Error(`Duplicate object property key: '${key}'.`);
-        }
-        seenKeys.add(key);
-        obj[key] = /* value */ prop[1];
-      }
-
-      return [NODE.objectExpr, obj] as tinyest.ObjectExpression;
+      return buildObjectExpression(objectProperties);
     },
   } as Transpilers<JsNode>;
 }
