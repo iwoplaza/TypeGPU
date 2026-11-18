@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import babelPlugin from 'unplugin-typegpu/babel';
 import { expect, test } from 'vitest';
 import { d, std, tgpu } from 'typegpu';
-import { generators, type Program, Rng } from './generators.ts';
+import { generators, operatorReference, type Program, Rng } from './generators.ts';
 
 const seed = Number(process.env.FUZZ_SEED ?? Date.now() % 1_000_000);
 const count = Number(process.env.FUZZ_COUNT ?? 2000);
@@ -25,7 +25,11 @@ const BATCH_SIZE = 250;
 const nagaAvailable = spawnSync('naga', ['--version']).status === 0;
 
 interface KnownFailure {
-  matches: (program: Program, message: string) => boolean;
+  /**
+   * `referenceValid` says whether the operator program's operation, written directly in WGSL
+   * after the conversions TypeGPU is expected to make, is valid (see `operatorReference`).
+   */
+  matches: (program: Program, message: string, referenceValid?: boolean) => boolean;
 }
 
 /**
@@ -36,8 +40,9 @@ const knownFailures: Record<string, KnownFailure> = {
   // Binary operators on operand types WGSL has no overload for (`f32 ^ f32`, `bool * bool`,
   // `vec3f & vec3f`, `vec4h * mat4x4f`, ...) are emitted as is instead of being rejected.
   uncheckedBinaryOperator: {
-    matches: ({ generator, shape }, message) =>
+    matches: ({ generator, shape }, message, referenceValid) =>
       generator === 'operator' &&
+      referenceValid === false &&
       (/Operation \w+ can't work with|Abstract types may only appear in constant expressions|failed to convert expression to a concrete type|type mismatch for reject and accept values/.test(
         message,
       ) ||
@@ -142,7 +147,7 @@ type Outcome =
   | { kind: 'valid' }
   | { kind: 'rejected'; message: string }
   | { kind: 'crashed'; message: string }
-  | { kind: 'invalid'; wgsl: string; message: string };
+  | { kind: 'invalid'; wgsl: string; message: string; referenceValid?: boolean };
 
 function resolveProgram(program: Program): { wgsl: string } | Exclude<Outcome, { kind: 'valid' }> {
   const code = Babel.transform(`function __program(tgpu, d, std) {\n${program.source}\n}`, {
@@ -211,12 +216,12 @@ function validate(shaders: Map<number, string>): Map<number, string> {
   }
 }
 
-function classify(program: Program, message: string): string | undefined {
+function classify(program: Program, message: string, referenceValid?: boolean): string | undefined {
   for (const [name, entry] of [
     ...Object.entries(knownFailures),
     ...Object.entries(validatorGaps),
   ]) {
-    if (entry.matches(program, message)) {
+    if (entry.matches(program, message, referenceValid)) {
       return name;
     }
   }
@@ -245,8 +250,18 @@ test.skipIf(!nagaAvailable)('generated WGSL passes validation', () => {
         outcomes[i] = result;
       }
     }
+    const references = new Map<number, string>();
     for (const [i, message] of validate(toValidate)) {
       outcomes[i] = { kind: 'invalid', wgsl: toValidate.get(i) as string, message };
+      const program = programs[i] as Program;
+      if (program.generator === 'operator') {
+        references.set(i, operatorReference(program.shape));
+      }
+    }
+    const referenceErrors = validate(references);
+    for (const i of references.keys()) {
+      (outcomes[i] as Extract<Outcome, { kind: 'invalid' }>).referenceValid =
+        !referenceErrors.has(i);
     }
   }
 
@@ -258,7 +273,10 @@ test.skipIf(!nagaAvailable)('generated WGSL passes validation', () => {
       summary[outcome.kind] = (summary[outcome.kind] ?? 0) + 1;
       return;
     }
-    const known = outcome.kind === 'invalid' ? classify(program, outcome.message) : undefined;
+    const known =
+      outcome.kind === 'invalid'
+        ? classify(program, outcome.message, outcome.referenceValid)
+        : undefined;
     if (known) {
       summary[known] = (summary[known] ?? 0) + 1;
       return;

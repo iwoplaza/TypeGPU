@@ -206,6 +206,100 @@ export function generateOperator(rng: Rng): Program | null {
   return { generator: 'operator', shape: { op, lt, rt, lo, ro, pos }, source };
 }
 
+const wgslTypeNames: Record<string, string> = {
+  f: 'f32',
+  h: 'f16',
+  i: 'i32',
+  u: 'u32',
+  b: 'bool',
+};
+
+function wgslType(typeName: string): string | null {
+  if (typeName.startsWith('abstract')) {
+    return null;
+  }
+  const vec = /^vec(\d)([fhiub])$/.exec(typeName);
+  if (vec) {
+    return `vec${vec[1]}<${wgslTypeNames[vec[2] as string]}>`;
+  }
+  const mat = /^mat(\d)x(\d)f$/.exec(typeName);
+  return mat ? `mat${mat[1]}x${mat[2]}<f32>` : typeName;
+}
+
+const scalarPreference = ['f32', 'f16', 'i32', 'u32', 'bool'];
+
+/**
+ * The type TypeGPU converts both operands of a binary operator to, or `undefined` when it
+ * leaves them as they are. Mirrors `getBestConversion`: abstract integers convert to any
+ * numeric scalar, abstract floats to `f32` and `f16` (and to `f32` next to `i32` or `u32`),
+ * concrete scalars (`bool` included) are cast to the most preferred one of the two, and
+ * vectors and matrices only match their own type.
+ */
+export function operandCommonType(lt: string, rt: string): string | undefined {
+  if (lt === rt) {
+    return lt;
+  }
+  const la = lt.startsWith('abstract');
+  const ra = rt.startsWith('abstract');
+  if (la && ra) {
+    return 'abstractFloat';
+  }
+  const [abstract, other] = la ? [lt, rt] : ra ? [rt, lt] : [null, null];
+  if (abstract && other) {
+    if (!scalarPreference.includes(other) || other === 'bool') {
+      return undefined;
+    }
+    return abstract === 'abstractInt' || other.startsWith('f') ? other : 'f32';
+  }
+  if (scalarPreference.includes(lt) && scalarPreference.includes(rt)) {
+    return scalarPreference[Math.min(scalarPreference.indexOf(lt), scalarPreference.indexOf(rt))];
+  }
+  return undefined;
+}
+
+/**
+ * The operator program's operation written directly in WGSL, after the conversions TypeGPU is
+ * expected to make. When it does not validate, WGSL has no overload for the operator and the
+ * operand types, and TypeGPU should have rejected the program.
+ */
+export function operatorReference({ op, lt, rt, pos }: Record<string, string>): string {
+  const shift = op === '<<' || op === '>>';
+  let [lType, rType] = [lt as string, rt as string];
+  if (shift) {
+    if (operandCommonType('u32', rType) !== undefined && !rType.startsWith('vec')) {
+      rType = lType.startsWith('vec') ? rType : 'u32';
+    }
+  } else {
+    const common =
+      pos === 'compound'
+        ? operandCommonType(lType, rType) === lType
+          ? lType
+          : undefined
+        : operandCommonType(lType, rType);
+    if (common) {
+      lType = lType.startsWith('abstract') && common.startsWith('abstract') ? lType : common;
+      rType = rType.startsWith('abstract') && common.startsWith('abstract') ? rType : common;
+    }
+  }
+  const params: string[] = [];
+  const value = (typeName: string, original: string, name: string) => {
+    const type = wgslType(typeName);
+    if (!type) {
+      return (opTypes[original] as OperandType).ctor;
+    }
+    params.push(`${name}: ${type}`);
+    return name;
+  };
+  const A = value(lType, lt as string, 'a');
+  const B = value(rType, rt as string, 'b');
+  const wgslOp = op === '===' ? '==' : op === '!==' ? '!=' : op;
+  const body =
+    pos === 'compound'
+      ? `var r = ${A};\n  r ${wgslOp}= ${B};`
+      : `let r = ${op === '**' ? `pow(${A}, ${B})` : `(${A} ${wgslOp} ${B})`};`;
+  return `enable f16;\nfn f(${params.join(', ')}) {\n  ${body}\n}\n`;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Conversions: a value of one type flowing into a slot of another type, at a call argument,
 // return value, struct field, array element, assignment, or constructor argument.
