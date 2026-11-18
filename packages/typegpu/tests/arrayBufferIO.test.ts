@@ -1,5 +1,5 @@
 import { describe, expect } from 'vitest';
-import { d, patchArrayBuffer, readFromArrayBuffer, writeToArrayBuffer } from 'typegpu';
+import { d, patchArrayBuffer, readFromArrayBuffer, tgpu, writeToArrayBuffer } from 'typegpu';
 import { it } from 'typegpu-testing-utility';
 
 describe('arrayBufferIO', () => {
@@ -231,16 +231,30 @@ describe('arrayBufferIO', () => {
       ]);
     });
 
-    it('keeps vectors read with non-finite values usable', () => {
+    it('keeps the finite checks everywhere else', () => {
       const buffer = new Float32Array([Infinity, 1, 2, 0]).buffer;
 
       const result = readFromArrayBuffer(buffer, d.vec3f);
 
       expect([...result.yz]).toStrictEqual([1, 2]);
+      expect(() => result.xy).toThrow();
+      expect(() => d.vec3f(result)).toThrow();
       expect(() => {
         result.y = Infinity;
       }).toThrow();
       expect(() => d.vec3f(Infinity)).toThrow();
+    });
+
+    it('does not turn a vector of NaNs into a zero vector in a shader', () => {
+      const buffer = new Float32Array([NaN, NaN, NaN, 0]).buffer;
+      const result = readFromArrayBuffer(buffer, d.vec3f);
+
+      const fn = () => {
+        'use gpu';
+        return result;
+      };
+
+      expect(() => tgpu.resolve([fn])).toThrow();
     });
   });
 

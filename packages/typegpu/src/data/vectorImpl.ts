@@ -117,7 +117,7 @@ export abstract class VecBase<S> extends Array implements SelfResolvable {
     // oxlint-disable-next-line typescript-eslint(no-explicit-any)
     const vecSchema = WORKAROUND_getSchema(this as any);
 
-    if (this.every((e) => !e)) {
+    if (this.every((e) => !e && !Number.isNaN(e))) {
       return ctx.gen.typeInstantiation(vecSchema, []);
     }
 
