@@ -34,6 +34,28 @@ export function createDeepNoopProxy<T extends object>(
   });
 }
 
+/**
+ * A stand-in for a module the tests don't care about (e.g. a plotting library), meant to be
+ * returned from a `vi.mock` factory. Every export, and anything reached from it through property
+ * access, calls or construction, is the same no-op stub (which converts to `0` when used as a
+ * primitive).
+ */
+export function createDeepStubModule(): Record<string, unknown> {
+  const get = (_target: object, prop: PropertyKey) => {
+    if (prop === Symbol.toPrimitive) {
+      return () => 0;
+    }
+    return prop === 'then' || typeof prop === 'symbol' ? undefined : stub;
+  };
+  const stub: object = new Proxy(function () {}, {
+    get,
+    set: () => true,
+    apply: () => stub,
+    construct: () => stub,
+  });
+  return new Proxy({}, { get, has: () => true });
+}
+
 export async function testExampleShaderGeneration(
   examplePath: string,
   controlTriggers: string[] = [],
