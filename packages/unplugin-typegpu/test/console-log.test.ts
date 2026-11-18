@@ -1,6 +1,20 @@
+import Babel from '@babel/standalone';
+import { runInThisContext } from 'node:vm';
 import { describe, expect, test } from 'vitest';
+import babelPlugin from '../src/babel.ts';
 import { unpluginFactory } from '../src/core/factory.ts';
 import { babelTransform, rollupTransform } from './transform.ts';
+
+/** Runs only the transform of the unplugin factory, without bundling */
+function unpluginTransform(code: string, id = 'file.js'): string {
+  const plugin = unpluginFactory({ include: [/\.m?[jt]sx?$/], autoNamingEnabled: false }, {
+    framework: 'vite',
+  } as never);
+  const transform = plugin.transform as unknown as {
+    handler(this: unknown, code: string, id: string): { code: string } | undefined;
+  };
+  return transform.handler.call({ warn: () => {} }, code, id)?.code ?? code;
+}
 
 describe('functions that log', () => {
   const code = `\
@@ -161,5 +175,112 @@ describe('files with directives', () => {
       `'use client';`,
       `import * as _typegpu from 'typegpu';`,
     ]);
+  });
+});
+
+describe('CommonJS files', () => {
+  const code = `\
+    const { tgpu } = require('typegpu');
+
+    const logs = () => {
+      'use gpu';
+      console.log(1);
+    };
+
+    module.exports = { logs };
+  `;
+
+  /** Runs a CommonJS module, with `typegpu` stubbed, and returns what it exports */
+  function runCommonJs(output: string, typegpu: object) {
+    const module = { exports: {} as Record<string, unknown> };
+    const require = (id: string) => (id === 'typegpu' ? typegpu : undefined);
+    const wrapper = runInThisContext(`(function (require, module, exports) {\n${output}\n})`);
+    wrapper(require, module, module.exports);
+    return module.exports;
+  }
+
+  function consoleLogOf(fn: unknown) {
+    const meta = (globalThis as { __TYPEGPU_META__?: WeakMap<object, { consoleLog?: unknown }> })
+      .__TYPEGPU_META__;
+    return meta?.get(fn as object)?.consoleLog;
+  }
+
+  test.each(['script', 'unambiguous', 'module'] as const)(
+    'babel (sourceType: %s) refers to typegpu with require',
+    (sourceType) => {
+      const output =
+        Babel.transform(code, {
+          plugins: [[babelPlugin, { include: [/\.m?[jt]sx?$/], autoNamingEnabled: false }]],
+          sourceType,
+        }).code ?? '';
+
+      expect(output).not.toMatch(/^\s*import /m);
+      expect(output).toContain(`consoleLog: require("typegpu").INTERNAL_consoleLog`);
+
+      const support = {};
+      const { logs } = runCommonJs(output, { tgpu: {}, INTERNAL_consoleLog: support });
+      expect(consoleLogOf(logs)).toBe(support);
+    },
+  );
+
+  test('unplugin refers to typegpu with require', () => {
+    const output = unpluginTransform(code);
+
+    expect(output).not.toMatch(/^\s*import /m);
+    expect(output).toContain(`consoleLog: require('typegpu').INTERNAL_consoleLog`);
+
+    const support = {};
+    const { logs } = runCommonJs(output, { tgpu: {}, INTERNAL_consoleLog: support });
+    expect(consoleLogOf(logs)).toBe(support);
+  });
+
+  test('babel leaves scripts without require alone', () => {
+    const output =
+      Babel.transform(`const logs = () => {\n  'use gpu';\n  console.log(1);\n};`, {
+        plugins: [[babelPlugin, { include: [/\.m?[jt]sx?$/], autoNamingEnabled: false }]],
+        sourceType: 'script',
+      }).code ?? '';
+
+    expect(output).toContain('globalThis.__TYPEGPU_META__');
+    expect(output).not.toContain('import');
+    expect(output).not.toContain('consoleLog');
+  });
+});
+
+describe('console reached through the global object', () => {
+  const code = `\
+    import { tgpu } from 'typegpu';
+
+    const { console: c } = globalThis;
+
+    export const first = () => {
+      'use gpu';
+      globalThis.console.log(1);
+    };
+
+    export const second = () => {
+      'use gpu';
+      window.console.warn(2);
+    };
+
+    export const third = () => {
+      'use gpu';
+      c.info(3);
+    };
+
+    export const notConsole = () => {
+      'use gpu';
+      globalThis.notConsole.log(4);
+    };
+  `;
+
+  test('babel', () => {
+    const result = babelTransform(code) ?? '';
+    expect(result.match(/consoleLog: _typegpu\.INTERNAL_consoleLog/g)).toHaveLength(3);
+  });
+
+  test('unplugin', () => {
+    const result = unpluginTransform(code);
+    expect(result.match(/consoleLog: _typegpu\.INTERNAL_consoleLog/g)).toHaveLength(3);
   });
 });

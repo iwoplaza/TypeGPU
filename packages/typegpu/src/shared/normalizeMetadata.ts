@@ -16,7 +16,10 @@ export interface RawMetadataV2 {
   name: string;
   ast: { params: FuncParameter[]; body: Block };
   externals: { [key: string]: () => unknown };
-  /** Only present on functions that call `console.*`, attached by newer versions of `unplugin-typegpu` */
+  /**
+   * Only present on functions that call `console.*`, attached by newer versions of `unplugin-typegpu`.
+   * Never read, referencing it is what keeps shader logging support in the bundle.
+   */
   consoleLog?: LogSupport | undefined;
 }
 
@@ -31,7 +34,6 @@ export type RawMetadata = RawMetadataV1 | RawMetadataV2;
 export interface Metadata {
   ast: { params: FuncParameter[]; body: Block };
   externals: () => Record<string, unknown>;
-  consoleLog?: LogSupport | undefined;
 }
 
 /**

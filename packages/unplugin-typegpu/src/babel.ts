@@ -11,6 +11,7 @@ import {
   getBlockScope,
   initPluginState,
   CONSOLE_LOG_EXPORT,
+  type TypegpuModuleRef,
 } from './core/common.ts';
 import { createFilterForId } from './core/filter.ts';
 
@@ -44,18 +45,23 @@ function assignMetadata(
   path: NodePath<t.FunctionDeclaration | t.ArrowFunctionExpression | t.FunctionExpression>,
   name: string | undefined,
   ast: TranspilationResult,
-  typegpuNamespace: string | undefined,
+  typegpuModule: TypegpuModuleRef | undefined,
 ): void {
   const metadata = t.objectExpression([
     t.objectProperty(i('v'), t.numericLiteral(METADATA_FORMAT_VERSION)),
     t.objectProperty(i('name'), t.valueToNode(name)),
     t.objectProperty(i('ast'), t.valueToNode({ params: ast.params, body: ast.body })),
     t.objectProperty(i('externals'), externalsToNode(ast.externalNames)),
-    ...(typegpuNamespace
+    ...(typegpuModule
       ? [
           t.objectProperty(
             i('consoleLog'),
-            t.memberExpression(i(typegpuNamespace), i(CONSOLE_LOG_EXPORT)),
+            t.memberExpression(
+              typegpuModule.kind === 'import'
+                ? i(typegpuModule.name)
+                : t.callExpression(i('require'), [t.stringLiteral('typegpu')]),
+              i(CONSOLE_LOG_EXPORT),
+            ),
           ),
         ]
       : []),

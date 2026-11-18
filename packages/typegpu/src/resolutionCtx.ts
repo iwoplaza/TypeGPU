@@ -44,13 +44,9 @@ import {
   type TgpuLayoutEntry,
 } from './tgpuBindGroupLayout.ts';
 import { fallbackLogSnippet } from './tgsl/consoleLog/fallback.ts';
+import { getLogSupport } from './tgsl/consoleLog/registry.ts';
 import { logger } from './tgpuLogger.ts';
-import type {
-  LogGenerator,
-  LogResources,
-  LogSupport,
-  SupportedLogOp,
-} from './tgsl/consoleLog/types.ts';
+import type { LogGenerator, LogResources, SupportedLogOp } from './tgsl/consoleLog/types.ts';
 import { getBestConversion } from './tgsl/conversion.ts';
 import { coerceToSnippet, concretize, numericLiteralToSnippet } from './tgsl/generationHelpers.ts';
 import type { ShaderGenerator } from './tgsl/shaderGenerator.ts';
@@ -635,13 +631,11 @@ export class ResolutionCtxImpl implements ResolutionCtx {
     this._itemStateStack.clearBlockExternals();
   }
 
-  provideLogSupport(support: LogSupport): void {
-    if (this.#root && !this.#logGenerator) {
-      this.#logGenerator = support.createGenerator(this.#root);
-    }
-  }
-
   generateLog(op: SupportedLogOp, args: readonly Snippet[]): Snippet {
+    if (this.#root && !this.#logGenerator) {
+      this.#logGenerator = getLogSupport()?.createGenerator(this.#root);
+    }
+
     if (this.#logGenerator) {
       return this.#logGenerator.generateLog(this, op, args);
     }
@@ -649,7 +643,7 @@ export class ResolutionCtxImpl implements ResolutionCtx {
     if (this.#root) {
       logger.warn(
         'fallback',
-        "Shader 'console' support was not attached to this function. Make sure it's transformed by an up-to-date 'unplugin-typegpu', and that it calls 'console' methods directly.",
+        "Shader 'console' support is not included in this program. Make sure functions that log are transformed by an up-to-date 'unplugin-typegpu', and that they call 'console' methods directly.",
       );
     } else {
       logger.warn('fallback', "'console.log' is only supported when resolving pipelines.");

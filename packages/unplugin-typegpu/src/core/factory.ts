@@ -17,7 +17,13 @@ import {
   CONSOLE_LOG_EXPORT,
 } from './common.ts';
 
-import type { Options, UnpluginPluginState, MetadatableFunction, NodeLocation } from './common.ts';
+import type {
+  Options,
+  UnpluginPluginState,
+  MetadatableFunction,
+  NodeLocation,
+  TypegpuModuleRef,
+} from './common.ts';
 
 // I love CommonJS 💔
 let traverse = _traverse;
@@ -44,11 +50,10 @@ function assignMetadata(
   path: NodePath<MetadatableFunction>,
   name: string | undefined,
   ast: TranspilationResult,
-  typegpuNamespace: string | undefined,
+  typegpuModule: TypegpuModuleRef | undefined,
 ): void {
-  const consoleLog = typegpuNamespace
-    ? `,\n    consoleLog: ${typegpuNamespace}.${CONSOLE_LOG_EXPORT}`
-    : '';
+  const typegpu = typegpuModule?.kind === 'import' ? typegpuModule.name : `require('typegpu')`;
+  const consoleLog = typegpuModule ? `,\n    consoleLog: ${typegpu}.${CONSOLE_LOG_EXPORT}` : '';
   const metadata = `{
     v: ${METADATA_FORMAT_VERSION},
     name: ${name ? `"${name}"` : 'undefined'},

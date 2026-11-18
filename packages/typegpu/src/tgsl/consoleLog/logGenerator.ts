@@ -23,6 +23,7 @@ import { convertToCommonType } from '../conversion.ts';
 import { concretizeSnippet } from '../generationHelpers.ts';
 import { logDataFromGPU } from './deserializers.ts';
 import { fallbackLogSnippet } from './fallback.ts';
+import { registerLogSupport } from './registry.ts';
 import { createLoggingFunction } from './serializers.ts';
 import {
   type LogGenerator,
@@ -134,6 +135,9 @@ export class LogGeneratorImpl implements LogGenerator {
   }
 }
 
-export const consoleLogSupport: LogSupport = {
+// Registering as soon as this is evaluated makes logging work in every function of the program,
+// no matter which function carries the reference or in which order they are resolved.
+// Marked pure so that bundlers can drop it when nothing references it.
+export const consoleLogSupport: LogSupport = /*#__PURE__*/ registerLogSupport({
   createGenerator: (root) => new LogGeneratorImpl(root),
-};
+});

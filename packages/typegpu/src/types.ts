@@ -51,7 +51,7 @@ import type { ShaderGenerator } from './tgsl/shaderGenerator.ts';
 import type { StorageFlag } from './extension.ts';
 import type { TgpuBufferBinding } from './core/buffer/bufferBinding.ts';
 import type { ShelllessRepository } from './tgsl/shellless.ts';
-import type { LogSupport, SupportedLogOp } from './tgsl/consoleLog/types.ts';
+import type { SupportedLogOp } from './tgsl/consoleLog/types.ts';
 
 export type ResolvableObject =
   | SelfResolvable
@@ -423,8 +423,6 @@ export interface ResolutionCtx {
 
   pushBlockScope(): void;
   popBlockScope(): void;
-  /** Enables `console.*` in shaders resolved by this context, see {@link LogSupport} */
-  provideLogSupport(support: LogSupport): void;
   generateLog(op: SupportedLogOp, args: readonly Snippet[]): Snippet;
   getById(id: string): Snippet | null;
   defineVariable(id: string, snippet: Snippet): void;

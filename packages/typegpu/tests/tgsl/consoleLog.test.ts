@@ -825,28 +825,6 @@ describe('WgslGenerator with console.log', () => {
   });
 
   describe('functions without attached console support', () => {
-    it('falls back to a comment and warns', ({ root }) => {
-      using consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const legacyLog = withLegacyLoggingMetadata(() => {});
-
-      const myPipeline = root.createGuardedComputePipeline(() => {
-        'use gpu';
-        legacyLog();
-      });
-
-      const wgsl = tgpu.resolve([myPipeline.pipeline]);
-      expect(wgsl).toContain('/* console.log() */;');
-      expect(wgsl).not.toContain('dataBuffer');
-      expect(consoleWarnSpy.mock.calls).toMatchInlineSnapshot(`
-        [
-          [
-            "⚠️ [fallback] ",
-            "Shader 'console' support was not attached to this function. Make sure it's transformed by an up-to-date 'unplugin-typegpu', and that it calls 'console' methods directly.",
-          ],
-        ]
-      `);
-    });
-
     it('can log when another function in the same shader carries support', ({ root }) => {
       const legacyLog = withLegacyLoggingMetadata(() => {});
 
@@ -860,6 +838,27 @@ describe('WgslGenerator with console.log', () => {
       expect(wgsl).not.toContain('/* console.log() */');
       expect(wgsl).toContain('log1(2i);');
       expect(wgsl).toMatch(/fn legacyLog\(\) {\s+log2\w*\(1i\);/);
+    });
+
+    it('can log when resolved before the function that carries support', ({ root }) => {
+      using consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const legacyLog = withLegacyLoggingMetadata(() => {});
+      const logs = () => {
+        'use gpu';
+        console.log(2);
+      };
+
+      const myPipeline = root.createGuardedComputePipeline(() => {
+        'use gpu';
+        legacyLog();
+        logs();
+      });
+
+      const wgsl = tgpu.resolve([myPipeline.pipeline]);
+      expect(wgsl).not.toContain('/* console.log() */');
+      expect(wgsl).toMatch(/fn legacyLog\(\) {\s+log1\w*\(1i\);/);
+      expect(wgsl).toMatch(/fn logs\(\) {\s+log2\w*\(2i\);/);
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
   });
 });
