@@ -280,6 +280,75 @@ describe('TgpuTexture', () => {
     );
   });
 
+  it('passes textureBindingViewDimension to the device', ({ root, device }) => {
+    const cubemap = root.createTexture({
+      size: [16, 16, 6],
+      format: 'rgba8unorm',
+      textureBindingViewDimension: 'cube',
+    });
+
+    expectTypeOf(cubemap).toEqualTypeOf<TgpuTexture<{ size: [16, 16, 6]; format: 'rgba8unorm' }>>();
+
+    root.unwrap(cubemap);
+
+    expect(device.mock.createTexture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        size: [16, 16, 6],
+        textureBindingViewDimension: 'cube',
+      }),
+    );
+  });
+
+  it('only accepts a textureBindingViewDimension that matches the texture', ({ root }) => {
+    root.createTexture({ size: [16, 16], format: 'rgba8unorm', textureBindingViewDimension: '2d' });
+    root.createTexture({
+      size: [16, 16, 4],
+      format: 'rgba8unorm',
+      textureBindingViewDimension: '2d-array',
+    });
+    root.createTexture({
+      size: [16],
+      format: 'rgba8unorm',
+      dimension: '1d',
+      textureBindingViewDimension: '1d',
+    });
+    root.createTexture({
+      size: [16, 16, 16],
+      format: 'rgba8unorm',
+      dimension: '3d',
+      textureBindingViewDimension: '3d',
+    });
+
+    root.createTexture({
+      size: [16, 16, 16],
+      format: 'rgba8unorm',
+      dimension: '3d',
+      // @ts-expect-error
+      textureBindingViewDimension: '2d',
+    });
+
+    root.createTexture({
+      size: [16, 16, 4],
+      format: 'rgba8unorm',
+      // @ts-expect-error: a cube needs exactly 6 layers
+      textureBindingViewDimension: 'cube',
+    });
+
+    root.createTexture({
+      size: [16, 16, 4],
+      format: 'rgba8unorm',
+      // @ts-expect-error: '2d' needs exactly 1 layer
+      textureBindingViewDimension: '2d',
+    });
+
+    root.createTexture({
+      size: [16, 16, 12],
+      format: 'rgba8unorm',
+      // @ts-expect-error: 'cube-array' cannot be used as a binding view dimension
+      textureBindingViewDimension: 'cube-array',
+    });
+  });
+
   it('limits available extensions based on the chosen format', ({ root }) => {
     root
       .createTexture({
@@ -416,6 +485,40 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
 
       // @ts-expect-error
       attest(texture4.createView()).type.errors.snap('Expected 1-2 arguments, but got 0.');
+    });
+
+    it('passes usage and swizzle to the raw view descriptor', ({ root }) => {
+      const texture = root
+        .createTexture({
+          size: [16, 16],
+          format: 'rgba8unorm',
+        })
+        .$usage('sampled', 'render');
+
+      const sampledView = texture.createView(d.texture2d(d.f32), {
+        usage: GPUTextureUsage.TEXTURE_BINDING,
+        swizzle: 'bgr1',
+      });
+      const renderView = texture.createView('render', {
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+
+      const rawTexture = root.unwrap(texture);
+      root.unwrap(sampledView);
+      root.unwrap(renderView);
+
+      expect(rawTexture.createView).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usage: GPUTextureUsage.TEXTURE_BINDING,
+          swizzle: 'bgr1',
+          dimension: '2d',
+        }),
+      );
+      expect(rawTexture.createView).toHaveBeenCalledWith(
+        expect.objectContaining({
+          usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        }),
+      );
     });
 
     it('creates an unfilterable-float view of a depth texture', ({ root, device }) => {

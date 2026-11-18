@@ -386,6 +386,29 @@ type SrgbVariantOrSelf<T extends GPUTextureFormat> = T extends keyof SrgbVariant
       : T[] | undefined
     : T[] | undefined;
 
+/**
+ * The view dimensions a texture can be bound as on devices without `core-features-and-limits`,
+ * based on its dimension and, for 2d textures, its layer count.
+ */
+type TextureBindingViewDimension<
+  TSize,
+  TDimension extends GPUTextureDimension,
+> = GPUTextureDimension extends TDimension
+  ? TextureBindingViewDimension<TSize, '2d'>
+  : TDimension extends '1d'
+    ? '1d'
+    : TDimension extends '3d'
+      ? '3d'
+      : TSize extends readonly [number, number, infer TLayers extends number]
+        ? number extends TLayers
+          ? '2d' | '2d-array' | 'cube'
+          : TLayers extends 1
+            ? '2d' | '2d-array'
+            : TLayers extends 6
+              ? '2d-array' | 'cube'
+              : '2d-array'
+        : '2d' | '2d-array';
+
 export type CreateTextureOptions<
   TSize,
   TFormat extends GPUTextureFormat,
@@ -425,6 +448,13 @@ export type CreateTextureOptions<
    * @default '2d'
    */
   dimension?: TDimension | undefined;
+  /**
+   * On devices without the `core-features-and-limits` feature (compatibility mode), views of this
+   * texture that are bound to a shader must have this dimension, e.g. `'cube'` for a 6-layer cubemap.
+   * Ignored on devices with `core-features-and-limits`.
+   * @default derived from `dimension` and the layer count
+   */
+  textureBindingViewDimension?: TextureBindingViewDimension<TSize, TDimension> | undefined;
 };
 
 export type CreateTextureResult<

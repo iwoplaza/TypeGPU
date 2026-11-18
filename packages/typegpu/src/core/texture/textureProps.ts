@@ -5,4 +5,5 @@ export type TextureProps = {
   dimension?: GPUTextureDimension | undefined;
   mipLevelCount?: number | undefined;
   sampleCount?: number | undefined;
+  textureBindingViewDimension?: GPUTextureViewDimension | undefined;
 };
