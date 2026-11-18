@@ -51,6 +51,18 @@ type CompleteDataReaders = {
   [TType in AnyConcreteData['type']]: DataReader<Extract<AnyData, { readonly type: TType }>>;
 };
 
+function toUnorm(value: number, max: number): number {
+  return Math.round(Math.max(0, Math.min(1, value)) * max);
+}
+
+function toSnorm(value: number, max: number): number {
+  return Math.round(Math.max(-1, Math.min(1, value)) * max);
+}
+
+function fromSnorm(value: number, max: number): number {
+  return Math.max(value / max, -1);
+}
+
 function writeStructLike(
   output: ISerialOutput,
   schema: wgsl.WgslStruct | Unstruct,
@@ -306,30 +318,30 @@ const dataWriters = {
     output.writeInt8(value.w);
   },
   unorm8(output, _, value) {
-    output.writeUint8(Math.round(value * 255));
+    output.writeUint8(toUnorm(value, 255));
   },
   unorm8x2(output, _, value) {
-    output.writeUint8(Math.round(value.x * 255));
-    output.writeUint8(Math.round(value.y * 255));
+    output.writeUint8(toUnorm(value.x, 255));
+    output.writeUint8(toUnorm(value.y, 255));
   },
   unorm8x4(output, _, value) {
-    output.writeUint8(Math.round(value.x * 255));
-    output.writeUint8(Math.round(value.y * 255));
-    output.writeUint8(Math.round(value.z * 255));
-    output.writeUint8(Math.round(value.w * 255));
+    output.writeUint8(toUnorm(value.x, 255));
+    output.writeUint8(toUnorm(value.y, 255));
+    output.writeUint8(toUnorm(value.z, 255));
+    output.writeUint8(toUnorm(value.w, 255));
   },
   snorm8(output, _, value) {
-    output.writeInt8(Math.round(value * 127));
+    output.writeInt8(toSnorm(value, 127));
   },
   snorm8x2(output, _, value) {
-    output.writeInt8(Math.round(value.x * 127));
-    output.writeInt8(Math.round(value.y * 127));
+    output.writeInt8(toSnorm(value.x, 127));
+    output.writeInt8(toSnorm(value.y, 127));
   },
   snorm8x4(output, _, value) {
-    output.writeInt8(Math.round(value.x * 127));
-    output.writeInt8(Math.round(value.y * 127));
-    output.writeInt8(Math.round(value.z * 127));
-    output.writeInt8(Math.round(value.w * 127));
+    output.writeInt8(toSnorm(value.x, 127));
+    output.writeInt8(toSnorm(value.y, 127));
+    output.writeInt8(toSnorm(value.z, 127));
+    output.writeInt8(toSnorm(value.w, 127));
   },
   uint16(output, _, value) {
     output.writeUint16(value);
@@ -358,30 +370,30 @@ const dataWriters = {
     output.writeInt16(value.w);
   },
   unorm16(output, _, value) {
-    output.writeUint16(Math.round(value * 65535));
+    output.writeUint16(toUnorm(value, 65535));
   },
   unorm16x2(output, _, value) {
-    output.writeUint16(Math.round(value.x * 65535));
-    output.writeUint16(Math.round(value.y * 65535));
+    output.writeUint16(toUnorm(value.x, 65535));
+    output.writeUint16(toUnorm(value.y, 65535));
   },
   unorm16x4(output, _, value) {
-    output.writeUint16(Math.round(value.x * 65535));
-    output.writeUint16(Math.round(value.y * 65535));
-    output.writeUint16(Math.round(value.z * 65535));
-    output.writeUint16(Math.round(value.w * 65535));
+    output.writeUint16(toUnorm(value.x, 65535));
+    output.writeUint16(toUnorm(value.y, 65535));
+    output.writeUint16(toUnorm(value.z, 65535));
+    output.writeUint16(toUnorm(value.w, 65535));
   },
   snorm16(output, _, value) {
-    output.writeInt16(Math.round(value * 32767));
+    output.writeInt16(toSnorm(value, 32767));
   },
   snorm16x2(output, _, value) {
-    output.writeInt16(Math.round(value.x * 32767));
-    output.writeInt16(Math.round(value.y * 32767));
+    output.writeInt16(toSnorm(value.x, 32767));
+    output.writeInt16(toSnorm(value.y, 32767));
   },
   snorm16x4(output, _, value) {
-    output.writeInt16(Math.round(value.x * 32767));
-    output.writeInt16(Math.round(value.y * 32767));
-    output.writeInt16(Math.round(value.z * 32767));
-    output.writeInt16(Math.round(value.w * 32767));
+    output.writeInt16(toSnorm(value.x, 32767));
+    output.writeInt16(toSnorm(value.y, 32767));
+    output.writeInt16(toSnorm(value.z, 32767));
+    output.writeInt16(toSnorm(value.w, 32767));
   },
   float16(output, _, value) {
     writeFloat16(output, value);
@@ -459,10 +471,10 @@ const dataWriters = {
     output.writeUint32(packed);
   },
   'unorm8x4-bgra'(output, _, value) {
-    output.writeUint8(Math.round(value.z * 255));
-    output.writeUint8(Math.round(value.y * 255));
-    output.writeUint8(Math.round(value.x * 255));
-    output.writeUint8(Math.round(value.w * 255));
+    output.writeUint8(toUnorm(value.z, 255));
+    output.writeUint8(toUnorm(value.y, 255));
+    output.writeUint8(toUnorm(value.x, 255));
+    output.writeUint8(toUnorm(value.w, 255));
   },
 
   disarray: writeArrayLike,
@@ -691,10 +703,15 @@ const dataReaders = {
   unorm8x2: (i) => vec2f(i.readUint8() / 255, i.readUint8() / 255),
   unorm8x4: (i) =>
     vec4f(i.readUint8() / 255, i.readUint8() / 255, i.readUint8() / 255, i.readUint8() / 255),
-  snorm8: (i) => i.readInt8() / 127,
-  snorm8x2: (i) => vec2f(i.readInt8() / 127, i.readInt8() / 127),
+  snorm8: (i) => fromSnorm(i.readInt8(), 127),
+  snorm8x2: (i) => vec2f(fromSnorm(i.readInt8(), 127), fromSnorm(i.readInt8(), 127)),
   snorm8x4: (i) =>
-    vec4f(i.readInt8() / 127, i.readInt8() / 127, i.readInt8() / 127, i.readInt8() / 127),
+    vec4f(
+      fromSnorm(i.readInt8(), 127),
+      fromSnorm(i.readInt8(), 127),
+      fromSnorm(i.readInt8(), 127),
+      fromSnorm(i.readInt8(), 127),
+    ),
   uint16: (i) => i.readUint16(),
   uint16x2: (i) => vec2u(i.readUint16(), i.readUint16()),
   uint16x4: (i) => vec4u(i.readUint16(), i.readUint16(), i.readUint16(), i.readUint16()),
@@ -710,14 +727,15 @@ const dataReaders = {
       i.readUint16() / 65535,
       i.readUint16() / 65535,
     ),
-  snorm16: (i) => i.readInt16() / 32767,
-  snorm16x2: (i): wgsl.v2f => vec2f(i.readInt16() / 32767, i.readInt16() / 32767),
+  snorm16: (i) => fromSnorm(i.readInt16(), 32767),
+  snorm16x2: (i): wgsl.v2f =>
+    vec2f(fromSnorm(i.readInt16(), 32767), fromSnorm(i.readInt16(), 32767)),
   snorm16x4: (i): wgsl.v4f =>
     vec4f(
-      i.readInt16() / 32767,
-      i.readInt16() / 32767,
-      i.readInt16() / 32767,
-      i.readInt16() / 32767,
+      fromSnorm(i.readInt16(), 32767),
+      fromSnorm(i.readInt16(), 32767),
+      fromSnorm(i.readInt16(), 32767),
+      fromSnorm(i.readInt16(), 32767),
     ),
   float16(i) {
     return readFloat16(i);

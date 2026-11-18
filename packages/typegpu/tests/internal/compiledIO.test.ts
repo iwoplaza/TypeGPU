@@ -333,10 +333,10 @@ describe('buildWriter (partial mode)', () => {
       }
       if (((offset + 8) + 0) < endOffset) { output.setUint8(((offset + 8) + 0), value.c.x, littleEndian); }
       if (((offset + 8) + 1) < endOffset) { output.setUint8(((offset + 8) + 1), value.c.y, littleEndian); }
-      if (((offset + 10) + 0) < endOffset) { output.setUint8(((offset + 10) + 0), Math.round(value.d.x * 255), littleEndian); }
-      if (((offset + 10) + 1) < endOffset) { output.setUint8(((offset + 10) + 1), Math.round(value.d.y * 255), littleEndian); }
-      if (((offset + 10) + 2) < endOffset) { output.setUint8(((offset + 10) + 2), Math.round(value.d.z * 255), littleEndian); }
-      if (((offset + 10) + 3) < endOffset) { output.setUint8(((offset + 10) + 3), Math.round(value.d.w * 255), littleEndian); }
+      if (((offset + 10) + 0) < endOffset) { output.setUint8(((offset + 10) + 0), Math.round(Math.max(0, Math.min(1, value.d.x)) * 255), littleEndian); }
+      if (((offset + 10) + 1) < endOffset) { output.setUint8(((offset + 10) + 1), Math.round(Math.max(0, Math.min(1, value.d.y)) * 255), littleEndian); }
+      if (((offset + 10) + 2) < endOffset) { output.setUint8(((offset + 10) + 2), Math.round(Math.max(0, Math.min(1, value.d.z)) * 255), littleEndian); }
+      if (((offset + 10) + 3) < endOffset) { output.setUint8(((offset + 10) + 3), Math.round(Math.max(0, Math.min(1, value.d.w)) * 255), littleEndian); }
       "
     `);
   });
@@ -910,10 +910,10 @@ describe('createCompileInstructions', () => {
       output.setUint32((offset + 4), ((Math.round(value.b.x*1023)&0x3FF)<<22)|((Math.round(value.b.y*1023)&0x3FF)<<12)|((Math.round(value.b.z*1023)&0x3FF)<<2)|(Math.round(value.b.w*3)&3), littleEndian);
       output.setUint8(((offset + 8) + 0), value.c.x, littleEndian);
       output.setUint8(((offset + 8) + 1), value.c.y, littleEndian);
-      output.setUint8(((offset + 10) + 0), Math.round(value.d.x * 255), littleEndian);
-      output.setUint8(((offset + 10) + 1), Math.round(value.d.y * 255), littleEndian);
-      output.setUint8(((offset + 10) + 2), Math.round(value.d.z * 255), littleEndian);
-      output.setUint8(((offset + 10) + 3), Math.round(value.d.w * 255), littleEndian);
+      output.setUint8(((offset + 10) + 0), Math.round(Math.max(0, Math.min(1, value.d.x)) * 255), littleEndian);
+      output.setUint8(((offset + 10) + 1), Math.round(Math.max(0, Math.min(1, value.d.y)) * 255), littleEndian);
+      output.setUint8(((offset + 10) + 2), Math.round(Math.max(0, Math.min(1, value.d.z)) * 255), littleEndian);
+      output.setUint8(((offset + 10) + 3), Math.round(Math.max(0, Math.min(1, value.d.w)) * 255), littleEndian);
       "
     `);
     const writer = getCompiledWriter(unstruct)!;
@@ -1148,18 +1148,18 @@ describe('createCompileInstructions', () => {
         new Uint8Array(output.buffer).set(new Uint8Array(value.buffer, value.byteOffset, Math.min(value.byteLength, 44)), output.byteOffset + (offset));
       } else {
       for (let i = 0; i < 2; i++) {
-      output.setUint16((((offset + i * 22) + 0) + 0), Math.round(value[i].a.x * 65535), littleEndian);
-      output.setUint16((((offset + i * 22) + 0) + 2), Math.round(value[i].a.y * 65535), littleEndian);
-      output.setUint8((((offset + i * 22) + 4) + 0), Math.round(value[i].b.z * 255), littleEndian);
-      output.setUint8((((offset + i * 22) + 4) + 1), Math.round(value[i].b.y * 255), littleEndian);
-      output.setUint8((((offset + i * 22) + 4) + 2), Math.round(value[i].b.x * 255), littleEndian);
-      output.setUint8((((offset + i * 22) + 4) + 3), Math.round(value[i].b.w * 255), littleEndian);
-      output.setInt8((((offset + i * 22) + 8) + 0), Math.round(value[i].c.x * 127), littleEndian);
-      output.setInt8((((offset + i * 22) + 8) + 1), Math.round(value[i].c.y * 127), littleEndian);
-      output.setInt8((((offset + i * 22) + 8) + 2), Math.round(value[i].c.z * 127), littleEndian);
-      output.setInt8((((offset + i * 22) + 8) + 3), Math.round(value[i].c.w * 127), littleEndian);
-      output.setInt16((((offset + i * 22) + 12) + 0), Math.round(value[i].d.x * 32767), littleEndian);
-      output.setInt16((((offset + i * 22) + 12) + 2), Math.round(value[i].d.y * 32767), littleEndian);
+      output.setUint16((((offset + i * 22) + 0) + 0), Math.round(Math.max(0, Math.min(1, value[i].a.x)) * 65535), littleEndian);
+      output.setUint16((((offset + i * 22) + 0) + 2), Math.round(Math.max(0, Math.min(1, value[i].a.y)) * 65535), littleEndian);
+      output.setUint8((((offset + i * 22) + 4) + 0), Math.round(Math.max(0, Math.min(1, value[i].b.z)) * 255), littleEndian);
+      output.setUint8((((offset + i * 22) + 4) + 1), Math.round(Math.max(0, Math.min(1, value[i].b.y)) * 255), littleEndian);
+      output.setUint8((((offset + i * 22) + 4) + 2), Math.round(Math.max(0, Math.min(1, value[i].b.x)) * 255), littleEndian);
+      output.setUint8((((offset + i * 22) + 4) + 3), Math.round(Math.max(0, Math.min(1, value[i].b.w)) * 255), littleEndian);
+      output.setInt8((((offset + i * 22) + 8) + 0), Math.round(Math.max(-1, Math.min(1, value[i].c.x)) * 127), littleEndian);
+      output.setInt8((((offset + i * 22) + 8) + 1), Math.round(Math.max(-1, Math.min(1, value[i].c.y)) * 127), littleEndian);
+      output.setInt8((((offset + i * 22) + 8) + 2), Math.round(Math.max(-1, Math.min(1, value[i].c.z)) * 127), littleEndian);
+      output.setInt8((((offset + i * 22) + 8) + 3), Math.round(Math.max(-1, Math.min(1, value[i].c.w)) * 127), littleEndian);
+      output.setInt16((((offset + i * 22) + 12) + 0), Math.round(Math.max(-1, Math.min(1, value[i].d.x)) * 32767), littleEndian);
+      output.setInt16((((offset + i * 22) + 12) + 2), Math.round(Math.max(-1, Math.min(1, value[i].d.y)) * 32767), littleEndian);
       output.setInt8((((offset + i * 22) + 16) + 0), value[i].e.x, littleEndian);
       output.setInt8((((offset + i * 22) + 16) + 1), value[i].e.y, littleEndian);
       output.setInt16((((offset + i * 22) + 18) + 0), value[i].f.x, littleEndian);
