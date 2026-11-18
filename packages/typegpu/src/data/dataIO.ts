@@ -779,6 +779,70 @@ export function readData<TData extends wgsl.BaseData>(
 
 const endianness = getSystemEndianness();
 
+/**
+ * Skips every write that starts at or past `endOffset`, the same way the compiled writer does.
+ */
+class BoundedBufferWriter extends BufferWriter {
+  readonly #endOffset: number;
+
+  constructor(buffer: ArrayBuffer, endOffset: number) {
+    super(buffer);
+    this.#endOffset = endOffset;
+  }
+
+  #fits(byteLength: number): boolean {
+    if (this.currentByteOffset < this.#endOffset) {
+      return true;
+    }
+    this.skipBytes(byteLength);
+    return false;
+  }
+
+  override writeInt8(value: number) {
+    if (this.#fits(1)) super.writeInt8(value);
+  }
+
+  override writeUint8(value: number) {
+    if (this.#fits(1)) super.writeUint8(value);
+  }
+
+  override writeInt16(value: number) {
+    if (this.#fits(2)) super.writeInt16(value);
+  }
+
+  override writeUint16(value: number) {
+    if (this.#fits(2)) super.writeUint16(value);
+  }
+
+  override writeFloat16(value: number) {
+    if (this.#fits(2)) super.writeFloat16(value);
+  }
+
+  override writeInt32(value: number) {
+    if (this.#fits(4)) super.writeInt32(value);
+  }
+
+  override writeUint32(value: number) {
+    if (this.#fits(4)) super.writeUint32(value);
+  }
+
+  override writeFloat32(value: number) {
+    if (this.#fits(4)) super.writeFloat32(value);
+  }
+
+  override writeSlice(bufferView: Parameters<BufferWriter['writeSlice']>[0]) {
+    const bytes = new Uint8Array(bufferView.buffer, bufferView.byteOffset, bufferView.byteLength);
+    const fitting = Math.max(
+      0,
+      Math.min(bytes.byteLength, this.#endOffset - this.currentByteOffset),
+    );
+    if (fitting > 0) {
+      super.writeSlice(bytes.subarray(0, fitting));
+    }
+    this.skipBytes(bytes.byteLength - fitting);
+  }
+}
+
 export function calculateOffsets<T extends wgsl.BaseData>(
   options: BufferWriteOptions | undefined,
   schema: T,
@@ -853,7 +917,10 @@ export function writeToArrayBuffer<T extends wgsl.BaseData>(
     }
   }
 
-  const writer = new BufferWriter(buffer);
+  const writer =
+    startOffset + sizeOf(schema) <= endOffset
+      ? new BufferWriter(buffer)
+      : new BoundedBufferWriter(buffer, endOffset);
   writer.seekTo(startOffset);
   writeData(writer, schema, data);
 }
