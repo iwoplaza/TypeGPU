@@ -177,7 +177,7 @@ function operatorToType<
     return bool;
   }
 
-  if (op === '=' || (op === '%' && wgsl.isVec(rhs))) {
+  if (op === '=' || (op === '%' && !wgsl.isVec(lhs) && wgsl.isVec(rhs))) {
     return rhs;
   }
 

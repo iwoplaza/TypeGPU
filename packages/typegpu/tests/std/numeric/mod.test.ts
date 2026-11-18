@@ -252,11 +252,17 @@ describe('mod parseResolved test', () => {
 
 describe('% operator with a scalar and a vector', () => {
   it('gives the vector type in both operand orders', () => {
-    const scalarVec = tgpu.fn([d.f32, d.vec3f], d.vec3f)((a, b) => {
+    const scalarVec = tgpu.fn(
+      [d.f32, d.vec3f],
+      d.vec3f,
+    )((a, b) => {
       'use gpu';
       return a % b;
     });
-    const vecScalar = tgpu.fn([d.vec3f, d.f32], d.vec3f)((a, b) => {
+    const vecScalar = tgpu.fn(
+      [d.vec3f, d.f32],
+      d.vec3f,
+    )((a, b) => {
       'use gpu';
       return a % b;
     });
@@ -321,6 +327,37 @@ describe('% operator with a scalar and a vector', () => {
         let v = vec3i(1, 2, 3);
         let s = 2i;
         return (((5i % v) + (v % 2i)) + vec3i((f32(s) % vec3f(v))));
+      }"
+    `);
+  });
+
+  it('keeps the left operand type for mismatched vectors', () => {
+    const vecVecI = () => {
+      'use gpu';
+      const a = d.vec3i(1, 2, 3);
+      const b = d.vec4i(4, 5, 6, 7);
+      // @ts-ignore
+      return a % b;
+    };
+    const vecVecF = () => {
+      'use gpu';
+      const a = d.vec3i(1, 2, 3);
+      const b = d.vec3f(4, 5, 6);
+      // @ts-ignore
+      return a % b;
+    };
+
+    expect(tgpu.resolve([vecVecI, vecVecF])).toMatchInlineSnapshot(`
+      "fn vecVecI() -> vec3i {
+        let a = vec3i(1, 2, 3);
+        let b = vec4i(4, 5, 6, 7);
+        return (a % b);
+      }
+
+      fn vecVecF() -> vec3i {
+        let a = vec3i(1, 2, 3);
+        let b = vec3f(4, 5, 6);
+        return (a % b);
       }"
     `);
   });
