@@ -4,6 +4,7 @@ import { arrayOf } from '../data/array.ts';
 import { type AnyData, UnknownData, unptr } from '../data/dataTypes.ts';
 import { abstractInt, bool, i32, u32 } from '../data/numeric.ts';
 import { vec2u, vec3u, vec4u } from '../data/vector.ts';
+import { generalizeFn } from '../data/generalizeFn.ts';
 import {
   fallthroughCopyOrigin,
   isMutableOrigin,
@@ -877,6 +878,18 @@ export class WgslGenerator implements ShaderGenerator {
         }
         convRhs = tryConvertSnippet(this.ctx, rhsExpr, rhsTarget, false);
         convLhs = lhsExpr;
+
+        // A constant shift amount has to be less than the bit width, while JS masks it to 5 bits
+        const knownRhs = asComptime(convRhs)?.value;
+        if (typeof knownRhs === 'number' || wgsl.isVecInstance(knownRhs)) {
+          const masked = generalizeFn((amount) => amount & 31, [knownRhs]);
+          convRhs = snip(
+            masked,
+            rhsTarget,
+            /* origin */ 'constant',
+            /* possibleSideEffects */ false,
+          );
+        }
       } else {
         const forcedType = exprType === NODE.assignmentExpr ? [lhsExpr.dataType] : undefined;
         [convLhs, convRhs] = convertToCommonType(this.ctx, [lhsExpr, rhsExpr], forcedType) ?? [

@@ -519,3 +519,59 @@ describe('std.bitShift', () => {
     y.bitShiftLeft(2);
   });
 });
+
+describe('constant shift amounts', () => {
+  it('masks the amount to the bit width, like JS does', () => {
+    const f = () => {
+      'use gpu';
+      let x = i32(3);
+      let y = u32(8);
+      const a = x << u32(33);
+      const b = x >> 34;
+      const c = y >>> 35;
+      y <<= 33;
+      return a + b + i32(c + y);
+    };
+
+    expect(f()).toBe(6 + 0 + 1 + 16);
+    expect(tgpu.resolve([f])).toMatchInlineSnapshot(`
+      "fn f() -> i32 {
+        let x = 3i;
+        var y = 8u;
+        let a = (x << 1u);
+        let b = (x >> 2u);
+        let c = (y >> 3u);
+        y <<= 1u;
+        return ((a + b) + i32((c + y)));
+      }"
+    `);
+  });
+
+  it('masks each component of a vector amount', () => {
+    const f = () => {
+      'use gpu';
+      let x = vec3i(1, 2, 3);
+      let y = vec3u(4, 5, 6);
+      // @ts-ignore
+      return (x << vec3u(1, 32, 63)) + vec3i(y >>> vec3u(33, 0, 31));
+    };
+
+    expect(tgpu.resolve([f])).toMatchInlineSnapshot(`
+      "fn f() -> vec3i {
+        let x = vec3i(1, 2, 3);
+        let y = vec3u(4, 5, 6);
+        return ((x << vec3u(1, 0, 31)) + vec3i((y >> vec3u(1, 0, 31))));
+      }"
+    `);
+  });
+
+  it('keeps runtime amounts as they are', () => {
+    const f = tgpu.fn([i32, u32], i32)((x, amount) => x << amount);
+
+    expect(tgpu.resolve([f])).toMatchInlineSnapshot(`
+      "fn f(x: i32, amount: u32) -> i32 {
+        return (x << amount);
+      }"
+    `);
+  });
+});
