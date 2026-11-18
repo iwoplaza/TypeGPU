@@ -389,6 +389,27 @@ fn main () {
       `[Error: Found resources originating from different roots in a single resolve (root 1: A; root 2: B, D).]`,
     );
   });
+
+  it('suffixes every global name with a number when using random names', () => {
+    const Boid = d.struct({ pos: d.vec2f });
+    const scale = tgpu.const(d.f32, 2);
+    const getPos = tgpu.fn([Boid], d.vec2f)((boid) => d.vec2f(boid.pos));
+    const main = tgpu.fn([])(() => {
+      const boid = Boid();
+      const pos = getPos(boid);
+      const s = scale.$;
+    });
+
+    const code = tgpu.resolve([main], { names: 'random' });
+
+    const declaredNames = [...code.matchAll(/^(?:struct|fn|const)\s+(\w+)/gm)].map(
+      ([, name]) => name,
+    );
+    expect(declaredNames).toHaveLength(4);
+    for (const name of declaredNames) {
+      expect(name).toMatch(/^(Boid|scale|getPos|main)_\d+$/);
+    }
+  });
 });
 
 describe('tgpu resolve - nesting', () => {

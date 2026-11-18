@@ -67,6 +67,30 @@ describe('render pipeline behavior', () => {
     );
   });
 
+  it('throws an error if vertex buffers are missing', ({ root }) => {
+    const vertexLayout = tgpu.vertexLayout(d.arrayOf(d.vec2f));
+
+    const pipeline = root
+      .createRenderPipeline({
+        attribs: { pos: vertexLayout.attrib },
+        vertex: ({ pos }) => {
+          'use gpu';
+          return { $position: d.vec4f(pos, 0, 1) };
+        },
+        fragment: () => {
+          'use gpu';
+          return d.vec4f(1);
+        },
+        targets: { format: 'rgba8unorm' },
+      })
+      // oxlint-disable-next-line typescript/no-explicit-any -- not testing color attachment at this time
+      .withColorAttachment({ view: {} } as any);
+
+    expect(() => pipeline.draw(3)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Missing vertex buffers for layouts: 'vertexLayout'. Please provide it using pipeline.with(layout, buffer).(...)]`,
+    );
+  });
+
   it('allows to omit input in entry function shell', () => {
     expectTypeOf(tgpu.vertexFn({ in: {}, out: { pos: d.builtin.position } })).toEqualTypeOf<
       TgpuVertexFnShell<{}, { pos: d.BuiltinPosition }>

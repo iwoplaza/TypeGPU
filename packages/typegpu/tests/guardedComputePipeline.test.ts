@@ -57,6 +57,36 @@ describe('TgpuGuardedComputePipeline', () => {
     expect(() => guarded.with(pass)).toThrow();
   });
 
+  it('dispatches enough 1D workgroups to cover every thread', ({ root, computePassEncoder }) => {
+    const pipeline = root.createGuardedComputePipeline((_x: number) => {
+      'use gpu';
+    });
+
+    pipeline.dispatchThreads(1000); // 256 threads per workgroup
+
+    expect(computePassEncoder.dispatchWorkgroups).toHaveBeenCalledExactlyOnceWith(4, 1, 1);
+  });
+
+  it('dispatches enough 2D workgroups to cover every thread', ({ root, computePassEncoder }) => {
+    const pipeline = root.createGuardedComputePipeline((_x: number, _y: number) => {
+      'use gpu';
+    });
+
+    pipeline.dispatchThreads(100, 3); // 16x16 threads per workgroup
+
+    expect(computePassEncoder.dispatchWorkgroups).toHaveBeenCalledExactlyOnceWith(7, 1, 1);
+  });
+
+  it('dispatches enough 3D workgroups to cover every thread', ({ root, computePassEncoder }) => {
+    const pipeline = root.createGuardedComputePipeline((_x: number, _y: number, _z: number) => {
+      'use gpu';
+    });
+
+    pipeline.dispatchThreads(10, 9, 5); // 8x8x4 threads per workgroup
+
+    expect(computePassEncoder.dispatchWorkgroups).toHaveBeenCalledExactlyOnceWith(2, 2, 2);
+  });
+
   it('delegates `withTimestampWrites` to the underlying pipeline', ({ root }) => {
     const querySet = root.createQuerySet('timestamp', 2);
     const guarded = root.createGuardedComputePipeline(() => {
