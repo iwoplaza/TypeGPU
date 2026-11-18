@@ -55,7 +55,7 @@ function isSpaceRequired(current: string, next: string | undefined) {
   if (separatorNeededRegex.test(currentLast) && separatorNeededRegex.test(nextFirst)) {
     return true;
   }
-  if (['//', '/*', '*/'].includes(`${currentLast}${nextFirst}`)) {
+  if (['//', '/*', '*/', '--', '++'].includes(`${currentLast}${nextFirst}`)) {
     return true;
   }
   return false;

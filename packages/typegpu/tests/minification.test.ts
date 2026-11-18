@@ -304,6 +304,27 @@ describe('minification', () => {
       expect(code).toContain('c||false');
     });
 
+    it('keeps adjacent minus signs apart', () => {
+      const fn = (a: number, b: number) => {
+        'use gpu';
+        let c = a - -b;
+        c = a - -b;
+        c = -(-a);
+        let i = 0;
+        i--;
+        i++;
+        return c + i;
+      };
+
+      const code = tgpu.resolve([tgpu.fn([d.f32, d.f32], d.f32)(fn)], { unstable_minify: true });
+
+      expect(code).toMatchInlineSnapshot(
+        `"fn fn_1(a:f32,b:f32)->f32{var c=(a- -(b));c=(a- -(b));c=-(-(a));var i=0;i--;i++;return(c+f32(i));}"`,
+      );
+      expect(code).not.toContain('a--');
+      expect(code).toContain('i--;');
+    });
+
     it('handles spaces at the start and end of a file', () => {
       const fn = tgpu.fn([])`  
         (   ) => {
