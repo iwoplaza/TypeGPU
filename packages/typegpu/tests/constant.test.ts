@@ -228,4 +228,37 @@ describe('tgpu.const', () => {
       - fn*:testFn(): 'c.$[index] = 1' is invalid, because the left side is immutable.]
     `);
   });
+
+  it('does not freeze the value passed to it', () => {
+    const origin = d.vec3f(0, 0, 0);
+    const vel = d.vec3u(4, 5, 6);
+    const values = [1, 2, 3];
+    const originConst = tgpu.const(d.vec3f, origin);
+    const boid = tgpu.const(Boid, { pos: origin, vel });
+    const valuesConst = tgpu.const(d.arrayOf(d.u32, 3), values);
+
+    origin.x = 1;
+    vel.y = 10;
+    values[0] = 10;
+
+    expect(origin).toStrictEqual(d.vec3f(1, 0, 0));
+    expect(vel).toStrictEqual(d.vec3u(4, 10, 6));
+    expect(values).toStrictEqual([10, 2, 3]);
+
+    expect(originConst.$).toStrictEqual(d.vec3f(0, 0, 0));
+    expect(boid.$).toStrictEqual({ pos: d.vec3f(0, 0, 0), vel: d.vec3u(4, 5, 6) });
+    expect(valuesConst.$).toStrictEqual([1, 2, 3]);
+    expect(tgpu.resolve([originConst, boid, valuesConst])).toMatchInlineSnapshot(`
+      "const originConst: vec3f = vec3f();
+
+      struct Boid {
+        pos: vec3f,
+        vel: vec3u,
+      }
+
+      const boid: Boid = Boid(vec3f(), vec3u(4, 5, 6));
+
+      const valuesConst: array<u32, 3> = array<u32, 3>(1u, 2u, 3u);"
+    `);
+  });
 });
