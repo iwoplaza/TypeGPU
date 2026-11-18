@@ -1,4 +1,5 @@
 import type { AnyData } from '../../data/dataTypes.ts';
+import { schemaCallWrapper } from '../../data/schemaCallWrapper.ts';
 import { snip } from '../../data/snippet.ts';
 import type { BaseData } from '../../data/wgslTypes.ts';
 import { IllegalVarAccessError } from '../../errors.ts';
@@ -128,7 +129,10 @@ class TgpuVarImpl<TScope extends VariableScope, TDataType extends BaseData> impl
           get(state) {
             if (!state.vars[this[$soul].scope].has(this)) {
               // Not initialized yet
-              state.vars[this[$soul].scope].set(this, this[$soul].initialValue);
+              state.vars[this[$soul].scope].set(
+                this,
+                schemaCallWrapper(this[$soul].dataType, this[$soul].initialValue),
+              );
             }
             return state.vars[this[$soul].scope].get(this);
           },

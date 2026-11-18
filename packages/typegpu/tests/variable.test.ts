@@ -172,5 +172,82 @@ var<private> x: array<s, 2> = array<s, 2>(s(1u, vec2i(2, 3)), s(4u, vec2i(5, 6))
       expect(result2.value).toEqual(1);
       expect(result3.value).toEqual(1);
     });
+
+    it('zero-initializes variables without an initial value', () => {
+      const counter = tgpu.privateVar(d.u32);
+      const pos = tgpu.privateVar(d.vec3f);
+      const Boid = d.struct({ pos: d.vec2f, vel: d.vec2f });
+      const boid = tgpu.privateVar(Boid);
+      const shared = tgpu.workgroupVar(d.arrayOf(d.i32, 3));
+
+      const result = tgpu['~unstable'].simulate(() => {
+        counter.$ += 1;
+        counter.$ += 2;
+        return {
+          counter: counter.$,
+          pos: pos.$,
+          boid: boid.$,
+          shared: shared.$,
+        };
+      });
+
+      expect(result.value.counter).toBe(3);
+      expect(result.value.pos).toStrictEqual(d.vec3f());
+      expect(result.value.boid).toStrictEqual({ pos: d.vec2f(), vel: d.vec2f() });
+      expect(result.value.shared).toStrictEqual([0, 0, 0]);
+    });
+
+    it('does not share initial values between simulations', () => {
+      const Boid = d.struct({ pos: d.vec2f, vel: d.vec2f });
+      const counter = tgpu.privateVar(d.f32, 1);
+      const pos = tgpu.privateVar(d.vec3f, d.vec3f(1, 2, 3));
+      const boid = tgpu.privateVar(Boid, Boid({ pos: d.vec2f(1, 2), vel: d.vec2f(3, 4) }));
+      const values = tgpu.privateVar(d.arrayOf(d.u32, 3), [1, 2, 3]);
+      const sharedPos = tgpu.workgroupVar(d.vec2f);
+      const sharedValues = tgpu.workgroupVar(d.arrayOf(d.u32, 2));
+
+      tgpu['~unstable'].simulate(() => {
+        counter.$ = 100;
+        pos.$.x = 100;
+        boid.$.pos.x = 100;
+        boid.$.vel = d.vec2f(100);
+        values.$[0] = 100;
+        sharedPos.$.x = 100;
+        sharedValues.$[1] = 100;
+      });
+
+      const result = tgpu['~unstable'].simulate(() => ({
+        counter: counter.$,
+        pos: pos.$,
+        boid: boid.$,
+        values: values.$,
+        sharedPos: sharedPos.$,
+        sharedValues: sharedValues.$,
+      }));
+
+      expect(result.value.counter).toBe(1);
+      expect(result.value.pos).toStrictEqual(d.vec3f(1, 2, 3));
+      expect(result.value.boid).toStrictEqual({ pos: d.vec2f(1, 2), vel: d.vec2f(3, 4) });
+      expect(result.value.values).toStrictEqual([1, 2, 3]);
+      expect(result.value.sharedPos).toStrictEqual(d.vec2f());
+      expect(result.value.sharedValues).toStrictEqual([0, 0]);
+    });
+
+    it('does not mutate the initial value used in generated WGSL', () => {
+      const pos = tgpu.privateVar(d.vec3f, d.vec3f(1, 2, 3));
+
+      tgpu['~unstable'].simulate(() => {
+        pos.$.x = 100;
+      });
+
+      expect(
+        tgpu.resolve([
+          () => {
+            'use gpu';
+            return d.vec3f(pos.$);
+          },
+        ]),
+      ).toContain('var<private> pos: vec3f = vec3f(1, 2, 3);');
+    });
   });
 });
