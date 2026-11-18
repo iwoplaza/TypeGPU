@@ -507,6 +507,111 @@ const HELPERS = {
 };
 
 /**
+ * Built-in functions of GLSL ES 3.00 (chapter 8). User-defined functions cannot redeclare them,
+ * and variables with these names would hide them for the rest of their scope.
+ */
+const builtinFunctions = [
+  // 8.1 Angle and Trigonometry Functions
+  'radians',
+  'degrees',
+  'sin',
+  'cos',
+  'tan',
+  'asin',
+  'acos',
+  'atan',
+  'sinh',
+  'cosh',
+  'tanh',
+  'asinh',
+  'acosh',
+  'atanh',
+  // 8.2 Exponential Functions
+  'pow',
+  'exp',
+  'log',
+  'exp2',
+  'log2',
+  'sqrt',
+  'inversesqrt',
+  // 8.3 Common Functions
+  'abs',
+  'sign',
+  'floor',
+  'trunc',
+  'round',
+  'roundEven',
+  'ceil',
+  'fract',
+  'mod',
+  'modf',
+  'min',
+  'max',
+  'clamp',
+  'mix',
+  'step',
+  'smoothstep',
+  'isnan',
+  'isinf',
+  'floatBitsToInt',
+  'floatBitsToUint',
+  'intBitsToFloat',
+  'uintBitsToFloat',
+  // 8.4 Floating-Point Pack and Unpack Functions
+  'packSnorm2x16',
+  'unpackSnorm2x16',
+  'packUnorm2x16',
+  'unpackUnorm2x16',
+  'packHalf2x16',
+  'unpackHalf2x16',
+  // 8.5 Geometric Functions
+  'length',
+  'distance',
+  'dot',
+  'cross',
+  'normalize',
+  'faceforward',
+  'reflect',
+  'refract',
+  // 8.6 Matrix Functions
+  'matrixCompMult',
+  'outerProduct',
+  'transpose',
+  'determinant',
+  'inverse',
+  // 8.7 Vector Relational Functions
+  'lessThan',
+  'lessThanEqual',
+  'greaterThan',
+  'greaterThanEqual',
+  'equal',
+  'notEqual',
+  'any',
+  'all',
+  'not',
+  // 8.8 Texture Lookup Functions
+  'textureSize',
+  'texture',
+  'textureProj',
+  'textureLod',
+  'textureOffset',
+  'texelFetch',
+  'texelFetchOffset',
+  'textureProjOffset',
+  'textureLodOffset',
+  'textureProjLod',
+  'textureProjLodOffset',
+  'textureGrad',
+  'textureGradOffset',
+  'textureProjGrad',
+  'textureProjGradOffset',
+  // 8.9 Fragment Processing Functions
+  'dFdx',
+  'dFdy',
+  'fwidth',
+];
+
+/**
  * A GLSL ES 3.0 shader generator that extends WgslGenerator.
  * Overrides `dataType` to emit GLSL type names instead of WGSL ones,
  * and overrides variable declaration emission to use `type name = rhs` syntax.
@@ -541,6 +646,9 @@ export class GlslGenerator extends WgslGenerator {
     // Reserving GLSL keywords
     for (const keyword of reservedKeywords) {
       ctx.reserveIdentifier(keyword, 'global');
+    }
+    for (const builtinFunction of builtinFunctions) {
+      ctx.reserveIdentifier(builtinFunction, 'global');
     }
 
     // Reserving any identifiers produced by previous shader stages
