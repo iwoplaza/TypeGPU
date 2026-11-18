@@ -33,6 +33,17 @@ export function shortArrayWriteCases() {
       expect(consoleWarnSpy).not.toHaveBeenCalled();
     });
 
+    it('leaves the rest of an array of arrays untouched', () => {
+      using consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const schema = d.arrayOf(d.arrayOf(d.u32, 2), 3);
+      const buffer = new Uint32Array(6).fill(7).buffer;
+
+      writeToArrayBuffer(buffer, schema, [[1], [2, 3]], { endOffset: d.sizeOf(schema) });
+
+      expect([...new Uint32Array(buffer)]).toStrictEqual([1, 7, 2, 3, 7, 7]);
+      expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
+
     it('keeps writing the fields after a shorter nested array of vectors', () => {
       using consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const schema = d.struct({ arr: d.arrayOf(d.vec2u, 3), tail: d.u32 });
