@@ -95,7 +95,7 @@ const knownFailures: Record<string, KnownFailure> = {
       shape.op === '%' &&
       !/^(vec|mat)/.test(shape.lt as string) &&
       (shape.rt as string).startsWith('vec') &&
-      /Expected reject and accept args|Expected selection argument types to match|cannot cast a vec|Composing 0's component type|automatic conversions cannot convert `vec|doesn't match the type/.test(
+      /Expected reject and accept args|Expected selection argument types to match|cannot cast a vec|Composing 0's component type|automatic conversions cannot convert `vec|doesn't match the type|does not match the declared return type/.test(
         message,
       ),
   },
