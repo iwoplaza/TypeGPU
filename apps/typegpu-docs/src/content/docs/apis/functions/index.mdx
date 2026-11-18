@@ -260,7 +260,7 @@ const settings = {
 const pipeline = root.createGuardedComputePipeline(() => {
   'use gpu';
   const speed = settings.speed;
-  // ^ generates: var speed = 1;
+  // ^ generates: const speed = 1;
 
   // ...
 });
