@@ -49,6 +49,7 @@ import type {
 } from '../data/texture.ts';
 import type { comparisonSampler, sampler } from '../data/sampler.ts';
 import type { Snippet } from '../data/snippet.ts';
+import { WgslTypeError } from '../errors.ts';
 
 function compactSnippetArgs(args: readonly (Snippet | undefined)[]): Snippet[] {
   return args.filter((arg): arg is Snippet => arg !== undefined);
@@ -320,6 +321,27 @@ type PrimitiveToLoadedType = {
 type TexelFormatToInstanceType<T extends StorageTextureFormats> =
   TextureFormats[T]['vectorType'][typeof $repr];
 
+/**
+ * Rejects storage textures whose access mode is exactly `TAccess`. Textures typed with
+ * any access mode (e.g. `d.textureStorage2d<'rgba8unorm'>`) are still accepted.
+ */
+type DisallowAccess<
+  T extends { [$internal]: [StorageTextureFormats, GPUStorageTextureAccess] },
+  TAccess extends GPUStorageTextureAccess,
+> = T[typeof $internal][1] extends TAccess ? never : unknown;
+
+function assertStorageTextureAccess(
+  fnName: string,
+  texture: WgslStorageTexture,
+  allowed: readonly GPUStorageTextureAccess[],
+) {
+  if (!allowed.includes(texture.access)) {
+    throw new WgslTypeError(
+      `\`${fnName}\` requires a storage texture with ${allowed.map((a) => `'${a}'`).join(' or ')} access, got '${texture.access}'`,
+    );
+  }
+}
+
 function textureLoadCpu<T extends texture1d>(
   texture: T,
   coords: number,
@@ -364,20 +386,20 @@ function textureLoadCpu<T extends textureDepthMultisampled2d>(
 ): number;
 function textureLoadCpu<T extends textureExternal>(texture: T, coords: v2i | v2u): v4f;
 function textureLoadCpu<T extends textureStorage1d>(
-  texture: T,
+  texture: T & DisallowAccess<T, 'write-only'>,
   coords: number,
 ): TexelFormatToInstanceType<T[typeof $internal][0]>;
 function textureLoadCpu<T extends textureStorage2d>(
-  texture: T,
+  texture: T & DisallowAccess<T, 'write-only'>,
   coords: v2i | v2u,
 ): TexelFormatToInstanceType<T[typeof $internal][0]>;
 function textureLoadCpu<T extends textureStorage2dArray>(
-  texture: T,
+  texture: T & DisallowAccess<T, 'write-only'>,
   coords: v2i | v2u,
   arrayIndex: number,
 ): TexelFormatToInstanceType<T[typeof $internal][0]>;
 function textureLoadCpu<T extends textureStorage3d>(
-  texture: T,
+  texture: T & DisallowAccess<T, 'write-only'>,
   coords: v3i | v3u,
 ): TexelFormatToInstanceType<T[typeof $internal][0]>;
 function textureLoadCpu(
@@ -416,6 +438,7 @@ export const textureLoad = dualImpl({
         returnType: vec4f,
       };
     }
+    assertStorageTextureAccess('textureLoad', texture, ['read-only', 'read-write']);
     const format = texture.format;
     const dataType = getTextureFormatInfo(format).vectorType;
     return {
@@ -427,23 +450,23 @@ export const textureLoad = dualImpl({
 });
 
 function textureStoreCpu<T extends textureStorage1d>(
-  texture: T,
+  texture: T & DisallowAccess<T, 'read-only'>,
   coords: number,
   value: TexelFormatToInstanceType<T[typeof $internal][0]>,
 ): void;
 function textureStoreCpu<T extends textureStorage2d>(
-  texture: T,
+  texture: T & DisallowAccess<T, 'read-only'>,
   coords: v2i | v2u,
   value: TexelFormatToInstanceType<T[typeof $internal][0]>,
 ): void;
 function textureStoreCpu<T extends textureStorage2dArray>(
-  texture: T,
+  texture: T & DisallowAccess<T, 'read-only'>,
   coords: v2i | v2u,
   arrayIndex: number,
   value: TexelFormatToInstanceType<T[typeof $internal][0]>,
 ): void;
 function textureStoreCpu<T extends textureStorage3d>(
-  texture: T,
+  texture: T & DisallowAccess<T, 'read-only'>,
   coords: v3i | v3u,
   value: TexelFormatToInstanceType<T[typeof $internal][0]>,
 ): void;
