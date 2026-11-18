@@ -212,12 +212,13 @@ export const unpluginFactory = ((rawOptions, _meta) => {
           }
           const pos = { line: loc.line, column: loc.column };
           // Rollup-compatible contexts (rollup, vite, rolldown) throw here and accept a position
-          // to print a code frame for. The rest collect the error, so we bail out of the transform.
+          // to print a code frame for. The rest only collect the error, so the transform still
+          // has to fail, otherwise the untransformed file would end up in the bundle.
           (this.error as (message: UnpluginMessage, position?: typeof pos) => void)(
             { message: error.message, stack: error.stack, id, loc: { file: id, ...pos } },
             pos,
           );
-          return undefined;
+          throw error;
         }
 
         if (magicString.hasChanged()) {

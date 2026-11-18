@@ -192,7 +192,9 @@ export default function TypeGPUPlugin() {
           if (!(error instanceof Error) || !node?.loc || !path.hub) {
             throw error;
           }
-          throw path.hub.buildError(node as t.Node, error.message, Error);
+          const located = path.hub.buildError(node as t.Node, error.message, Error);
+          located.cause = error;
+          throw located;
         }
       },
     } satisfies TraverseOptions<PluginState>,
