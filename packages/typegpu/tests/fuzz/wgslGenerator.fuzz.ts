@@ -16,7 +16,13 @@ import { join } from 'node:path';
 import babelPlugin from 'unplugin-typegpu/babel';
 import { expect, test } from 'vitest';
 import { d, std, tgpu } from 'typegpu';
-import { generators, operatorReference, type Program, Rng } from './generators.ts';
+import {
+  conversionExpected,
+  generators,
+  operatorReference,
+  type Program,
+  Rng,
+} from './generators.ts';
 
 const seed = Number(process.env.FUZZ_SEED ?? Date.now() % 1_000_000);
 const count = Number(process.env.FUZZ_COUNT ?? 2000);
@@ -100,7 +106,7 @@ const knownFailures: Record<string, KnownFailure> = {
   uncheckedConversion: {
     matches: ({ generator, shape }, message) =>
       generator === 'conversion' &&
-      shape.tt !== shape.st &&
+      !conversionExpected(shape) &&
       /automatic conversions cannot convert|doesn't match the type stored|cannot cast a|Composing|does not match the declared return type|doesn't match the type|Abstract types may only appear in constant expressions|cannot represent the abstract value/.test(
         message,
       ),

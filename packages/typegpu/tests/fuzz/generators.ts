@@ -363,6 +363,49 @@ const convSites = [
 ];
 const scalarTypes = new Set(['f32', 'f16', 'i32', 'u32', 'bool']);
 
+const numericScalars = new Set(['f32', 'f16', 'i32', 'u32']);
+
+/**
+ * Whether TypeGPU is expected to turn a value of type `st` into `tt` at `site`, so that the
+ * program is valid:
+ * - the same type always converts;
+ * - implicitly (arguments, return values, struct fields, array elements, assignments), abstract
+ *   values convert to any numeric scalar they fit in (so not `-4` to `u32`), and concrete
+ *   scalars, `bool` included, are cast to each other; vectors, matrices, structs and arrays
+ *   only convert to their own type;
+ * - an explicit constructor call `T(x)` (`ctorCall`, and `argShellless`, whose callee calls
+ *   `T(x)`) also converts a vector to a vector of the same size, and a matrix to a matrix of the
+ *   same size;
+ * - a vector constructor with one argument per component (`ctorArgs`) converts scalars.
+ */
+export function conversionExpected({ tt, st, site }: Record<string, string>): boolean {
+  const target = tt as string;
+  const source = st as string;
+  if (target === source) {
+    return true;
+  }
+  const scalarConverts =
+    (scalarTypes.has(source) && scalarTypes.has(target)) ||
+    ((source === 'abstractNeg' ? ['f32', 'f16', 'i32'] : [...numericScalars]).includes(target) &&
+      source.startsWith('abstract'));
+  if (site === 'ctorArgs') {
+    const component = { f: 'f32', h: 'f16', i: 'i32', u: 'u32', b: 'bool' }[
+      target.at(-1) as string
+    ];
+    return conversionExpected({ tt: component as string, st: source, site: 'ctorCall' });
+  }
+  if (site === 'ctorCall' || site === 'argShellless') {
+    const vec = (t: string) => /^vec(\d)/.exec(t)?.[1];
+    const mat = (t: string) => /^mat(\d)x/.exec(t)?.[1];
+    return (
+      scalarConverts ||
+      (vec(target) !== undefined && vec(target) === vec(source)) ||
+      (mat(target) !== undefined && mat(target) === mat(source))
+    );
+  }
+  return scalarConverts;
+}
+
 export function generateConversion(rng: Rng): Program | null {
   const tt = rng.pick(Object.keys(convTypes).filter((k) => convTypes[k]?.schema));
   const st = rng.pick(Object.keys(convTypes));
