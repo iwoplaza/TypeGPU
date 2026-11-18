@@ -155,6 +155,22 @@ describe('min in shaders', () => {
     `);
   });
 
+  it('keeps mixed integers as integers', () => {
+    const mixed = tgpu.fn(
+      [d.u32, d.i32],
+      d.i32,
+    )((a, b) => {
+      'use gpu';
+      return std.min(a, b) + std.clamp(b, 0, a);
+    });
+
+    expect(tgpu.resolve([mixed])).toMatchInlineSnapshot(`
+      "fn mixed(a: u32, b: i32) -> i32 {
+        return (min(i32(a), b) + clamp(b, 0i, i32(a)));
+      }"
+    `);
+  });
+
   it('converts booleans to a numeric type, like other numeric functions', () => {
     const main = (b: boolean) => {
       'use gpu';
