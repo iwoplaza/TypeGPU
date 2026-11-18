@@ -184,11 +184,26 @@ function validate(shaders: Map<number, string>): Map<number, string> {
       maxBuffer: 1 << 28,
     });
     const output = `${result.stdout}${result.stderr}`;
+    if (result.error) {
+      throw new Error(`Running naga failed: ${result.error.message}`);
+    }
     const errors = new Map<number, string>();
-    const parts = output.split(/^Error validating (\S+)\.wgsl:$/m);
+    const [body = '', failedList = ''] = output.split(
+      /^Validation failed for the following inputs:$/m,
+    );
+    const parts = body.split(/^Error validating (\S+)\.wgsl:$/m);
     for (let j = 1; j < parts.length; j += 2) {
-      const message = (parts[j + 1] ?? '').split(/^Validation failed for the following/m)[0];
-      errors.set(Number(parts[j]), (message ?? '').trim());
+      errors.set(Number(parts[j]), (parts[j + 1] ?? '').trim());
+    }
+    const failed = failedList.match(/\S+(?=\.wgsl)/g) ?? [];
+    const consistent =
+      result.status === (errors.size ? 1 : 0) &&
+      failed.length === errors.size &&
+      failed.every((name) => errors.has(Number(name)));
+    if (!consistent) {
+      throw new Error(
+        `Unexpected naga output (exit status ${result.status}, signal ${result.signal}, ${errors.size} errors parsed, ${failed.length} inputs listed as failed):\n${output.slice(0, 4000)}`,
+      );
     }
     return errors;
   } finally {
