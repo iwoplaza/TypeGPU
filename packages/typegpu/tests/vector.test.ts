@@ -1303,3 +1303,34 @@ describe('index access', () => {
     `);
   });
 });
+
+describe('array methods', () => {
+  it('return plain arrays', () => {
+    const v = d.vec3f(1, 2, 3);
+    const results = [
+      [v.concat([4]), [1, 2, 3, 4]],
+      [v.slice(0, 2), [1, 2]],
+      [v.filter((x) => x > 1), [2, 3]],
+      [d.vec3i(1, 2, 3).map((x) => x / 2), [0.5, 1, 1.5]],
+      [d.vec2b(true, false).map((x) => !x), [false, true]],
+    ] as const;
+
+    for (const [result, expected] of results) {
+      expect(Object.getPrototypeOf(result)).toBe(Array.prototype);
+      expect('kind' in result).toBe(false);
+      expect(result).toStrictEqual(expected);
+    }
+  });
+
+  it('leave the source vector untouched', () => {
+    const v = d.vec3f(1, 2, 3);
+    v.concat([4]);
+    v.slice(0, 2);
+    v.map((x) => x * 2);
+    v.filter((x) => x > 1);
+
+    expect(v).toStrictEqual(d.vec3f(1, 2, 3));
+    expect(v.length).toBe(3);
+    expect(String(v)).toBe('vec3f(1, 2, 3)');
+  });
+});
