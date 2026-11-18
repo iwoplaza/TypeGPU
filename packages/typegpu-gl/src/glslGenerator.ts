@@ -3,6 +3,7 @@ import type { Expression, Return, ObjectExpression, ObjectProperty } from 'tinye
 import { tgpu, d, type ShaderStage, std } from 'typegpu';
 import {
   abstractInt,
+  concretize,
   getName,
   snip,
   stringifyNode,
@@ -1213,19 +1214,16 @@ export class GlslGenerator extends WgslGenerator {
       const propType =
         expectedReturnType && d.isWgslStruct(expectedReturnType)
           ? expectedReturnType.propTypes[key]
-          : undefined;
+          : autoStruct?.accessProp(key)?.type;
       const rhsExpr = propType
         ? this._expressionWithTypeConversion(rhsNode, propType)
         : this._expression(rhsNode);
-      const dataType = rhsExpr.dataType as d.BaseData;
+      const dataType = concretize(rhsExpr.dataType as d.BaseData);
       const rhsStr = this.ctx.resolve(rhsExpr.value, dataType).value;
 
       // Register the prop on the auto-struct so the caller's completeStruct picks it up.
-      if (autoStruct) {
-        const existing = autoStruct.accessProp(key);
-        if (!existing) {
-          autoStruct.provideProp(key, dataType);
-        }
+      if (autoStruct && !propType) {
+        autoStruct.provideProp(key, dataType);
       }
 
       if (
