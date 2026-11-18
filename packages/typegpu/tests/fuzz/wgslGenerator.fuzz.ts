@@ -28,7 +28,12 @@ const seed = Number(process.env.FUZZ_SEED ?? Date.now() % 1_000_000);
 const count = Number(process.env.FUZZ_COUNT ?? 2000);
 const BATCH_SIZE = 250;
 
-const nagaAvailable = spawnSync('naga', ['--version']).status === 0;
+const nagaVersion = spawnSync('naga', ['--version']);
+// Only a missing binary skips the test, a `naga` that is there but broken fails it
+const nagaAvailable = (nagaVersion.error as NodeJS.ErrnoException | undefined)?.code !== 'ENOENT';
+if (nagaAvailable && nagaVersion.status !== 0) {
+  throw new Error(`\`naga --version\` failed with exit status ${nagaVersion.status}`);
+}
 
 interface KnownFailure {
   /**
@@ -181,12 +186,12 @@ function resolveProgram(program: Program): { wgsl: string } | Exclude<Outcome, {
   }
 }
 
-/** Validates many shaders with one `naga` process, returns the error message per index. */
 // Every batch carries one shader that must be rejected and one that must be accepted,
 // so a validator that stays silent or rejects everything cannot pass for a clean run.
 const INVALID_CANARY = 'canary-invalid';
 const VALID_CANARY = 'canary-valid';
 
+/** Validates many shaders with one `naga` process, returns the error message per index. */
 function validate(shaders: Map<number, string>): Map<number, string> {
   const dir = mkdtempSync(join(tmpdir(), 'tgpu-fuzz-'));
   try {
@@ -222,7 +227,7 @@ function validate(shaders: Map<number, string>): Map<number, string> {
       !errorsByName.has(VALID_CANARY);
     if (!consistent) {
       throw new Error(
-        `Unexpected naga output (exit status ${result.status}, signal ${result.signal}, ${errorsByName.size} errors parsed, ${failed.length} inputs listed as failed):\n${output.slice(0, 4000)}`,
+        `Unexpected naga output, or it did not reject ${INVALID_CANARY}.wgsl and accept ${VALID_CANARY}.wgsl (exit status ${result.status}, signal ${result.signal}, ${errorsByName.size} errors parsed, ${failed.length} inputs listed as failed):\n${output.slice(0, 4000)}`,
       );
     }
     errorsByName.delete(INVALID_CANARY);
