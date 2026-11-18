@@ -280,6 +280,32 @@ describe('TgpuTexture', () => {
     );
   });
 
+  it('forwards the dimension, mip level count and sample count to WebGPU', ({ root, device }) => {
+    root.unwrap(
+      root
+        .createTexture({
+          size: [64, 64, 8],
+          format: 'rgba8unorm',
+          dimension: '3d',
+          mipLevelCount: 4,
+        })
+        .$usage('sampled'),
+    );
+    root.unwrap(
+      root.createTexture({ size: [64, 64], format: 'rgba8unorm', sampleCount: 4 }).$usage('render'),
+    );
+    root.unwrap(root.createTexture({ size: [64, 64], format: 'rgba8unorm' }).$usage('sampled'));
+
+    const descriptors = device.mock.createTexture.mock.calls.map(
+      ([{ dimension, mipLevelCount, sampleCount }]) => ({ dimension, mipLevelCount, sampleCount }),
+    );
+    expect(descriptors).toStrictEqual([
+      { dimension: '3d', mipLevelCount: 4, sampleCount: 1 },
+      { dimension: '2d', mipLevelCount: 1, sampleCount: 4 },
+      { dimension: '2d', mipLevelCount: 1, sampleCount: 1 },
+    ]);
+  });
+
   it('limits available extensions based on the chosen format', ({ root }) => {
     root
       .createTexture({

@@ -205,6 +205,93 @@ describe('TgpuBindGroupLayout', () => {
   });
 });
 
+describe('TgpuBindGroupLayout entries', () => {
+  it('marks multisampled textures as such', ({ root, device }) => {
+    const layout = tgpu.bindGroupLayout({
+      ms: { texture: d.textureMultisampled2d() },
+      plain: { texture: d.texture2d() },
+    });
+
+    root.unwrap(layout);
+
+    const entries = [...device.mock.createBindGroupLayout.mock.calls[0]![0].entries];
+    expect(entries.map((entry) => entry.texture?.multisampled)).toStrictEqual([true, false]);
+  });
+});
+
+describe('TgpuBindGroup usage validation', () => {
+  it('rejects a buffer without uniform usage in a uniform slot', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({ foo: { uniform: d.f32 } });
+    const buffer = root.createBuffer(d.f32).$usage('storage').$name('myBuffer');
+
+    // @ts-expect-error: the buffer is not usable as a uniform
+    const bindGroup = root.createBindGroup(layout, { foo: buffer });
+
+    expect(() => root.unwrap(bindGroup)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Buffer 'myBuffer' is not bindable as a uniform. Use .$usage('uniform') to allow it.]`,
+    );
+  });
+
+  it('rejects a buffer without storage usage in a storage slot', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({ foo: { storage: d.f32 } });
+    const buffer = root.createBuffer(d.f32).$usage('uniform').$name('myBuffer');
+
+    // @ts-expect-error: the buffer is not usable as storage
+    const bindGroup = root.createBindGroup(layout, { foo: buffer });
+
+    expect(() => root.unwrap(bindGroup)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Resource 'myBuffer' cannot be bound as 'storage'. Use .$usage('storage') to allow it.]`,
+    );
+  });
+
+  it('rejects a texture without sampled usage in a texture slot', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({ foo: { texture: d.texture2d() } });
+    const texture = root
+      .createTexture({ size: [32, 32], format: 'rgba8unorm' })
+      .$usage('render')
+      .$name('myTexture');
+
+    // @ts-expect-error: the texture is not usable as sampled
+    const bindGroup = root.createBindGroup(layout, { foo: texture });
+
+    expect(() => root.unwrap(bindGroup)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Resource 'myTexture' cannot be bound as 'sampled'. Use .$usage('sampled') to allow it.]`,
+    );
+  });
+
+  it('rejects a texture without storage usage in a storage texture slot', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({
+      foo: { storageTexture: d.textureStorage2d('rgba8unorm') },
+    });
+    const texture = root
+      .createTexture({ size: [32, 32], format: 'rgba8unorm' })
+      .$usage('sampled')
+      .$name('myTexture');
+
+    // @ts-expect-error: the texture is not usable as storage
+    const bindGroup = root.createBindGroup(layout, { foo: texture });
+
+    expect(() => root.unwrap(bindGroup)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Resource 'myTexture' cannot be bound as 'storage'. Use .$usage('storage') to allow it.]`,
+    );
+  });
+
+  it('rejects a texture without sampled usage in an external texture slot', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({ foo: { externalTexture: d.textureExternal() } });
+    const texture = root
+      .createTexture({ size: [32, 32], format: 'rgba8unorm' })
+      .$usage('render')
+      .$name('myTexture');
+
+    // @ts-expect-error: the texture is not usable as sampled
+    const bindGroup = root.createBindGroup(layout, { foo: texture });
+
+    expect(() => root.unwrap(bindGroup)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Resource 'myTexture' cannot be bound as 'sampled'. Use .$usage('sampled') to allow it.]`,
+    );
+  });
+});
+
 describe('TgpuBindGroup', () => {
   describe('buffer layout', () => {
     let layout: TgpuBindGroupLayout<{ foo: { uniform: d.Vec3f } }>;
