@@ -237,6 +237,8 @@ function gatherTgpuAliases(state: PluginState, node: t.ImportDeclaration) {
     } else if (spec.type === 'ImportNamespaceSpecifier') {
       // Importing everything, e.g. import * as t from 'typegpu';
       state.tgpuAliases.add(`${spec.local.name}.tgpu`);
+      // e.g. import * as t from 'typegpu'; t.default.fn(...)
+      state.tgpuAliases.add(`${spec.local.name}.default`);
     }
   }
 }
@@ -252,6 +254,20 @@ function isShellImplementationCall(node: t.CallExpression, state: PluginState) {
     node.arguments.length === 1 &&
     isTgpu(state, node.callee.callee.object)
   );
+}
+
+/**
+ * Returns the name of a property key, if it is known statically.
+ * Computed keys are only named when they are string literals, e.g. `['key']`.
+ */
+function getPropertyKeyName(key: t.Node, computed: boolean): string | undefined {
+  if (key.type === 'StringLiteral') {
+    return key.value;
+  }
+  if (!computed && key.type === 'Identifier') {
+    return key.name;
+  }
+  return undefined;
 }
 
 /**
@@ -277,18 +293,20 @@ function extractLabelledExpression(path: NodePath): [string, NodePath<t.Expressi
     if (maybeName) {
       return [maybeName, path.get('right') as NodePath<t.Expression>];
     }
-  } else if (path.node.type === 'ObjectProperty' && path.node.key.type === 'Identifier') {
+  } else if (path.node.type === 'ObjectProperty') {
     // const a = { key: value }
-    return [path.node.key.name, path.get('value') as NodePath<t.Expression>];
-  } else if (
-    path.node.type === 'ClassProperty' &&
-    path.node.value &&
-    path.node.key.type === 'Identifier'
-  ) {
+    const maybeName = getPropertyKeyName(path.node.key, path.node.computed);
+    if (maybeName) {
+      return [maybeName, path.get('value') as NodePath<t.Expression>];
+    }
+  } else if (path.node.type === 'ClassProperty' && path.node.value) {
     // class Class {
     //	 key = value;
     // }
-    return [path.node.key.name, path.get('value') as NodePath<t.Expression>];
+    const maybeName = getPropertyKeyName(path.node.key, path.node.computed);
+    if (maybeName) {
+      return [maybeName, path.get('value') as NodePath<t.Expression>];
+    }
   } else if (
     path.node.type === 'ClassPrivateProperty' &&
     path.node.value &&
@@ -386,6 +404,8 @@ function containsResourceConstructorCall(node: t.Node, state: PluginState) {
  * tryFindIdentifier('myBuffer'); // 'myBuffer'
  * tryFindIdentifier('buffers.myBuffer'); // 'myBuffer'
  * tryFindIdentifier('this.myBuffer'); // 'myBuffer'
+ * tryFindIdentifier('buffers["myBuffer"]'); // 'myBuffer'
+ * tryFindIdentifier('buffers[key]'); // undefined
  * tryFindIdentifier('[a, b]'); // undefined
  */
 function tryFindIdentifier(node: t.Node): string | undefined {
@@ -396,7 +416,9 @@ function tryFindIdentifier(node: t.Node): string | undefined {
     return tryFindIdentifier(node.id);
   }
   if (node.type === 'MemberExpression') {
-    return tryFindIdentifier(node.property);
+    return node.computed
+      ? getPropertyKeyName(node.property, true)
+      : tryFindIdentifier(node.property);
   }
 }
 
@@ -430,7 +452,17 @@ function performExpressionNaming(
 
   const labelledExpression = extractLabelledExpression(path);
   if (labelledExpression) {
-    const [label, expressionPath] = labelledExpression;
+    const [label] = labelledExpression;
+    let [, expressionPath] = labelledExpression;
+    // Looking through TypeScript-only wrappers, e.g. `tgpu.slot() as X`
+    while (
+      expressionPath.isTSAsExpression() ||
+      expressionPath.isTSSatisfiesExpression() ||
+      expressionPath.isTSNonNullExpression() ||
+      expressionPath.isTSTypeAssertion()
+    ) {
+      expressionPath = expressionPath.get('expression') as NodePath<t.Expression>;
+    }
     if (containsResourceConstructorCall(expressionPath.node, state)) {
       namingCallback(expressionPath, label);
     }
