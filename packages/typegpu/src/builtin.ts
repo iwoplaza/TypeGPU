@@ -9,6 +9,7 @@ import type {
   Builtin,
   Decorated,
   F32,
+  Invariant,
   U32,
   Vec3u,
   Vec4f,
@@ -24,6 +25,7 @@ export type BuiltinVertexIndex = Decorated<U32, [Builtin<'vertex_index'>]>;
 export type BuiltinInstanceIndex = Decorated<U32, [Builtin<'instance_index'>]>;
 export type BuiltinClipDistances = Decorated<WgslArray<U32>, [Builtin<'clip_distances'>]>;
 export type BuiltinPosition = Decorated<Vec4f, [Builtin<'position'>]>;
+export type BuiltinInvariantPosition = Decorated<Vec4f, [Builtin<'position'>, Invariant]>;
 export type BuiltinFrontFacing = Decorated<Bool, [Builtin<'front_facing'>]>;
 export type BuiltinFragDepth = Decorated<F32, [Builtin<'frag_depth'>]>;
 export type BuiltinPrimitiveIndex = Decorated<U32, [Builtin<'primitive_index'>]>;
@@ -93,7 +95,10 @@ export type AnyComputeBuiltin =
   | BuiltinSubgroupId
   | BuiltinNumSubgroups;
 export type AnyVertexInputBuiltin = BuiltinVertexIndex | BuiltinInstanceIndex;
-export type AnyVertexOutputBuiltin = BuiltinClipDistances | BuiltinPosition;
+export type AnyVertexOutputBuiltin =
+  | BuiltinClipDistances
+  | BuiltinPosition
+  | BuiltinInvariantPosition;
 export type AnyFragmentInputBuiltin =
   | BuiltinPosition
   | BuiltinFrontFacing
@@ -104,12 +109,12 @@ export type AnyFragmentInputBuiltin =
   | BuiltinSubgroupSize;
 export type AnyFragmentOutputBuiltin = BuiltinFragDepth | BuiltinSampleMask;
 
-export type OmitBuiltins<S> = S extends AnyBuiltin
+export type OmitBuiltins<S> = S extends AnyBuiltin | BuiltinInvariantPosition
   ? never
   : S extends BaseData
     ? S
     : {
-        [Key in keyof S as S[Key] extends AnyBuiltin
+        [Key in keyof S as S[Key] extends AnyBuiltin | BuiltinInvariantPosition
           ? never
           : Key extends `$${string}`
             ? never

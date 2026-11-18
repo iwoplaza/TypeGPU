@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { tgpu, d } from 'typegpu';
+import { describe, expect, expectTypeOf } from 'vitest';
+import { tgpu, d, type TgpuRenderPipeline, type TgpuVertexFn } from 'typegpu';
+import { it } from 'typegpu-testing-utility';
 
 describe('invariant', () => {
   it('adds @invariant attribute to position builtin', () => {
@@ -34,5 +35,43 @@ describe('invariant', () => {
 
     expect(resolved).toContain('@invariant @builtin(position) pos: vec4f');
     expect(resolved).toContain('color: vec4f');
+  });
+
+  it('can be used in a vertex function shell output', () => {
+    const main = tgpu.vertexFn({
+      out: { pos: d.invariant(d.builtin.position), uv: d.vec2f },
+    })(() => {
+      'use gpu';
+      return { pos: d.vec4f(), uv: d.vec2f() };
+    });
+
+    expectTypeOf(main).toEqualTypeOf<TgpuVertexFn<{}, { uv: d.Vec2f }>>();
+    expect(tgpu.resolve([main])).toContain('@invariant @builtin(position) pos: vec4f');
+  });
+
+  it('is not treated as a varying by render pipelines', ({ root }) => {
+    const vertex = tgpu.vertexFn({
+      out: { pos: d.invariant(d.builtin.position), uv: d.vec2f },
+    })(() => {
+      'use gpu';
+      return { pos: d.vec4f(), uv: d.vec2f() };
+    });
+
+    const fragment = tgpu.fragmentFn({
+      in: { uv: d.vec2f },
+      out: d.vec4f,
+    })(({ uv }) => {
+      'use gpu';
+      return d.vec4f(uv, 0, 1);
+    });
+
+    const pipeline = root.createRenderPipeline({
+      vertex,
+      fragment,
+      targets: { format: 'rgba8unorm' },
+    });
+
+    expectTypeOf(pipeline).toEqualTypeOf<TgpuRenderPipeline<d.Vec4f>>();
+    expect(tgpu.resolve([pipeline])).toContain('@invariant @builtin(position) pos: vec4f');
   });
 });
