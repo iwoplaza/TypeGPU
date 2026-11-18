@@ -102,6 +102,11 @@ export type BinaryOperator =
   | '^=';
 
 /**
+ * Unary operators that can appear in WGSL
+ */
+export type UnaryOperator = '!' | '-' | '~';
+
+/**
  * Represents generators that, once instantiated, will generate `wgsl` (as opposed to e.g. `glsl`)
  */
 export type WgslGeneratorClass = ShaderGeneratorClass<ShaderGenerator & { languageKey: 'wgsl' }>;
@@ -132,4 +137,5 @@ export interface ShaderGenerator {
   emitTypeAnnotation(schema: BaseData): string;
   emitCall(name: string, templateParams: readonly Snippet[], args: readonly Snippet[]): string;
   emitBinaryOp(lhs: Snippet, op: BinaryOperator, rhs: Snippet): string;
+  emitUnaryOp(op: UnaryOperator, arg: Snippet): string;
 }

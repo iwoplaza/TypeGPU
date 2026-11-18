@@ -22,6 +22,7 @@ import type {
   ResolvedSnippet,
   ResolvedStatement,
   BinaryOperator,
+  UnaryOperator,
 } from 'typegpu/~internal';
 
 const vectorComparisonBuiltins: Partial<Record<BinaryOperator, string>> = {
@@ -273,6 +274,18 @@ ${Object.entries(struct.propTypes)
 };`);
 
   return id;
+}
+
+function isBoolVec(dataType: d.BaseData | UnknownData): dataType is d.Vec2b | d.Vec3b | d.Vec4b {
+  return dataType === d.vec2b || dataType === d.vec3b || dataType === d.vec4b;
+}
+
+function isBoolish(dataType: d.BaseData | UnknownData): boolean {
+  return dataType === d.bool || isBoolVec(dataType);
+}
+
+function correspondingUintVectorSchema(dataType: d.Vec2b | d.Vec3b | d.Vec4b) {
+  return dataType === d.vec2b ? d.vec2u : dataType === d.vec3b ? d.vec3u : d.vec4u;
 }
 
 function correspondingBooleanVectorSchema(dataType: d.BaseData) {
@@ -995,6 +1008,22 @@ export class GlslGenerator extends WgslGenerator {
       return super.emitCall(comparisonBuiltin, [], [lhs, rhs]);
     }
 
+    if ((op === '&' || op === '|') && (isBoolish(lhs.dataType) || isBoolish(rhs.dataType))) {
+      const lhsStr = this.ctx.resolveSnippet(lhs).value;
+      const rhsStr = this.ctx.resolveSnippet(rhs).value;
+      const boolVec = isBoolVec(lhs.dataType)
+        ? lhs.dataType
+        : isBoolVec(rhs.dataType)
+          ? rhs.dataType
+          : undefined;
+      if (!boolVec) {
+        return `(${lhsStr} ${op}${op} ${rhsStr})`;
+      }
+      // GLSL has no component-wise and/or on boolean vectors, but has bitwise ones on integer vectors
+      const uintVec = this.emitTypeAnnotation(correspondingUintVectorSchema(boolVec));
+      return `${this.emitTypeAnnotation(boolVec)}(${uintVec}(${lhsStr}) ${op} ${uintVec}(${rhsStr}))`;
+    }
+
     if (op === '%' && (isF32VecfSchema(lhs.dataType) || isF32VecfSchema(rhs.dataType))) {
       const result = this._callShellless(HELPERS.remainder, [lhs, rhs]);
       if (!result) {
@@ -1008,6 +1037,13 @@ export class GlslGenerator extends WgslGenerator {
     }
 
     return super.emitBinaryOp(lhs, op, rhs);
+  }
+
+  override emitUnaryOp(op: UnaryOperator, arg: Snippet): string {
+    if (op === '!' && isBoolVec(arg.dataType)) {
+      return super.emitCall('not', [], [arg]);
+    }
+    return super.emitUnaryOp(op, arg);
   }
 
   /**
