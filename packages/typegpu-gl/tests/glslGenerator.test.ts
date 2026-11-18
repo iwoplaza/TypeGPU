@@ -1,6 +1,6 @@
 import { describe, expect, vi } from 'vitest';
 import { tgpu, d, std } from 'typegpu';
-import { dualGlOptions, glOptions } from '@typegpu/gl';
+import { dualGlOptions, glOptions, initWithGL } from '@typegpu/gl';
 import { translateWgslTypeToGlsl } from '../src/glslGenerator.ts';
 import { it } from './utils/extendedTest.ts';
 
@@ -1480,6 +1480,65 @@ describe('GlslGenerator - fragment builtin outputs', () => {
         }
       }"
     `);
+  });
+
+  it('writes a returned fragDepth builtin to gl_FragDepth', () => {
+    const fragFn = tgpu.fragmentFn({ out: d.builtin.fragDepth })(() => {
+      'use gpu';
+      return 0.25;
+    });
+
+    expect(tgpu.resolve([fragFn], dualGlOptions().fragment)).toMatchInlineSnapshot(`
+      "void main() {
+        gl_FragDepth = 0.25;
+      }"
+    `);
+  });
+
+  it('writes the fragDepth builtin of an auto struct to gl_FragDepth', ({ gl }) => {
+    const root = initWithGL({ gl });
+    root
+      .createRenderPipeline({
+        vertex: () => {
+          'use gpu';
+          return { $position: d.vec4f(0, 0, 0, 1) };
+        },
+        fragment: () => {
+          'use gpu';
+          return { $fragDepth: d.f32(0.5), color: d.vec4f(1, 0, 0, 1) };
+        },
+      })
+      .draw(3);
+
+    const fragmentSource = vi.mocked(gl.shaderSource).mock.calls.at(-1)?.[1];
+    expect(fragmentSource).toMatchInlineSnapshot(`
+      "#version 300 es
+      precision highp float;
+      precision highp int;
+
+
+
+      layout(location=0) out vec4 vary_color;
+
+      void main() {
+        {
+          gl_FragDepth = 0.5;
+          vary_color = vec4(1, 0, 0, 1);
+          return;
+        }
+      }"
+    `);
+  });
+
+  it('throws for a returned sampleMask builtin', () => {
+    const fragFn = tgpu.fragmentFn({ out: d.builtin.sampleMask })(() => {
+      'use gpu';
+      return d.u32(1);
+    });
+
+    expect(() => tgpu.resolve([fragFn], dualGlOptions().fragment)).toThrow(
+      "The 'sample_mask' builtin is not supported by the WebGL fallback",
+    );
   });
 
   it('throws for a sampleMask output', () => {

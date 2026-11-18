@@ -302,6 +302,7 @@ function resolveArraySizeSuffix(ctx: ResolutionCtx, schema: d.BaseData | Unknown
 }
 
 const gl_PositionSnippet = tgpu['~unstable'].rawCodeSnippet('gl_Position', d.vec4f, 'private');
+const gl_FragDepthSnippet = tgpu['~unstable'].rawCodeSnippet('gl_FragDepth', d.f32, 'private');
 
 interface OutVarInfo {
   varName: string;
@@ -1134,6 +1135,23 @@ export class GlslGenerator extends WgslGenerator {
     }
 
     const exprType = expr.dataType.type;
+    const returnBuiltinKind = expectedReturnType && getBuiltinKindFromDecorated(expectedReturnType);
+
+    if (this.#functionType === 'fragment' && returnBuiltinKind === 'sample_mask') {
+      // gl_SampleMask needs OES_sample_variables, which WebGL 2 does not expose
+      throw new Error(
+        `The 'sample_mask' builtin is not supported by the WebGL fallback, GLSL ES 3.00 has no equivalent`,
+      );
+    }
+
+    if (this.#functionType === 'fragment' && returnBuiltinKind === 'frag_depth') {
+      const block = super._block(
+        [NODE.block, [[NODE.assignmentExpr, 'gl_FragDepth', '=', exprNode], [NODE.return]]],
+        /* allowInlining */ true,
+        { gl_FragDepth: gl_FragDepthSnippet.$ },
+      );
+      return `${this.ctx.pre}${block.code}`;
+    }
 
     if (
       this.#functionType === 'fragment' &&
