@@ -13,6 +13,7 @@ import {
   type TgpuVertexFnShell,
 } from 'typegpu';
 import { restoreResource, snapshotResource } from 'typegpu/~internal';
+import type { LayoutToAllowedAttribs } from '../src/core/vertexLayout/vertexAttribute.ts';
 import { it } from 'typegpu-testing-utility';
 
 describe('render pipeline behavior', () => {
@@ -130,6 +131,26 @@ describe('render pipeline behavior', () => {
     fromBare(withoutInputs);
     fromAny(withInputs);
     fromUnion(withInputs);
+  });
+
+  it('accepts helpers that are generic over the vertex input type', ({ root }) => {
+    const fragment = tgpu.fragmentFn({ out: d.vec4f })`{ return vec4f(); }`;
+
+    function withoutAttribs<TIn extends TgpuVertexFn.In>(
+      vertex: TgpuVertexFn<TIn, { pos: d.BuiltinPosition }>,
+    ) {
+      root.createRenderPipeline({ vertex });
+      root.createRenderPipeline({ vertex, fragment: undefined });
+      root.createRenderPipeline({ vertex, fragment, targets: { format: 'rgba8unorm' } });
+    }
+
+    function withAttribs<TIn extends TgpuVertexFn.In>(
+      vertex: TgpuVertexFn<TIn, { pos: d.BuiltinPosition }>,
+      attribs: LayoutToAllowedAttribs<TIn>,
+    ) {
+      root.createRenderPipeline({ attribs, vertex });
+      root.createRenderPipeline({ attribs, vertex, fragment, targets: { format: 'rgba8unorm' } });
+    }
   });
 
   it('throws an error if bind groups are missing', ({ root }) => {

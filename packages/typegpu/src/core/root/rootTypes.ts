@@ -182,14 +182,21 @@ type NormalizeOutput<T> = T extends { readonly [$internal]: unknown } | number |
 
 /**
  * `attribs` can only be omitted if the vertex function has no non-builtin inputs.
+ */
+type RequiresAttribs<TVertexIn> = [TVertexIn] extends [never]
+  ? false
+  : {} extends OmitBuiltins<TVertexIn>
+    ? false
+    : true;
+
+/**
  * `TVertexIn` should be wrapped in `NoInfer`, so that the requirement doesn't take part in inference.
+ * While `TVertexIn` is an unresolved type parameter (e.g. in a helper that is generic over it),
+ * `RequiresAttribs<TVertexIn> extends true` can't be decided, and TypeScript only checks the descriptor
+ * against the `unknown` branch, so `attribs` stays optional there instead of becoming required.
  */
 type RenderDescriptorBase<TVertexIn, TAttribs> = TgpuRenderPipeline.DescriptorBase &
-  ([TVertexIn] extends [never]
-    ? unknown
-    : {} extends OmitBuiltins<TVertexIn>
-      ? unknown
-      : { attribs: TAttribs });
+  (RequiresAttribs<TVertexIn> extends true ? { attribs: TAttribs } : unknown);
 
 export interface WithBinding extends Withable<WithBinding> {
   createComputePipeline<ComputeIn extends IORecord<AnyComputeBuiltin>>(
