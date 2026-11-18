@@ -17,6 +17,11 @@ export interface ExampleTestConfig {
   setupMocks?: () => void;
   waitTime?: number;
   expectedCalls?: number;
+  /**
+   * Runs after the example is loaded, but before its shader code is extracted and its
+   * `onCleanup` is called. Useful for driving the example, e.g. rendering a frame.
+   */
+  beforeCleanup?: () => void | Promise<void>;
 }
 
 /**
@@ -51,6 +56,8 @@ export async function runExampleTest(
 
   let shaderCodes: string;
   try {
+    await config.beforeCleanup?.();
+
     if (config.expectedCalls) {
       await waitForExpectedCalls(device, config.expectedCalls);
     }
