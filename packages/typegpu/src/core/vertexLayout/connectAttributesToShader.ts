@@ -4,7 +4,11 @@ import { isData } from '../../data/dataTypes.ts';
 import type { AnyVertexAttribs, TgpuVertexAttrib } from '../../shared/vertexFormat.ts';
 import type { IOData } from '../function/fnTypes.ts';
 import type { TgpuVertexFn } from '../function/tgpuVertexFn.ts';
-import type { INTERNAL_TgpuVertexAttrib, TgpuVertexLayout } from './vertexLayout.ts';
+import {
+  assertValidAttribOffset,
+  type INTERNAL_TgpuVertexAttrib,
+  type TgpuVertexLayout,
+} from './vertexLayout.ts';
 
 export interface ConnectAttributesToShaderResult {
   usedVertexLayouts: TgpuVertexLayout[];
@@ -29,6 +33,7 @@ export function connectAttributesToShader(
       );
     }
 
+    assertValidAttribOffset(attributes);
     usedVertexLayouts.push(attributes._layout);
 
     return {
@@ -65,6 +70,8 @@ export function connectAttributesToShader(
     if (!matchingAttribute) {
       throw new Error(`An attribute by the name of '${key}' was not provided to the shader.`);
     }
+
+    assertValidAttribOffset(matchingAttribute);
 
     const layout = matchingAttribute._layout;
     let attribList = layoutToAttribListMap.get(layout);

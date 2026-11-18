@@ -99,4 +99,50 @@ describe('tgpu.vertexLayout', () => {
   it('throws when trying to use type that has no attribute representation', () => {
     expect(() => tgpu.vertexLayout(d.disarrayOf(d.vec3h))).toThrow();
   });
+
+  it('throws when the stride is not a multiple of 4', () => {
+    expect(() => tgpu.vertexLayout(d.disarrayOf(d.unorm8x2))).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex layout of unorm8x2 has a stride of 2 bytes, but WebGPU requires the stride to be a multiple of 4. Use d.size() or d.align() to pad the element type.]`,
+    );
+    expect(() =>
+      tgpu.vertexLayout(d.disarrayOf(d.unstruct({ a: d.unorm8x2, b: d.unorm8 }).$name('Vertex'))),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex layout of unstruct:Vertex has a stride of 3 bytes, but WebGPU requires the stride to be a multiple of 4. Use d.size() or d.align() to pad the element type.]`,
+    );
+  });
+
+  it('accepts misaligned attributes, as long as they are not connected to a shader', () => {
+    const layout = tgpu.vertexLayout(
+      d.disarrayOf(d.unstruct({ pos: d.float32x3, tag: d.uint8, extra: d.unorm16, tail: d.uint8 })),
+    );
+
+    expect(layout.stride).toBe(16);
+    expect(layout.attrib.extra).toMatchObject({ format: 'unorm16', offset: 13 });
+  });
+
+  it('accepts packed formats placed at valid offsets', () => {
+    const single = tgpu.vertexLayout(d.disarrayOf(d.unorm8x4));
+    expect(single.stride).toBe(4);
+    expect(single.attrib).toMatchObject({ format: 'unorm8x4', offset: 0 });
+
+    const packed = tgpu.vertexLayout(
+      d.disarrayOf(d.unstruct({ a: d.unorm8x2, b: d.unorm8x2, c: d.float32 })),
+    );
+    expect(packed.stride).toBe(8);
+    expect(packed.attrib).toMatchObject({
+      a: { format: 'unorm8x2', offset: 0 },
+      b: { format: 'unorm8x2', offset: 2 },
+      c: { format: 'float32', offset: 4 },
+    });
+
+    const padded = tgpu.vertexLayout(
+      d.disarrayOf(d.unstruct({ a: d.unorm8, b: d.align(4, d.float32), c: d.size(4, d.uint8) })),
+    );
+    expect(padded.stride).toBe(12);
+    expect(padded.attrib).toMatchObject({
+      a: { format: 'unorm8', offset: 0 },
+      b: { format: 'float32', offset: 4 },
+      c: { format: 'uint8', offset: 8 },
+    });
+  });
 });
