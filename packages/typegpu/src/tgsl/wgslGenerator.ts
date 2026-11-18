@@ -283,10 +283,9 @@ function tryFoldBitwiseOp(lhs: Snippet, op: string, rhs: Snippet): Snippet | und
 
   if (resultType === u32) {
     value >>>= 0;
-  } else if (resultType === abstractInt && value > 2 ** 31 - 1) {
-    // Only `>>>` gets here. Its result does not fit an `i32`, which is what an abstract integer
-    // becomes by default, so we give it the only concrete type that can hold it.
-    resultType = u32;
+  } else if (value === -(2 ** 31)) {
+    // `-2147483648i` is not a valid WGSL literal, so we leave the expression to WGSL.
+    return undefined;
   }
 
   return snip(value, resultType, /* origin */ 'constant', /* possibleSideEffects */ false);
