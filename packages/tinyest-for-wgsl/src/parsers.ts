@@ -20,6 +20,32 @@ import { extractFunctionParts } from './functionParts.ts';
 
 const { NodeTypeCatalog: NODE } = tinyest;
 
+const errorNodes = new WeakMap<object, JsNode>();
+
+/**
+ * Returns the innermost source node that was being transpiled when `error` was thrown,
+ * if the error came from one of the transpile functions.
+ */
+export function getTranspilationErrorNode(error: unknown): JsNode | undefined {
+  return typeof error === 'object' && error !== null ? errorNodes.get(error) : undefined;
+}
+
+function withErrorNode<T>(node: JsNode, fn: () => T): T {
+  try {
+    return fn();
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      !errorNodes.has(error) &&
+      typeof node.start === 'number'
+    ) {
+      errorNodes.set(error, node);
+    }
+    throw error;
+  }
+}
+
 function createContext(params: tinyest.FuncParameter[], opts: TranspilationOptions): Context {
   return {
     externalNames: new Map(),
@@ -89,7 +115,7 @@ function createParser(kind: 'acorn' | 'babel' | 'legacy') {
         : createLegacyTraspilers()
   ) as Transpilers<JsNode>;
 
-  const transpile: Transpile<JsNode> = (ctx, node) => {
+  const transpileUnlocated: Transpile<JsNode> = (ctx, node) => {
     const transpiler = transpilers[node.type];
 
     if (!transpiler) {
@@ -119,9 +145,12 @@ function createParser(kind: 'acorn' | 'babel' | 'legacy') {
     return result;
   };
 
+  const transpile: Transpile<JsNode> = (ctx, node) =>
+    withErrorNode(node, () => transpileUnlocated(ctx, node));
+
   return {
     transpileFn(rootNode: JsNode, options: TranspilationOptions): TranspilationResult {
-      const { params, body } = extractFunctionParts(rootNode);
+      const { params, body } = withErrorNode(rootNode, () => extractFunctionParts(rootNode));
       const ctx = createContext(params, options);
 
       const tinyestBody = transpile(ctx, body);

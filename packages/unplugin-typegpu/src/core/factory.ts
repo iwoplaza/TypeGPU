@@ -1,9 +1,18 @@
 import defu from 'defu';
 import MagicString from 'magic-string';
 import { getBabelParserOptions, getLang } from 'ast-kit';
-import type { UnpluginBuildContext, UnpluginContext, UnpluginFactory } from 'unplugin';
+import type {
+  UnpluginBuildContext,
+  UnpluginContext,
+  UnpluginFactory,
+  UnpluginMessage,
+} from 'unplugin';
 import _traverse, { type NodePath } from '@babel/traverse';
-import type { Externals, TranspilationResult } from 'tinyest-for-wgsl';
+import {
+  getTranspilationErrorNode,
+  type Externals,
+  type TranspilationResult,
+} from 'tinyest-for-wgsl';
 import * as parser from '@babel/parser';
 import * as t from '@babel/types';
 import { METADATA_FORMAT_VERSION } from './version.ts';
@@ -193,7 +202,24 @@ export const unpluginFactory = ((rawOptions, _meta) => {
           replaceWithBinaryOverload,
         });
 
-        traverse(ast, functionVisitor, undefined, state);
+        try {
+          traverse(ast, functionVisitor, undefined, state);
+        } catch (error) {
+          const loc = getTranspilationErrorNode(error)?.loc?.start;
+          // The Bun entry point calls this handler without a plugin context
+          if (!(error instanceof Error) || !loc || typeof this.error !== 'function') {
+            throw error;
+          }
+          const pos = { line: loc.line, column: loc.column };
+          // Rollup-compatible contexts (rollup, vite, rolldown) throw here and accept a position
+          // to print a code frame for. The rest only collect the error, so the transform still
+          // has to fail, otherwise the untransformed file would end up in the bundle.
+          (this.error as (message: UnpluginMessage, position?: typeof pos) => void)(
+            { message: error.message, stack: error.stack, id, loc: { file: id, ...pos } },
+            pos,
+          );
+          throw error;
+        }
 
         if (magicString.hasChanged()) {
           return {
