@@ -79,6 +79,7 @@ import {
   sanitizePrimer,
   bannedTokens,
   builtins,
+  predeclaredTypes,
   templateEnumerants,
 } from './nameUtils.ts';
 import { minify } from './minify.ts';
@@ -512,6 +513,7 @@ export class ResolutionCtxImpl implements ResolutionCtx {
       bannedTokens.has(name) ||
       builtins.has(name) ||
       templateEnumerants.has(name) ||
+      predeclaredTypes.has(name) ||
       this.#namespaceInternal.takenGlobalIdentifiers.has(name) ||
       (scope === 'block'
         ? this._itemStateStack.isIdentifierTakenLocally(name)

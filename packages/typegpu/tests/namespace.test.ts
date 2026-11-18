@@ -49,6 +49,43 @@ describe('tgpu.namespace', () => {
     `);
   });
 
+  it('accepts names that WGSL does not reserve as struct member names', () => {
+    const Bindings = d.struct({ sampler: d.u32, uniform: d.f32, storage: d.i32 });
+
+    expect(tgpu.resolve([Bindings])).toMatchInlineSnapshot(`
+      "struct Bindings {
+        sampler: u32,
+        uniform: f32,
+        storage: i32,
+      }"
+    `);
+  });
+
+  it('does not name a declaration after a predeclared type or address space', () => {
+    const a = tgpu.privateVar(d.f32).$name('sampler');
+    const b = tgpu.privateVar(d.f32).$name('uniform');
+    const c = tgpu.privateVar(d.f32).$name('storage');
+
+    const fn = () => {
+      'use gpu';
+      const sampler = b.$;
+      a.$ = sampler + c.$;
+    };
+
+    expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+      "var<private> uniform_1: f32;
+
+      var<private> storage_1: f32;
+
+      var<private> sampler_2: f32;
+
+      fn fn_1() {
+        let sampler_1 = uniform_1;
+        sampler_2 = (sampler_1 + storage_1);
+      }"
+    `);
+  });
+
   it('defines direct dependencies only once', () => {
     const Boid = d.struct({
       pos: d.vec3f,

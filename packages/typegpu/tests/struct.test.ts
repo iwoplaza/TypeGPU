@@ -374,7 +374,7 @@ describe('struct', () => {
 
   it('throws when struct prop uses a reserved word', () => {
     expect(() => struct({ struct: f32 })).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Invalid property key 'struct': Identifiers cannot start with reserved keywords.]`,
+      `[Error: Invalid property key 'struct': Identifiers cannot be reserved keywords.]`,
     );
   });
 
