@@ -1,6 +1,5 @@
 import { mat2x2f, mat3x3f, mat4x4f } from '../../data/matrix.ts';
 import { f32, i32, u32 } from '../../data/numeric.ts';
-import { sizeOf } from '../../data/sizeOf.ts';
 import {
   vec2b,
   vec2f,
@@ -30,6 +29,7 @@ import { niceStringify } from '../../shared/stringify.ts';
 import { bitcast } from '../../std/bitcast.ts';
 import { unpack2x16float } from '../../std/packing.ts';
 import { logger } from '../../tgpuLogger.ts';
+import { serializedSlotCount } from './serializedLayout.ts';
 import type { LogMeta, LogResources } from './types.ts';
 
 const toF = (n: number | undefined) => bitcast(u32, f32)(n ?? 0);
@@ -141,7 +141,7 @@ function deserializeCompound(data: Uint32Array, dataTypes: (BaseData | string)[]
     if (!isWgslData(info)) {
       return info;
     }
-    const size = Math.ceil(sizeOf(info) / 4);
+    const size = serializedSlotCount(info);
     const value = deserialize(data.subarray(index, index + size), info);
     index += size;
     return value;
