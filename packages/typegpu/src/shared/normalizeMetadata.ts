@@ -1,4 +1,5 @@
 import type { Block, FuncParameter } from 'tinyest';
+import type { LogSupport } from '../tgsl/consoleLog/types.ts';
 import { safeStringify } from './stringify.ts';
 
 export interface RawMetadataV1 {
@@ -15,6 +16,8 @@ export interface RawMetadataV2 {
   name: string;
   ast: { params: FuncParameter[]; body: Block };
   externals: { [key: string]: () => unknown };
+  /** Only present on functions that call `console.*`, attached by newer versions of `unplugin-typegpu` */
+  consoleLog?: LogSupport | undefined;
 }
 
 /**
@@ -28,6 +31,7 @@ export type RawMetadata = RawMetadataV1 | RawMetadataV2;
 export interface Metadata {
   ast: { params: FuncParameter[]; body: Block };
   externals: () => Record<string, unknown>;
+  consoleLog?: LogSupport | undefined;
 }
 
 /**

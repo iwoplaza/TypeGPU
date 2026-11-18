@@ -14,6 +14,7 @@ import {
   functionVisitor,
   getBlockScope,
   checkOpts,
+  CONSOLE_LOG_EXPORT,
 } from './common.ts';
 
 import type { Options, UnpluginPluginState, MetadatableFunction, NodeLocation } from './common.ts';
@@ -43,12 +44,16 @@ function assignMetadata(
   path: NodePath<MetadatableFunction>,
   name: string | undefined,
   ast: TranspilationResult,
+  typegpuNamespace: string | undefined,
 ): void {
+  const consoleLog = typegpuNamespace
+    ? `,\n    consoleLog: ${typegpuNamespace}.${CONSOLE_LOG_EXPORT}`
+    : '';
   const metadata = `{
     v: ${METADATA_FORMAT_VERSION},
     name: ${name ? `"${name}"` : 'undefined'},
     ast: ${embedJSON({ params: ast.params, body: ast.body })},
-    externals: ${externalsToString(ast.externalNames)}
+    externals: ${externalsToString(ast.externalNames)}${consoleLog}
   }`;
 
   const visibility = t.isFunctionDeclaration(path.node)
@@ -95,6 +100,17 @@ function assignMetadata(
   } else {
     this.overwrite(nodeToOverride, code);
   }
+}
+
+function importTypegpuNamespace(
+  this: UnpluginPluginState,
+  program: NodePath<t.Program>,
+  name: string,
+): void {
+  // Imports are hoisted anyway, we only need to stay below directives and the hashbang
+  const pos = program.node.directives.at(-1)?.end ?? program.node.interpreter?.end ?? 0;
+  const code = `import * as ${name} from 'typegpu';`;
+  this.magicString.appendLeft(pos, pos === 0 ? `${code}\n` : `\n${code}`);
 }
 
 function wrapInAutoName(
@@ -188,6 +204,7 @@ export const unpluginFactory = ((rawOptions, _meta) => {
         initPluginState(state, {
           warn: (message) => this.warn(message),
           assignMetadata,
+          importTypegpuNamespace,
           wrapInAutoName,
           replaceWithAssignmentOverload,
           replaceWithBinaryOverload,

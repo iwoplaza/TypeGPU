@@ -10,6 +10,7 @@ import {
   functionVisitor,
   getBlockScope,
   initPluginState,
+  CONSOLE_LOG_EXPORT,
 } from './core/common.ts';
 import { createFilterForId } from './core/filter.ts';
 
@@ -43,12 +44,21 @@ function assignMetadata(
   path: NodePath<t.FunctionDeclaration | t.ArrowFunctionExpression | t.FunctionExpression>,
   name: string | undefined,
   ast: TranspilationResult,
+  typegpuNamespace: string | undefined,
 ): void {
   const metadata = t.objectExpression([
     t.objectProperty(i('v'), t.numericLiteral(METADATA_FORMAT_VERSION)),
     t.objectProperty(i('name'), t.valueToNode(name)),
     t.objectProperty(i('ast'), t.valueToNode({ params: ast.params, body: ast.body })),
     t.objectProperty(i('externals'), externalsToNode(ast.externalNames)),
+    ...(typegpuNamespace
+      ? [
+          t.objectProperty(
+            i('consoleLog'),
+            t.memberExpression(i(typegpuNamespace), i(CONSOLE_LOG_EXPORT)),
+          ),
+        ]
+      : []),
   ]);
 
   let expression: t.Expression;
@@ -126,6 +136,13 @@ function assignMetadata(
   path.skip();
 }
 
+function importTypegpuNamespace(program: NodePath<t.Program>, name: string): void {
+  program.unshiftContainer(
+    'body',
+    t.importDeclaration([t.importNamespaceSpecifier(i(name))], t.stringLiteral('typegpu')),
+  );
+}
+
 function wrapInAutoName(path: NodePath<t.Expression>, name: string): void {
   // /*#__PURE__*/(globalThis.__TYPEGPU_AUTONAME__ ?? (a => a))(<node>, '<name>')
   const callExpr = t.callExpression(
@@ -169,6 +186,7 @@ export default function TypeGPUPlugin() {
       initPluginState(this, {
         warn: (message) => console.warn(message),
         assignMetadata,
+        importTypegpuNamespace,
         wrapInAutoName,
         replaceWithAssignmentOverload,
         replaceWithBinaryOverload,

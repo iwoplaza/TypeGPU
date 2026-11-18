@@ -7,7 +7,6 @@ import {
   type TgpuBindGroup,
   type TgpuBindGroupLayout,
 } from '../../tgpuBindGroupLayout.ts';
-import { logDataFromGPU } from '../../tgsl/consoleLog/deserializers.ts';
 import type { LogResources } from '../../tgsl/consoleLog/types.ts';
 import { isBuffer } from '../../types.ts';
 import type { IndexFlag, TgpuBuffer, VertexFlag } from '../buffer/buffer.ts';
@@ -235,7 +234,7 @@ function queueLogDrain(
     return false;
   }
 
-  encoder[$internal].afterSubmit.set(logResources, () => logDataFromGPU(logResources));
+  encoder[$internal].afterSubmit.set(logResources, () => logResources.drain());
   return true;
 }
 

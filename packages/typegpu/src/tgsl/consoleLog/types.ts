@@ -1,4 +1,5 @@
 import type { TgpuMutable } from '../../core/buffer/bufferBinding.ts';
+import type { TgpuRoot } from '../../core/root/rootTypes.ts';
 import type { Snippet } from '../../data/snippet.ts';
 import type { AnyWgslData, Atomic, U32, WgslArray, WgslStruct } from '../../data/wgslTypes.ts';
 import type { ResolutionCtx } from '../../types.ts';
@@ -53,6 +54,16 @@ export interface LogResources {
   dataBuffer: TgpuMutable<WgslArray<SerializedLogCallData>>;
   options: Required<LogGeneratorOptions>;
   logIdToMeta: Map<number, LogMeta>;
+  /** Reads the logged data back from the GPU, prints it, and clears the buffers. */
+  drain(): void;
+}
+
+/**
+ * Everything needed to log from shaders. `unplugin-typegpu` attaches it to the metadata of
+ * functions that call `console.*`, so programs that never log don't bundle it.
+ */
+export interface LogSupport {
+  createGenerator(root: TgpuRoot): LogGenerator;
 }
 
 export interface LogGenerator {
