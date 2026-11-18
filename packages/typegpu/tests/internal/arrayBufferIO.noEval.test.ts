@@ -268,6 +268,30 @@ describe('arrayBufferIO', () => {
       expect(fallback).toStrictEqual(compiled);
     });
 
+    it('matches the compiled writer when endOffset falls inside an element', () => {
+      const { fallback, compiled } = writeWithBothWriters(
+        new Uint32Array(4),
+        d.arrayOf(d.u32, 4),
+        [1, 2, 3, 4],
+        { endOffset: 6 },
+      );
+
+      expect(fallback).toStrictEqual([1, 2, 0, 0]);
+      expect(fallback).toStrictEqual(compiled);
+    });
+
+    it('writes nothing when endOffset is not past startOffset', () => {
+      const { fallback, compiled } = writeWithBothWriters(
+        new Uint32Array(2).fill(10),
+        d.arrayOf(d.u32, 4),
+        [1, 2, 3, 4],
+        { startOffset: 16, endOffset: 16 },
+      );
+
+      expect(fallback).toStrictEqual([10, 10]);
+      expect(fallback).toStrictEqual(compiled);
+    });
+
     it('stops at endOffset when writing to a mapped buffer', ({ root }) => {
       const buffer = root.createBuffer(d.arrayOf(d.u32, 4), () => {
         buffer.write([1, 2, 3, 4], { endOffset: 8 });
