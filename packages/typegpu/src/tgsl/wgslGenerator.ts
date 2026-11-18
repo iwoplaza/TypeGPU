@@ -2037,10 +2037,6 @@ ${stringifyNode(statement)}`);
           }
         });
 
-        // Tests should not have duplicates.
-        // We skip this check, because WGSL errors are readable,
-        // and we cannot easily access non-comptime known constants.
-
         // Tests should not have non-trivial fallthrough
         resolvedCaseExprs
           .slice(0, matchedCaseWasNotLast ? undefined : -1)
@@ -2054,8 +2050,29 @@ ${stringifyNode(statement)}`);
           });
       }
 
+      // JS allows duplicate tests (the first match wins), WGSL does not.
+      // Since no fallthrough into a non-empty case is allowed, dropping a case does not
+      // change where the cases before it fall through to.
+      const seenTests = new Set<unknown>();
+      const uniqueCaseExprs = groupedCaseExprs.flatMap(([tests, consequent]) => {
+        const uniqueTests = tests.filter((test) => {
+          if (test === switchDefault) {
+            return true;
+          }
+          const key = asComptime(test)?.value ?? this.ctx.resolveSnippet(test).value;
+          if (seenTests.has(key)) {
+            return false;
+          }
+          seenTests.add(key);
+          return true;
+        });
+        return uniqueTests.length > 0
+          ? [[uniqueTests, consequent] as (typeof groupedCaseExprs)[number]]
+          : [];
+      });
+
       return {
-        code: this._emitSwitchStatement(discriminantExpr, groupedCaseExprs),
+        code: this._emitSwitchStatement(discriminantExpr, uniqueCaseExprs),
         definesInNearestScope: false,
       };
     }
