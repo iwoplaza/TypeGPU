@@ -203,6 +203,27 @@ describe('bitwise operators on compile-time known values', () => {
       return x ^ (0x7fffffff ^ -1);
     };
 
+    const unsigned = () => {
+      'use gpu';
+      return d.i32(d.u32(1) << 31);
+    };
+    const unsignedOperand = () => {
+      'use gpu';
+      let x = d.i32(1);
+      return x + (d.u32(2147483647) ^ d.u32(4294967295));
+    };
+
+    expect(tgpu.resolve([unsigned, unsignedOperand])).toMatchInlineSnapshot(`
+      "fn unsigned() -> i32 {
+        return i32((1u << 31u));
+      }
+
+      fn unsignedOperand() -> i32 {
+        let x = 1i;
+        return (x + i32((2147483647u ^ 4294967295u)));
+      }"
+    `);
+
     expect(tgpu.resolve([shl, xor, and, nested])).toMatchInlineSnapshot(`
       "fn shl() -> i32 {
         return (-1i << 31u);
