@@ -365,11 +365,22 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
         warnIfNotUniformAligned(this.dataType);
       }
 
-      this.flags |= usage === 'uniform' ? GPUBufferUsage.UNIFORM : 0;
-      this.flags |= usage === 'storage' ? GPUBufferUsage.STORAGE : 0;
-      this.flags |= usage === 'vertex' ? GPUBufferUsage.VERTEX : 0;
-      this.flags |= usage === 'index' ? GPUBufferUsage.INDEX : 0;
-      this.flags |= usage === 'indirect' ? GPUBufferUsage.INDIRECT : 0;
+      const flag =
+        (usage === 'uniform' ? GPUBufferUsage.UNIFORM : 0) |
+        (usage === 'storage' ? GPUBufferUsage.STORAGE : 0) |
+        (usage === 'vertex' ? GPUBufferUsage.VERTEX : 0) |
+        (usage === 'index' ? GPUBufferUsage.INDEX : 0) |
+        (usage === 'indirect' ? GPUBufferUsage.INDIRECT : 0);
+      const raw = this[$soul].raw;
+      if (raw && (raw.usage & flag) !== flag) {
+        throw new Error(
+          this.#ownBuffer
+            ? `Cannot add '${usage}' usage to ${this}, as its GPUBuffer has already been created without it. Call .$usage('${usage}') before the buffer is first used.`
+            : `Cannot use ${this} as '${usage}', as the GPUBuffer it wraps was not created with that usage.`,
+        );
+      }
+
+      this.flags |= flag;
       this.usableAsUniform = this.usableAsUniform || usage === 'uniform';
       this.usableAsStorage = this.usableAsStorage || usage === 'storage';
       this.usableAsVertex = this.usableAsVertex || usage === 'vertex';
@@ -385,6 +396,13 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
   $addFlags(flags: GPUBufferUsageFlags) {
     if (!this.#ownBuffer) {
       throw new Error('Cannot add flags to a buffer that is not managed by TypeGPU.');
+    }
+
+    const raw = this[$soul].raw;
+    if (raw && (raw.usage & flags) !== flags) {
+      throw new Error(
+        `Cannot add flags to ${this}, as its GPUBuffer has already been created without them. Call .$addFlags(...) before the buffer is first used.`,
+      );
     }
 
     if (flags & GPUBufferUsage.MAP_READ) {
