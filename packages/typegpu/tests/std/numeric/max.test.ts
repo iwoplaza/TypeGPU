@@ -125,3 +125,51 @@ describe('max', () => {
     );
   });
 });
+
+describe('max in shaders', () => {
+  it('unifies abstract literals with concrete arguments', () => {
+    const main = (x: number, v: d.v3f) => {
+      'use gpu';
+      const a = std.max(x, 0);
+      const b = std.max(v, d.vec3f(0));
+    };
+
+    expect(tgpu.resolve([tgpu.fn([d.f32, d.vec3f])(main)])).toMatchInlineSnapshot(`
+      "fn main(x: f32, v: vec3f) {
+        let a = max(x, 0f);
+        let b = max(v, vec3f());
+      }"
+    `);
+  });
+
+  it('rejects arguments that WGSL does not accept', () => {
+    expect(() =>
+      tgpu.resolve([
+        tgpu.fn([d.vec3f, d.bool])((v: d.v3f, b: boolean) => {
+          'use gpu';
+          // @ts-expect-error
+          std.max(v, 0);
+        }),
+      ]),
+    ).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:<unnamed>
+      - fn:max: Unsupported data types: vec3f, abstractInt. Supported types are: f32, f16, abstractFloat, vec2f, vec3f, vec4f, vec2h, vec3h, vec4h, i32, u32, vec2i, vec3i, vec4i, vec2u, vec3u, vec4u, abstractInt.]
+    `);
+  });
+
+  it('converts booleans to a numeric type, like other numeric functions', () => {
+    const main = (b: boolean) => {
+      'use gpu';
+      // @ts-expect-error
+      const a = std.max(b, b);
+    };
+
+    expect(tgpu.resolve([tgpu.fn([d.bool])(main)])).toMatchInlineSnapshot(`
+      "fn main(b: bool) {
+        let a = max(f32(b), f32(b));
+      }"
+    `);
+  });
+});
