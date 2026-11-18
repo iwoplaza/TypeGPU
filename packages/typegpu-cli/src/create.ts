@@ -7,7 +7,7 @@ import { scaffoldProject, prepareDirectory } from './utils/files.ts';
 import {
   getProjectName,
   isValidPackageName,
-  isValidProjectDirectory,
+  isValidProjectPath,
   getPackageName,
 } from './utils/inputs.ts';
 import { detect, resolveCommand } from 'package-manager-detector';
@@ -55,7 +55,7 @@ export async function createProject(cwd: string, options?: CreateProjectOptions)
   p.intro('Creating a new TypeGPU project.');
 
   const nonInteractive = options?.nonInteractive ?? false;
-  if (options?.projectDir !== undefined && !isValidProjectDirectory(options.projectDir)) {
+  if (options?.projectDir !== undefined && !isValidProjectPath(cwd, options.projectDir)) {
     failAndExit(`Invalid project directory: ${options.projectDir}`);
   }
 

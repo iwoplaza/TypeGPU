@@ -1,13 +1,27 @@
+import path from 'node:path';
 import * as p from '@clack/prompts';
 import { cancelExit } from './prompts.ts';
 import type { PackageJson } from './types.ts';
 import { hasDependency, typegpuPkgs, getVersionRange } from './pkg.ts';
 
-export function isValidProjectDirectory(projectDir: string) {
+function isValidProjectDirectory(projectDir: string) {
   const trimmedDir = projectDir.trim();
   return (
     projectDir.length === 0 || (trimmedDir.length > 0 && !/[<>:"\\|?*\s]|\/+$/.test(trimmedDir))
   );
+}
+
+/**
+ * Validates a project directory given as a path. Only the last segment (the one the package name
+ * is inferred from) has to follow the project name rules, parent directories can be anything.
+ */
+export function isValidProjectPath(
+  cwd: string,
+  projectDir: string,
+  pathImpl: path.PlatformPath = path,
+) {
+  const name = pathImpl.basename(pathImpl.resolve(cwd, projectDir));
+  return name.length > 0 && isValidProjectDirectory(name);
 }
 
 export function isValidPackageName(packageName: string) {
