@@ -37,7 +37,7 @@ After that, install React and `@typegpu/react` using the package manager of your
 
 ## Your first effect
 
-We first get a reference to a TypeGPU root via the [useRoot](#use-root) hook.
+We first get a reference to a TypeGPU root via the [useRoot](#useroot) hook.
 
 ```tsx twoslash
 import { useRoot } from '@typegpu/react';
@@ -49,7 +49,7 @@ function MyEffect() {
 }
 ```
 
-Then we create a [Render Pipeline](/TypeGPU/fundamentals/pipelines) that emits a red color over the whole canvas, and we memoize it.
+Then we create a [Render Pipeline](/TypeGPU/apis/pipelines) that emits a red color over the whole canvas, and we memoize it.
 
 ```tsx twoslash
 import React from 'react';
@@ -230,7 +230,7 @@ function MyEffect() {
 
 ### useRoot
 
-Returns the [TypeGPU root](/TypeGPU/fundamentals/roots) shared between all components
+Returns the [TypeGPU root](/TypeGPU/apis/roots) shared between all components
 under the nearest `<Root>` provider. (equivalent to calling `await tgpu.init()`).
 
 It's not necessary to use a `<Root>` provider; if none is found, the global root is used instead.

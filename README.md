@@ -248,11 +248,27 @@ Demos:
   functions for use in WebGPU/TypeGPU apps.
 - [packages/typegpu-noise](/packages/typegpu-noise) - A set of
   noise/pseudo-random functions for use in WebGPU/TypeGPU apps.
+- [packages/typegpu-sdf](/packages/typegpu-sdf) - A set of Signed Distance Field
+  functions for use in WebGPU/TypeGPU apps.
+- [packages/typegpu-radiance-cascades](/packages/typegpu-radiance-cascades) -
+  Radiance Cascades implementation in TypeGPU.
+- [packages/typegpu-react](/packages/typegpu-react) - Hooks and utilities for
+  integrating TypeGPU into React apps.
+- [packages/typegpu-three](/packages/typegpu-three) - Utilities for integrating
+  TypeGPU with Three.js.
+- [packages/typegpu-gl](/packages/typegpu-gl) - WebGL and GLSL utilities for
+  TypeGPU.
 
 **Tooling:**
 
 - [packages/unplugin-typegpu](/packages/unplugin-typegpu) - Plugin for your
   favorite bundler, enabling TypeGPU shader functions to be written in JS.
+- [packages/typegpu-cli](/packages/typegpu-cli) - CLI for creating a new TypeGPU
+  project or adding TypeGPU to an existing one.
+- [packages/create-typegpu](/packages/create-typegpu) - Enables
+  `npm create typegpu`, a proxy for `@typegpu/cli`.
+- [packages/eslint-plugin](/packages/eslint-plugin) - TypeGPU specific linting
+  rules for ESLint.
 - [packages/tgpu-gen](/packages/tgpu-gen) - CLI tool for automatic TypeGPU code
   generation.
 
@@ -263,7 +279,6 @@ Demos:
 - [packages/tinyest-for-wgsl](/packages/tinyest-for-wgsl) - Transforms
   JavaScript into its _tinyest_ form, to be used in generating equivalent (or
   close to) WGSL code.
-- [packages/tgpu-wgsl-parser](/packages/tgpu-wgsl-parser) - WGSL code parser.
 - [packages/tgpu-dev-cli](/packages/tgpu-dev-cli) - Development tools for
   packages in the monorepo.
 
