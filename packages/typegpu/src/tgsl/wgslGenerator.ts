@@ -30,7 +30,7 @@ import {
 } from '../shared/symbols.ts';
 import { safeStringify } from '../shared/stringify.ts';
 import { powOperator } from '../std/numeric.ts';
-import { add, div, mul, neg, sub } from '../std/operators.ts';
+import { add, div, infixOperators, mul, neg, sub } from '../std/operators.ts';
 import { eq, ne, lt, le, gt, ge, not } from '../std/boolean.ts';
 
 import {
@@ -535,12 +535,12 @@ export class WgslGenerator implements ShaderGenerator {
     if (isInfixDispatch(callee)) {
       if (!args[0]) {
         throw new WgslTypeError(
-          `An infix operator '${getName(callee.operator)}' was called without any arguments`,
+          `An infix operator '${callee.operator}' was called without any arguments`,
         );
       }
       const lhs = coerceToSnippet(callee.lhs);
       const rhs = args[0];
-      return callee.operator[$gpuCallable](this.ctx, [lhs, rhs]);
+      return infixOperators[callee.operator][$gpuCallable](this.ctx, [lhs, rhs]);
     }
 
     if (isGPUCallable(callee)) {

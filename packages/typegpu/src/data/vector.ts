@@ -1,5 +1,6 @@
 import { callableSchema } from '../core/function/createCallableSchema.ts';
 import { $internal, $repr } from '../shared/symbols.ts';
+import { assignInfixOperators } from '../tgsl/infixDispatch.ts';
 import { bool, f16, f32, i32, u32 } from './numeric.ts';
 import {
   Vec2bImpl,
@@ -17,7 +18,7 @@ import {
   Vec4hImpl,
   Vec4iImpl,
   Vec4uImpl,
-  type VecBase,
+  VecBase,
 } from './vectorImpl.ts';
 import type {
   AnyVecInstance,
@@ -253,6 +254,8 @@ export const vec4b = makeVecSchema(Vec4bImpl, bool) as Vec4b;
 // --------------
 // Implementation
 // --------------
+
+assignInfixOperators(VecBase, ['add', 'sub', 'mul', 'div', 'mod', 'bitShiftLeft', 'bitShiftRight']);
 
 export const vecTypeToConstructor = {
   vec2f,
