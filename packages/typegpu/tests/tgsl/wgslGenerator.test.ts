@@ -474,6 +474,142 @@ describe('WgslGenerator', () => {
     `);
   });
 
+  it('creates correct code for "for ... of ..." statements over an alias of an array or vector', () => {
+    const main = () => {
+      'use gpu';
+      let arr = d.arrayOf(d.f32, 4)([1, 2, 3, 4]);
+      let v = d.vec3f(5, 6, 7);
+      const arrAlias = arr;
+      const vAlias = v;
+      let acc = d.f32();
+      for (const x of arrAlias) {
+        acc += x;
+      }
+      for (const x of vAlias) {
+        acc += x;
+      }
+      return acc;
+    };
+
+    expect(main()).toBe(28);
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "fn main() -> f32 {
+        var arr = array<f32, 4>(1f, 2f, 3f, 4f);
+        var v = vec3f(5, 6, 7);
+        let arrAlias = (&arr);
+        let vAlias = (&v);
+        var acc = 0f;
+        for (var i = 0u; i < 4u; i += 1u) {
+          let x = (*arrAlias)[i];
+          acc += x;
+        }
+        for (var i = 0u; i < 3u; i += 1u) {
+          let x = (*vAlias)[i];
+          acc += x;
+        }
+        return acc;
+      }"
+    `);
+  });
+
+  it('creates correct code for "for ... of ..." statements over an alias of a struct member or a variable', () => {
+    const TestStruct = d.struct({ arr: d.arrayOf(d.f32, 4) });
+    const counts = tgpu.privateVar(d.arrayOf(d.u32, 3));
+
+    const main = () => {
+      'use gpu';
+      let testStruct = TestStruct({ arr: [1, 2, 3, 4] });
+      const arr = testStruct.arr;
+      const h = counts.$;
+      let acc = d.f32();
+      for (const x of arr) {
+        acc += x;
+      }
+      for (const x of h) {
+        acc += d.f32(x);
+      }
+      return acc;
+    };
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "struct TestStruct {
+        arr: array<f32, 4>,
+      }
+
+      var<private> counts: array<u32, 3>;
+
+      fn main() -> f32 {
+        var testStruct = TestStruct(array<f32, 4>(1f, 2f, 3f, 4f));
+        let arr = (&testStruct.arr);
+        let h = (&counts);
+        var acc = 0f;
+        for (var i = 0u; i < 4u; i += 1u) {
+          let x = (*arr)[i];
+          acc += x;
+        }
+        for (var i = 0u; i < 3u; i += 1u) {
+          let x = (*h)[i];
+          acc += f32(x);
+        }
+        return acc;
+      }"
+    `);
+  });
+
+  it('keeps the loop variable rules when iterating over an alias', () => {
+    const layout = tgpu.bindGroupLayout({
+      values: { storage: d.arrayOf(d.f32) },
+      points: { storage: d.arrayOf(d.vec2f, 3), access: 'readonly' },
+    });
+
+    const main = () => {
+      'use gpu';
+      let arr = [d.vec2f(1), d.vec2f(2)];
+      const alias = arr;
+      for (const x of alias) {
+        x.x = 3;
+      }
+      const values = layout.$.values;
+      let acc = d.f32();
+      for (const x of values) {
+        acc += x;
+      }
+    };
+
+    const mutateReadonly = () => {
+      'use gpu';
+      const points = layout.$.points;
+      for (const p of points) {
+        p.x = 1;
+      }
+    };
+
+    expect(tgpu.resolve([main])).toMatchInlineSnapshot(`
+      "@group(0) @binding(0) var<storage, read> values_1: array<f32>;
+
+      fn main() {
+        var arr = array<vec2f, 2>(vec2f(1), vec2f(2));
+        let alias_1 = (&arr);
+        for (var i = 0u; i < 2u; i += 1u) {
+          let x = (&(*alias_1)[i]);
+          (*x).x = 3f;
+        }
+        let values = (&values_1);
+        var acc = 0f;
+        for (var i = 0u; i < arrayLength(values); i += 1u) {
+          let x = (*values)[i];
+          acc += x;
+        }
+      }"
+    `);
+    expect(() => tgpu.resolve([mutateReadonly])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn*:mutateReadonly
+      - fn*:mutateReadonly(): 'p.x = 1' is invalid, because readonly buffers cannot be mutated.]
+    `);
+  });
+
   it('throws error when "for ... of ..." statement uses an ephemeral iterable', () => {
     const main = () => {
       'use gpu';
