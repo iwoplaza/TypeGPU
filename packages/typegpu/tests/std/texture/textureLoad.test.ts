@@ -222,3 +222,42 @@ describe('textureLoad', () => {
     );
   });
 });
+
+describe('textureLoad storage texture access', () => {
+  it('accepts read-write storage textures', () => {
+    const layout = tgpu.bindGroupLayout({
+      tex: { storageTexture: d.textureStorage2d('rgba32float', 'read-write') },
+    });
+
+    const testFn = tgpu.fn([], d.vec4f)(() => textureLoad(layout.$.tex, d.vec2i(0, 0)));
+
+    expect(tgpu.resolve([testFn])).toContain('return textureLoad(tex, vec2i());');
+  });
+
+  it('accepts storage textures typed with any access mode', () => {
+    const loadTexel = (tex: d.textureStorage2d<'rgba32float'>, coords: d.v2u) => {
+      'use gpu';
+      return textureLoad(tex, coords);
+    };
+
+    expect(loadTexel).toBeDefined();
+  });
+
+  it('rejects write-only storage textures', () => {
+    const layout = tgpu.bindGroupLayout({
+      tex: { storageTexture: d.textureStorage2d('rgba32float', 'write-only') },
+    });
+
+    const testFn = tgpu.fn([])(() => {
+      // @ts-expect-error: write-only storage textures cannot be loaded from
+      const _texel = textureLoad(layout.$.tex, d.vec2i(0, 0));
+    });
+
+    expect(() => tgpu.resolve([testFn])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:testFn
+      - fn:textureLoad: \`textureLoad\` requires a storage texture with 'read-only' or 'read-write' access, got 'write-only']
+    `);
+  });
+});
