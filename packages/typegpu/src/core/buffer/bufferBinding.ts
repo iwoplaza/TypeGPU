@@ -1,3 +1,4 @@
+import { containsAtomic } from '../../data/atomic.ts';
 import { schemaCallWrapper } from '../../data/schemaCallWrapper.ts';
 import { snip } from '../../data/snippet.ts';
 import type { AnyWgslData, BaseData } from '../../data/wgslTypes.ts';
@@ -211,6 +212,11 @@ export class TgpuBufferBindingImpl<
   }
 
   constructor(usage: TType, buffer: BoundBuffer<TType, TData>) {
+    if (usage !== 'mutable' && containsAtomic(buffer.dataType)) {
+      throw new Error(
+        `Cannot create a '${usage}' binding of a buffer with schema ${String(buffer.dataType)}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.`,
+      );
+    }
     this.resourceType = usage;
     this[$getNameForward] = buffer;
     this[$soul] = {

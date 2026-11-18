@@ -8,7 +8,9 @@ import {
   $validUniformSchema,
   $validVertexSchema,
 } from '../shared/symbols.ts';
-import type { Atomic, atomicI32, atomicU32, I32, U32 } from './wgslTypes.ts';
+import { isLooseDecorated } from './dataTypes.ts';
+import type { Atomic, atomicI32, atomicU32, BaseData, I32, U32 } from './wgslTypes.ts';
+import { isAtomic, isDecorated, isWgslArray, isWgslStruct } from './wgslTypes.ts';
 
 // ----------
 // Public API
@@ -25,6 +27,22 @@ import type { Atomic, atomicI32, atomicU32, I32, U32 } from './wgslTypes.ts';
  */
 export function atomic<TSchema extends U32 | I32>(data: TSchema): Atomic<TSchema> {
   return new AtomicImpl(data);
+}
+
+export function containsAtomic(schema: BaseData): boolean {
+  if (isAtomic(schema)) {
+    return true;
+  }
+  if (isWgslStruct(schema)) {
+    return Object.values(schema.propTypes).some(containsAtomic);
+  }
+  if (isWgslArray(schema)) {
+    return containsAtomic(schema.elementType);
+  }
+  if (isDecorated(schema) || isLooseDecorated(schema)) {
+    return containsAtomic(schema.inner);
+  }
+  return false;
 }
 
 // --------------
@@ -47,5 +65,9 @@ class AtomicImpl<TSchema extends U32 | I32> implements Atomic<TSchema> {
 
   constructor(inner: TSchema) {
     this.inner = inner;
+  }
+
+  toString(): string {
+    return `atomic<${String(this.inner)}>`;
   }
 }
