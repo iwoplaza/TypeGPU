@@ -13,7 +13,9 @@ For a complete list of feature names, consult the [WebGPU specification](https:/
 
 When initializing TypeGPU, include `requiredFeatures` and/or `optionalFeatures` in the `device` descriptor:
 
-```ts
+```ts twoslash
+import { tgpu } from 'typegpu';
+// ---cut---
 const root = await tgpu.init({
   adapter: {
     powerPreference: 'high-performance',
@@ -22,7 +24,7 @@ const root = await tgpu.init({
     // These features must be supported or initialization will fail
     requiredFeatures: [
       'timestamp-query',
-      'subgroup-operations',
+      'subgroups',
     ],
     // These features will be enabled if available; missing ones are ignored
     optionalFeatures: [
@@ -43,11 +45,14 @@ const root = await tgpu.init({
 
 After `tgpu.init()` resolves, you can check which features are enabled using the `enabledFeatures` property on the root object:
 
-```ts
+```ts twoslash
+import { tgpu } from 'typegpu';
+const root = await tgpu.init();
+// ---cut---
 if (root.enabledFeatures.has('timestamp-query')) {
   console.log('Timestamp queries are available');
 }
-if (root.enabledFeatures.has('subgroup-operations')) {
+if (root.enabledFeatures.has('subgroups')) {
   console.log('Subgroup operations are enabled');
 }
 ```
