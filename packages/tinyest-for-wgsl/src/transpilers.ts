@@ -292,23 +292,7 @@ const acornSpecificTranspilers = {
       return transpileAcornProperty(ctx, prop, transpile);
     });
 
-    if (objectProperties.some((prop) => /* computed */ prop[2])) {
-      return [NODE.objectExpr, objectProperties] as tinyest.ObjectExpression;
-    }
-
-    const obj: Record<string, tinyest.Expression> = {};
-    const seenKeys = new Set<string>();
-
-    for (const prop of objectProperties) {
-      const key = prop[0] as string;
-      if (seenKeys.has(key)) {
-        throw new Error(`Duplicate object property key: '${key}'.`);
-      }
-      seenKeys.add(key);
-      obj[key] = /* value */ prop[1];
-    }
-
-    return [NODE.objectExpr, obj] as tinyest.ObjectExpression;
+    return buildObjectExpression(objectProperties);
   },
 } satisfies Transpilers<acorn.AnyNode>;
 
@@ -394,23 +378,7 @@ const babelSpecificTranspilers = {
       return transpileBabelObjectProperty(ctx, prop, transpile);
     });
 
-    if (objectProperties.some((prop) => /* computed */ prop[2])) {
-      return [NODE.objectExpr, objectProperties] as tinyest.ObjectExpression;
-    }
-
-    const obj: Record<string, tinyest.Expression> = {};
-    const seenKeys = new Set<string>();
-
-    for (const prop of objectProperties) {
-      const key = prop[0] as string;
-      if (seenKeys.has(key)) {
-        throw new Error(`Duplicate object property key: '${key}'.`);
-      }
-      seenKeys.add(key);
-      obj[key] = /* value */ prop[1];
-    }
-
-    return [NODE.objectExpr, obj] as tinyest.ObjectExpression;
+    return buildObjectExpression(objectProperties);
   },
 
   TSAsExpression: tsFallthrough,
@@ -428,4 +396,26 @@ function extractId(ident: tinyest.Identifier): string {
     return ident;
   }
   return ident[1];
+}
+
+export function buildObjectExpression(
+  objectProperties: tinyest.ObjectProperty[],
+): tinyest.ObjectExpression {
+  if (objectProperties.some((prop) => /* computed */ prop[2])) {
+    return [NODE.objectExpr, objectProperties];
+  }
+
+  const obj: Record<string, tinyest.Expression> = {};
+  const seenKeys = new Set<string>();
+
+  for (const prop of objectProperties) {
+    const key = prop[0] as string;
+    if (seenKeys.has(key)) {
+      throw new Error(`Duplicate object property key: '${key}'.`);
+    }
+    seenKeys.add(key);
+    obj[key] = /* value */ prop[1];
+  }
+
+  return [NODE.objectExpr, obj];
 }
