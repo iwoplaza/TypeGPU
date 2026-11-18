@@ -612,82 +612,41 @@ export class TgpuBindGroupImpl<
           }
 
           if ('texture' in entry) {
-            let resource: GPUTextureView;
-            if (isTexture(value)) {
-              if (!isUsableAsSampled(value)) {
-                throw new NotSampledError(value);
-              }
-
-              resource = unwrapper.unwrap(
-                (value as TgpuTexture & SampledFlag).createView(entry.texture),
-              );
-            } else if (isTextureView(value)) {
-              resource = unwrapper.unwrap(value);
-            } else {
-              resource = value as GPUTextureView;
-            }
-
             return {
               binding: idx,
-              resource,
+              resource: unwrapTextureLike(unwrapper, value, 'sampled', (texture) =>
+                (texture as TgpuTexture & SampledFlag).createView(entry.texture),
+              ),
             };
           }
 
           if ('storageTexture' in entry) {
-            let resource: GPUTextureView;
-            if (isTexture(value)) {
-              if (!isUsableAsStorage(value)) {
-                throw new NotStorageError(value);
-              }
-
-              resource = unwrapper.unwrap(
-                (value as TgpuTexture & StorageFlag).createView(entry.storageTexture),
-              );
-            } else if (isTextureView(value)) {
-              resource = unwrapper.unwrap(value);
-            } else {
-              resource = value as GPUTextureView;
-            }
-
             return {
               binding: idx,
-              resource,
+              resource: unwrapTextureLike(unwrapper, value, 'storage', (texture) =>
+                (texture as TgpuTexture & StorageFlag).createView(entry.storageTexture),
+              ),
             };
           }
 
           if ('sampler' in entry) {
-            if (isComparisonSampler(value) || isSampler(value)) {
-              return {
-                binding: idx,
-                resource: unwrapper.unwrap(value as TgpuSampler),
-              };
-            }
-
             return {
               binding: idx,
-              resource: value as GPUSampler,
+              resource:
+                isComparisonSampler(value) || isSampler(value)
+                  ? unwrapper.unwrap(value as TgpuSampler)
+                  : (value as GPUSampler),
             };
           }
 
           if ('externalTexture' in entry) {
-            let resource: GPUExternalTexture | GPUTextureView | GPUTexture;
-            if (isTexture(value)) {
-              if (!isUsableAsSampled(value)) {
-                throw new NotSampledError(value);
-              }
-
-              resource = unwrapper.unwrap(
-                (value as TgpuTexture & SampledFlag).createView(texture2d(), { mipLevelCount: 1 }),
-              );
-            } else if (isTextureView(value)) {
-              resource = unwrapper.unwrap(value);
-            } else {
-              resource = value as GPUExternalTexture | GPUTextureView | GPUTexture;
-            }
-
             return {
               binding: idx,
-              resource,
+              resource: unwrapTextureLike(unwrapper, value, 'sampled', (texture) =>
+                (texture as TgpuTexture & SampledFlag).createView(texture2d(), {
+                  mipLevelCount: 1,
+                }),
+              ),
             };
           }
 
@@ -698,4 +657,25 @@ export class TgpuBindGroupImpl<
 
     return unwrapped;
   }
+}
+
+function unwrapTextureLike(
+  unwrapper: Unwrapper,
+  value: unknown,
+  usage: 'sampled' | 'storage',
+  createView: (texture: TgpuTexture) => TgpuTextureView,
+): GPUExternalTexture | GPUTextureView | GPUTexture {
+  if (isTexture(value)) {
+    if (usage === 'sampled' && !isUsableAsSampled(value)) {
+      throw new NotSampledError(value);
+    }
+    if (usage === 'storage' && !isUsableAsStorage(value)) {
+      throw new NotStorageError(value);
+    }
+    return unwrapper.unwrap(createView(value));
+  }
+  if (isTextureView(value)) {
+    return unwrapper.unwrap(value);
+  }
+  return value as GPUExternalTexture | GPUTextureView | GPUTexture;
 }
