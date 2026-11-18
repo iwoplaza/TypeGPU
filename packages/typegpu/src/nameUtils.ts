@@ -173,10 +173,6 @@ export const bannedTokens = new Set([
   'with',
   'writeonly',
   'yield',
-  // Keywords that should be reserved
-  'sampler',
-  'uniform',
-  'storage',
 ]);
 
 /**
@@ -239,6 +235,12 @@ export const templateEnumerants = new Set([
   'rgb10a2uint',
   'rg11b10ufloat',
 ]);
+
+/**
+ * Predeclared types that are not covered by `builtins`. A module-scope or local declaration with one
+ * of these names would shadow the type. Like `templateEnumerants`, they remain valid as struct member names.
+ */
+export const predeclaredTypes = new Set(['sampler']);
 
 export const builtins = new Set([
   // constructors
