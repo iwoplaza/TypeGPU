@@ -184,6 +184,10 @@ function operatorToType<
   return lhs;
 }
 
+function isPlainValueType(type: wgsl.BaseData | UnknownData): boolean {
+  return wgsl.isNumericSchema(type) || wgsl.isBool(type) || wgsl.isVec(type) || wgsl.isMat(type);
+}
+
 const unaryOpCodeToCodegen = {
   '-': neg[$gpuCallable].bind(neg),
   void: () => snip(undefined, wgsl.Void, 'constant', false),
@@ -803,10 +807,23 @@ export class WgslGenerator implements ShaderGenerator {
         convLhs = lhsExpr;
       } else {
         const forcedType = exprType === NODE.assignmentExpr ? [lhsExpr.dataType] : undefined;
-        [convLhs, convRhs] = convertToCommonType(this.ctx, [lhsExpr, rhsExpr], forcedType) ?? [
-          lhsExpr,
-          rhsExpr,
-        ];
+        const converted = convertToCommonType<[Snippet, Snippet]>(
+          this.ctx,
+          [lhsExpr, rhsExpr],
+          forcedType,
+        );
+        if (
+          !converted &&
+          op === '=' &&
+          !(lhsExpr.value instanceof Swizzle) &&
+          isPlainValueType(lhsExpr.dataType) &&
+          isPlainValueType(rhsExpr.dataType)
+        ) {
+          throw new WgslTypeError(
+            `Cannot assign '${stringifySnippet(rhsExpr)}' of type '${String(rhsExpr.dataType)}' to '${stringifySnippet(lhsExpr)}' of type '${String(lhsExpr.dataType)}'`,
+          );
+        }
+        [convLhs, convRhs] = converted ?? [lhsExpr, rhsExpr];
       }
 
       const type = operatorToType(convLhs.dataType, op, convRhs.dataType);
