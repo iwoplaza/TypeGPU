@@ -554,6 +554,32 @@ describe('TgpuCommandEncoder', () => {
     );
   });
 
+  it('submits the command buffer of its own raw encoder', ({ root, device }) => {
+    const first = root.createCommandEncoder();
+    const second = root.createCommandEncoder();
+    const firstRaw = root.unwrap(first);
+    const secondRaw = root.unwrap(second);
+
+    expect(firstRaw).not.toBe(secondRaw);
+
+    second.submit();
+    first.submit();
+
+    const finish = firstRaw.finish as Mock;
+    expect(finish.mock.contexts[0]).toBe(secondRaw);
+    expect(finish.mock.contexts[1]).toBe(firstRaw);
+
+    const [secondBuffer, firstBuffer] = finish.mock.results.map((result) => result.value);
+    expect(secondBuffer).toBeDefined();
+    expect(secondBuffer).not.toBe(firstBuffer);
+
+    const submitted = device.mock.queue.submit.mock.calls.map(
+      (call) => (call as unknown as [GPUCommandBuffer[]])[0],
+    );
+    expect(submitted[0]?.[0]).toBe(secondBuffer);
+    expect(submitted[1]?.[0]).toBe(firstBuffer);
+  });
+
   describe('pass descriptor', () => {
     it('reuses default views for texture attachments across passes', ({ root, commandEncoder }) => {
       const colorTexture = root
