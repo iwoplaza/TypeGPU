@@ -1104,3 +1104,71 @@ describe('TgpuBindGroup', () => {
     });
   });
 });
+
+describe('TgpuBindGroup with texture-like entries', () => {
+  it('rejects a texture without the sampled usage in a texture entry', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({ foo: { texture: d.texture2d(d.f32) } });
+    const texture = root
+      .createTexture({ size: [32, 32], format: 'rgba8unorm' })
+      .$usage('storage')
+      .$name('myTexture');
+
+    // @ts-expect-error: missing the sampled usage
+    const bindGroup = root.createBindGroup(layout, { foo: texture });
+
+    expect(() => root.unwrap(bindGroup)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Resource 'myTexture' cannot be bound as 'sampled'. Use .$usage('sampled') to allow it.]`,
+    );
+  });
+
+  it('rejects a texture without the storage usage in a storage texture entry', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({
+      foo: { storageTexture: d.textureStorage2d('rgba8unorm', 'write-only') },
+    });
+    const texture = root
+      .createTexture({ size: [32, 32], format: 'rgba8unorm' })
+      .$usage('sampled')
+      .$name('myTexture');
+
+    // @ts-expect-error: missing the storage usage
+    const bindGroup = root.createBindGroup(layout, { foo: texture });
+
+    expect(() => root.unwrap(bindGroup)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Resource 'myTexture' cannot be bound as 'storage'. Use .$usage('storage') to allow it.]`,
+    );
+  });
+
+  it('rejects a texture without the sampled usage in an external texture entry', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({ foo: { externalTexture: d.textureExternal() } });
+    const texture = root
+      .createTexture({ size: [32, 32], format: 'rgba8unorm' })
+      .$usage('storage')
+      .$name('myTexture');
+
+    // @ts-expect-error: missing the sampled usage
+    const bindGroup = root.createBindGroup(layout, { foo: texture });
+
+    expect(() => root.unwrap(bindGroup)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Resource 'myTexture' cannot be bound as 'sampled'. Use .$usage('sampled') to allow it.]`,
+    );
+  });
+
+  it('binds a single-mip 2d view of a typed texture in an external texture entry', ({ root }) => {
+    const layout = tgpu.bindGroupLayout({ foo: { externalTexture: d.textureExternal() } });
+    const texture = root
+      .createTexture({ size: [32, 32], format: 'rgba8unorm', mipLevelCount: 4 })
+      .$usage('sampled');
+
+    const bindGroup = root.createBindGroup(layout, { foo: texture });
+    root.unwrap(bindGroup);
+
+    expect(root.unwrap(texture).createView).toHaveBeenCalledWith(
+      expect.objectContaining({ dimension: '2d', mipLevelCount: 1 }),
+    );
+    expect(root.device.createBindGroup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entries: [{ binding: 0, resource: expect.anything() }],
+      }),
+    );
+  });
+});
