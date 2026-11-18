@@ -1168,7 +1168,7 @@ describe('WgslGenerator', () => {
       `[Error: Invalid property key '__': Identifiers cannot start with double underscores.]`,
     );
     expect(() => tgpu.resolve([d.struct({ struct: d.u32 })])).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Invalid property key 'struct': Identifiers cannot start with reserved keywords.]`,
+      `[Error: Invalid property key 'struct': Identifiers cannot be reserved keywords.]`,
     );
   });
 

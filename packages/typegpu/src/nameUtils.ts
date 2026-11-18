@@ -505,7 +505,7 @@ export function validateProp(ident: string): ValidationResult {
   if (bannedTokens.has(ident)) {
     return {
       success: false,
-      error: `Identifiers cannot start with reserved keywords.`,
+      error: `Identifiers cannot be reserved keywords.`,
     };
   }
   return {

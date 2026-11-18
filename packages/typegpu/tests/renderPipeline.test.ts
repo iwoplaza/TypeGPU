@@ -1180,7 +1180,7 @@ describe('root.createRenderPipeline', () => {
       - <root>
       - renderPipeline:pipeline
       - renderPipelineCore
-      - autoVertexFn: Invalid property key 'loop': Identifiers cannot start with reserved keywords.]
+      - autoVertexFn: Invalid property key 'loop': Identifiers cannot be reserved keywords.]
     `);
   });
 
