@@ -45,6 +45,9 @@ describe('mock GPUDevice buffer validation', () => {
     it('rejects mappedAtCreation with a size that is not a multiple of 4', ({ device }) => {
       expect(() =>
         device.createBuffer({ size: 6, usage: GPUBufferUsage.STORAGE, mappedAtCreation: true }),
+      ).toThrow(RangeError);
+      expect(() =>
+        device.createBuffer({ size: 6, usage: GPUBufferUsage.STORAGE, mappedAtCreation: true }),
       ).toThrow(/mappedAtCreation requires size \(6\) to be a multiple of 4/);
     });
   });
@@ -176,6 +179,40 @@ describe('mock GPUDevice buffer validation', () => {
 
       buffer.unmap();
       expect(() => buffer.getMappedRange()).toThrow(/buffer is not mapped/);
+    });
+
+    it('defaults the size to the rest of the buffer, not the rest of the mapping', async ({
+      device,
+    }) => {
+      const buffer = device.createBuffer({
+        size: 16,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      });
+
+      await buffer.mapAsync(GPUMapMode.READ, 0, 8);
+      expect(() => buffer.getMappedRange()).toThrow(/outside the mapped range/);
+
+      buffer.unmap();
+      await buffer.mapAsync(GPUMapMode.READ);
+      expect(buffer.getMappedRange().byteLength).toBe(16);
+    });
+
+    it('rejects ranges that overlap a range that was already returned', async ({ device }) => {
+      const buffer = device.createBuffer({
+        size: 16,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+      });
+
+      await buffer.mapAsync(GPUMapMode.READ);
+      expect(() => buffer.getMappedRange(0, 8)).not.toThrow();
+      expect(() => buffer.getMappedRange(0, 8)).toThrow(/overlaps/);
+      expect(() => buffer.getMappedRange(0, 4)).toThrow(/overlaps/);
+      expect(() => buffer.getMappedRange(8)).not.toThrow();
+      expect(() => buffer.getMappedRange()).toThrow(/overlaps/);
+
+      buffer.unmap();
+      await buffer.mapAsync(GPUMapMode.READ);
+      expect(() => buffer.getMappedRange()).not.toThrow();
     });
   });
 });

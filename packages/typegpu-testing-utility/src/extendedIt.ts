@@ -39,6 +39,8 @@ interface MockBufferState {
   destroyed: boolean;
   /** The [start, end) byte range of the current mapping, if there is one */
   mappedRange: [number, number] | undefined;
+  /** The [start, end) byte ranges already returned by `getMappedRange` for the current mapping */
+  views: [number, number][];
 }
 
 /** Bookkeeping kept off the mock buffers, so that it doesn't show up in snapshots */
@@ -49,8 +51,8 @@ function validateBufferDescriptor({ size, usage, mappedAtCreation, label }: GPUB
 
   // https://gpuweb.github.io/gpuweb/#dom-gpudevice-createbuffer
   if (mappedAtCreation && size % 4 !== 0) {
-    throw new MockValidationError(
-      `${name}: mappedAtCreation requires size (${size}) to be a multiple of 4`,
+    throw new RangeError(
+      `[typegpu-testing-utility mock] ${name}: mappedAtCreation requires size (${size}) to be a multiple of 4`,
     );
   }
   if (usage === 0) {
@@ -245,6 +247,7 @@ function createDeviceMock(
       const state: MockBufferState = {
         destroyed: false,
         mappedRange: mappedAtCreation ? [0, size] : undefined,
+        views: [],
       };
       const name = label ?? '';
 
@@ -258,7 +261,7 @@ function createDeviceMock(
           if (!state.mappedRange) {
             throw new MockValidationError(`getMappedRange(${name}): buffer is not mapped`);
           }
-          const end = offset + (rangeSize ?? Math.max(0, state.mappedRange[1] - offset));
+          const end = offset + (rangeSize ?? Math.max(0, size - offset));
           if (offset % 8 !== 0 || (end - offset) % 4 !== 0) {
             throw new MockValidationError(
               `getMappedRange(${name}): offset (${offset}) must be a multiple of 8 and size (${end - offset}) a multiple of 4`,
@@ -269,10 +272,20 @@ function createDeviceMock(
               `getMappedRange(${name}): range [${offset}, ${end}) is outside the mapped range [${state.mappedRange[0]}, ${state.mappedRange[1]})`,
             );
           }
+          const overlapping = state.views.find(
+            ([start, viewEnd]) => offset < viewEnd && start < end,
+          );
+          if (overlapping) {
+            throw new MockValidationError(
+              `getMappedRange(${name}): range [${offset}, ${end}) overlaps an already returned range [${overlapping[0]}, ${overlapping[1]})`,
+            );
+          }
+          state.views.push([offset, end]);
           return new ArrayBuffer(size);
         }),
         unmap: vi.fn(() => {
           state.mappedRange = undefined;
+          state.views = [];
           mockBuffer.mapState = 'unmapped';
         }),
         // https://gpuweb.github.io/gpuweb/#dom-gpubuffer-mapasync
@@ -313,6 +326,7 @@ function createDeviceMock(
         destroy: vi.fn(() => {
           state.destroyed = true;
           state.mappedRange = undefined;
+          state.views = [];
           mockBuffer.mapState = 'unmapped';
         }),
       };
