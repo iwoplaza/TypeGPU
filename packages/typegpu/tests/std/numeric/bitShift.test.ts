@@ -31,7 +31,7 @@ describe('bit shift', () => {
       "fn f() -> i32 {
         const shift = 4f;
         const x = 256i;
-        return ((x << u32(shift)) | (x >> u32(shift)));
+        return ((x << (u32(shift) & 31u)) | (x >> (u32(shift) & 31u)));
       }"
     `);
   });
@@ -565,12 +565,75 @@ describe('constant shift amounts', () => {
     `);
   });
 
+  it('masks amounts held in WGSL constants in the shader', () => {
+    const SHIFT = tgpu.const(u32, 33);
+    const SHIFTS = tgpu.const(vec3u, vec3u(1, 33, 2));
+
+    const f = () => {
+      'use gpu';
+      let x = i32(3);
+      const s = u32(33);
+      const t = 34;
+      const a = x << s;
+      const b = x >> t;
+      const c = x << SHIFT.$;
+      x <<= s;
+      return a + b + c + x;
+    };
+    const g = () => {
+      'use gpu';
+      let x = vec3i(1, 2, 3);
+      // @ts-ignore
+      return x << SHIFTS.$;
+    };
+
+    expect(f()).toBe(6 + 0 + 6 + 6);
+    expect(tgpu.resolve([f, g])).toMatchInlineSnapshot(`
+      "const SHIFT: u32 = 33u;
+
+      fn f() -> i32 {
+        var x = 3i;
+        const s = 33u;
+        const t = 34;
+        let a = (x << (s & 31u));
+        let b = (x >> (u32(t) & 31u));
+        let c = (x << (SHIFT & 31u));
+        x <<= (s & 31u);
+        return (((a + b) + c) + x);
+      }
+
+      const SHIFTS: vec3u = vec3u(1, 33, 2);
+
+      fn g() -> vec3i {
+        let x = vec3i(1, 2, 3);
+        return (x << (SHIFTS & vec3u(31)));
+      }"
+    `);
+  });
+
   it('keeps runtime amounts as they are', () => {
     const f = tgpu.fn([i32, u32], i32)((x, amount) => x << amount);
+    const privateAmount = tgpu.privateVar(u32, 33);
+    const g = () => {
+      'use gpu';
+      let x = i32(3);
+      let s = u32(33);
+      const t = s;
+      return (x << s) + (x << t) + (x << privateAmount.$);
+    };
 
-    expect(tgpu.resolve([f])).toMatchInlineSnapshot(`
+    expect(tgpu.resolve([f, g])).toMatchInlineSnapshot(`
       "fn f(x: i32, amount: u32) -> i32 {
         return (x << amount);
+      }
+
+      var<private> privateAmount: u32 = 33u;
+
+      fn g() -> i32 {
+        let x = 3i;
+        let s = 33u;
+        let t = s;
+        return (((x << s) + (x << t)) + (x << privateAmount));
       }"
     `);
   });

@@ -325,6 +325,8 @@ export class WgslGenerator implements ShaderGenerator {
   // used to detect `continue` and `break` nodes in loop body, as well as label
   // unrolled blocks with comments
   #unrollingChain: number[] = [];
+  // local definitions emitted as WGSL `const`, their values are not known to us
+  #localConstants = new WeakSet<Snippet>();
 
   // prototype properties
   declare languageKey: string;
@@ -886,6 +888,17 @@ export class WgslGenerator implements ShaderGenerator {
             masked,
             rhsTarget,
             /* origin */ 'constant',
+            /* possibleSideEffects */ false,
+          );
+        } else if (
+          rhsExpr.origin === 'constant-immutable-def' ||
+          this.#localConstants.has(rhsExpr)
+        ) {
+          const mask = wgsl.isVec(rhsTarget) ? `${rhsTarget.type}(31)` : '31u';
+          convRhs = snip(
+            stitch`(${convRhs} & ${mask})`,
+            rhsTarget,
+            /* origin */ 'runtime',
             /* possibleSideEffects */ false,
           );
         }
@@ -1695,6 +1708,9 @@ Try 'return ${typeStr}(${str});' instead.
       false,
     );
     this.ctx.defineVariable(rawId, snippet);
+    if (varType === 'const') {
+      this.#localConstants.add(snippet);
+    }
 
     const rhsSnippet = tryConvertSnippet(this.ctx, eq, definitionDataType, false);
     const rhsStr = this.ctx.resolveSnippet(rhsSnippet).value;
