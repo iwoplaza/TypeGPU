@@ -364,15 +364,17 @@ const convSites = [
 const scalarTypes = new Set(['f32', 'f16', 'i32', 'u32', 'bool']);
 
 const numericScalars = new Set(['f32', 'f16', 'i32', 'u32']);
+// `S` and `S2` have the same fields
+const structTypes = new Set(['S', 'S2']);
 
 /**
  * Whether TypeGPU is expected to turn a value of type `st` into `tt` at `site`, so that the
  * program is valid:
  * - the same type always converts;
  * - implicitly (arguments, return values, struct fields, array elements, assignments), abstract
- *   values convert to any numeric scalar they fit in (so not `-4` to `u32`), and concrete
- *   scalars, `bool` included, are cast to each other; vectors, matrices, structs and arrays
- *   only convert to their own type;
+ *   values convert to any numeric scalar (`-4` wraps to `4294967292u`), concrete scalars,
+ *   `bool` included, are cast to each other, and a struct converts to another struct with the
+ *   same fields; vectors, matrices and arrays only convert to their own type;
  * - an explicit constructor call `T(x)` (`ctorCall`, and `argShellless`, whose callee calls
  *   `T(x)`) also converts a vector to a vector of the same size, and a matrix to a matrix of the
  *   same size;
@@ -386,8 +388,7 @@ export function conversionExpected({ tt, st, site }: Record<string, string>): bo
   }
   const scalarConverts =
     (scalarTypes.has(source) && scalarTypes.has(target)) ||
-    ((source === 'abstractNeg' ? ['f32', 'f16', 'i32'] : [...numericScalars]).includes(target) &&
-      source.startsWith('abstract'));
+    (numericScalars.has(target) && source.startsWith('abstract'));
   if (site === 'ctorArgs') {
     const component = { f: 'f32', h: 'f16', i: 'i32', u: 'u32', b: 'bool' }[
       target.at(-1) as string
@@ -403,7 +404,7 @@ export function conversionExpected({ tt, st, site }: Record<string, string>): bo
       (mat(target) !== undefined && mat(target) === mat(source))
     );
   }
-  return scalarConverts;
+  return scalarConverts || (structTypes.has(source) && structTypes.has(target));
 }
 
 export function generateConversion(rng: Rng): Program | null {
