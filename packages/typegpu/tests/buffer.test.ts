@@ -112,6 +112,15 @@ describe('TgpuBuffer', () => {
     expect(rawBuffer.label).toBe('myBuffer');
   });
 
+  it('updates the label of an already created buffer when renamed', ({ root }) => {
+    const buffer = root.createBuffer(d.u32);
+
+    const rawBuffer = root.unwrap(buffer);
+    buffer.$name('myBuffer');
+
+    expect(rawBuffer.label).toBe('myBuffer');
+  });
+
   it('should properly clear a buffer', ({ root, commandEncoder }) => {
     const buffer = root.createBuffer(d.u32);
 
