@@ -87,10 +87,28 @@ function createCommandEncoderMock(
     copyTextureToBuffer: vi.fn(),
     copyTextureToTexture: vi.fn(),
     resolveQuerySet: vi.fn(),
-    finish: vi.fn(),
+    finish: vi.fn(
+      (descriptor?: GPUCommandBufferDescriptor) =>
+        ({ __brand: 'GPUCommandBuffer', label: descriptor?.label ?? '' }) as GPUCommandBuffer,
+    ),
   };
 
   return mockCommandEncoder as unknown as GPUCommandEncoder & { mock: typeof mockCommandEncoder };
+}
+
+/**
+ * Creates another command encoder that shares spies with `commandEncoder`, so assertions
+ * on the fixture cover every encoder, while `mock.contexts` and identity tell them apart.
+ */
+function forkCommandEncoderMock(commandEncoder: MockCommandEncoder): MockCommandEncoder {
+  const fork: MockCommandEncoder['mock'] = {
+    ...commandEncoder.mock,
+    get mock() {
+      return fork;
+    },
+  };
+
+  return fork as unknown as MockCommandEncoder;
 }
 
 export type MockCommandEncoder = ReturnType<typeof createCommandEncoderMock>;
@@ -122,6 +140,8 @@ function createDeviceMock(
   commandEncoder: MockCommandEncoder,
   renderBundleEncoder: MockRenderBundleEncoder,
 ) {
+  let handedOutFixtureEncoder = false;
+
   const mockDevice = {
     get mock() {
       return mockDevice;
@@ -150,7 +170,11 @@ function createDeviceMock(
       return mockBuffer;
     }),
     createCommandEncoder: vi.fn(function () {
-      return commandEncoder;
+      if (!handedOutFixtureEncoder) {
+        handedOutFixtureEncoder = true;
+        return commandEncoder;
+      }
+      return forkCommandEncoderMock(commandEncoder);
     }),
     createComputePipeline: vi.fn((descriptor: GPUComputePipelineDescriptor) => ({
       label: descriptor.label ?? '',
@@ -184,10 +208,44 @@ function createDeviceMock(
       writeBuffer: vi.fn(),
       writeTexture: vi.fn(),
     },
+    // Defaults from https://gpuweb.github.io/gpuweb/#limits
     limits: {
-      maxUniformBuffersPerShaderStage: 12,
+      maxTextureDimension1D: 8192,
+      maxTextureDimension2D: 8192,
+      maxTextureDimension3D: 2048,
+      maxTextureArrayLayers: 256,
+      maxBindGroups: 4,
+      maxBindGroupsPlusVertexBuffers: 24,
+      maxImmediateSize: 64,
+      maxBindingsPerBindGroup: 1000,
+      maxDynamicUniformBuffersPerPipelineLayout: 8,
+      maxDynamicStorageBuffersPerPipelineLayout: 4,
+      maxSampledTexturesPerShaderStage: 16,
+      maxSamplersPerShaderStage: 16,
       maxStorageBuffersPerShaderStage: 8,
+      maxStorageBuffersInVertexStage: 8,
+      maxStorageBuffersInFragmentStage: 8,
+      maxStorageTexturesPerShaderStage: 4,
+      maxStorageTexturesInVertexStage: 4,
+      maxStorageTexturesInFragmentStage: 4,
+      maxUniformBuffersPerShaderStage: 12,
+      maxUniformBufferBindingSize: 65536,
+      maxStorageBufferBindingSize: 128 * 1024 * 1024,
+      minUniformBufferOffsetAlignment: 256,
+      minStorageBufferOffsetAlignment: 256,
+      maxVertexBuffers: 8,
+      maxBufferSize: 256 * 1024 * 1024,
+      maxVertexAttributes: 16,
+      maxVertexBufferArrayStride: 2048,
+      maxInterStageShaderVariables: 16,
+      maxColorAttachments: 8,
+      maxColorAttachmentBytesPerSample: 32,
       maxComputeWorkgroupStorageSize: 16384,
+      maxComputeInvocationsPerWorkgroup: 256,
+      maxComputeWorkgroupSizeX: 256,
+      maxComputeWorkgroupSizeY: 256,
+      maxComputeWorkgroupSizeZ: 64,
+      maxComputeWorkgroupsPerDimension: 65535,
     },
     destroy: vi.fn(),
   };
