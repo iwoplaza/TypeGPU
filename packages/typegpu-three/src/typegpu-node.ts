@@ -602,6 +602,12 @@ export const fromTSL = tgpu.comptime(((
   node: THREE.TSL.NodeObject<THREE.Node> | THREE.Texture,
   type: d.AnyWgslData | ((length: number) => d.AnyWgslData),
 ) => {
+  if (!node) {
+    throw new Error(
+      `fromTSL() expected a TSL node or a three.js texture, got '${String(node)}'. If this happened while importing '@typegpu/three', the installed version of three.js is missing a node it relies on (three.js r180 or newer is required).`,
+    );
+  }
+
   const tgpuType = d.isData(type) ? type : type(0);
   const tslNode = (node as THREE.Texture).isTexture
     ? TSL.texture(node as THREE.Texture)
