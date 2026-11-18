@@ -16,7 +16,7 @@ describe('as type', () => {
       "const hello = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a: number, b: number | undefined) => {
         'use gpu';
 
-        return (globalThis.__tsover_add ?? ((a, b) => a + b))(a, b as number);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b as number);
       }, {
         v: 2,
         name: "hello",

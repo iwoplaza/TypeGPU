@@ -56,4 +56,39 @@ describe.each([
     }
     expect(f(2, 3)).toBe('mod(div(sub(add(mul(2, 3), 2), 1), 2), 3)');
   });
+
+  it('go through the tsover-runtime functions installed after the native fallback was used', async () => {
+    const f = evaluate(await transform(code));
+    expect(f(2, 3)).toBe(0.5);
+    for (const name of runtimeFns) {
+      globals[name] = (a: unknown, b: unknown) => `${name.slice('__tsover_'.length)}(${a}, ${b})`;
+    }
+    expect(f(2, 3)).toBe('mod(div(sub(add(mul(2, 3), 2), 1), 2), 3)');
+  });
+
+  it('evaluate each operand once and in order', async () => {
+    const f = evaluate(
+      await transform(`\
+        ctx.f = (next) => {
+          'use gpu';
+          let r = next() * next() - next();
+          r += next();
+          return r;
+        };
+      `),
+    );
+    const calls: number[] = [];
+    let counter = 0;
+    const next = () => {
+      calls.push(++counter);
+      return counter;
+    };
+    expect(f(next, undefined)).toBe(1 * 2 - 3 + 4);
+    expect(calls).toStrictEqual([1, 2, 3, 4]);
+  });
+
+  it('leave already transformed code as is', async () => {
+    const once = await transform(code);
+    expect(await transform(once ?? '')).toBe(once);
+  });
 });

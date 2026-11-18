@@ -77,8 +77,8 @@ async () => {
 	};
 	const increment = (/*#__PURE__*/(globalThis.__TYPEGPU_AUTONAME__ ?? (a => a))(tgpu.computeFn({ workgroupSize: [1] })((/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (() => {
 		"use gpu";
-		counter.$ = (globalThis.__tsover_add ?? ((a, b) => a + b))(counter.$, incrementBy.allModifier.$);
-		counter.$.y = (globalThis.__tsover_add ?? ((a, b) => a + b))(counter.$.y, incrementBy.yModifier.$);
+		counter.$ = (globalThis.__tsover_add ??= (a, b) => a + b)(counter.$, incrementBy.allModifier.$);
+		counter.$.y = (globalThis.__tsover_add ??= (a, b) => a + b)(counter.$.y, incrementBy.yModifier.$);
 	}), {
     v: 2,
     name: undefined,
@@ -305,7 +305,7 @@ instead of just prepending the entire object - this lets us only evaluate the ex
 
 To allow [tsover](https://github.com/software-mansion/tsover/tree/main) to work as we expect when the function is called in JavaScript, operators used inside the function body are swapped with calls to functions like `__tsover_add`, defined by [tsover-runtime](https://github.com/software-mansion/tsover/blob/main/packages/tsover-runtime/README.md).
 This makes it possible to add vectors together without referencing `std.add` and such.
-If `tsover-runtime` was never evaluated (e.g. it was tree-shaken away because nothing in the program uses vectors), the plain JavaScript operator is used instead.
+If `tsover-runtime` was never evaluated (e.g. it was tree-shaken away because nothing in the program uses vectors), the plain JavaScript operator is installed in its place, and `tsover-runtime` replaces it if it's evaluated later.
 
 :::note
 This change occurs only in the actual code.

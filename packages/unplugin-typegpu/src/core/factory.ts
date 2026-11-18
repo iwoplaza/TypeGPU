@@ -112,10 +112,12 @@ function wrapInAutoName(
 
 /**
  * The runtime function is only installed if `tsover-runtime` was evaluated, which a tree-shaken
- * bundle might not do. Without it, nothing can have overloaded the operator, so the native one is used.
+ * bundle might not do. Without it, nothing can have overloaded the operator, so the native one is
+ * installed in its place. `tsover-runtime` assigns its functions unconditionally, so it still takes
+ * over if it's evaluated later.
  */
 function overloadedOperatorCall(runtimeFn: string, operator: string, lhs: string, rhs: string) {
-  return `(globalThis.${runtimeFn} ?? ((a, b) => a ${operator} b))(${lhs}, ${rhs})`;
+  return `(globalThis.${runtimeFn} ??= (a, b) => a ${operator} b)(${lhs}, ${rhs})`;
 }
 
 function replaceWithAssignmentOverload(
