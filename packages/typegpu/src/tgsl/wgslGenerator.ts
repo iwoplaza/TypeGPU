@@ -2070,6 +2070,12 @@ ${stringifyNode(statement)}`);
       this.tryMarkModified(arg);
 
       const argType = unptr(argExpr.dataType);
+      if (!wgsl.isNumericSchema(argType)) {
+        throw new WgslTypeError(
+          `Operator ${op} requires a numeric scalar operand. Got '${stringifySnippet(argExpr)}' of type ${String(argType)}.`,
+        );
+      }
+
       if (argType === f32 || argType === f16) {
         // WGSL only allows `++` and `--` on integers
         const one = this.numericLiteral(1, argType);

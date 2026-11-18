@@ -92,3 +92,67 @@ describe('update statements', () => {
     `);
   });
 });
+
+describe('update statements on non-scalars', () => {
+  it('rejects ++ and -- on vectors', () => {
+    const inc = () => {
+      'use gpu';
+      let v = d.vec3f();
+      // @ts-expect-error: not allowed on vectors
+      v++;
+    };
+    const dec = () => {
+      'use gpu';
+      let v = d.vec3i();
+      // @ts-expect-error: not allowed on vectors
+      v--;
+    };
+
+    expect(() => tgpu.resolve([inc])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn*:inc
+      - fn*:inc(): Operator ++ requires a numeric scalar operand. Got 'v' of type vec3f.]
+    `);
+    expect(() => tgpu.resolve([dec])).toThrow(/requires a numeric scalar operand/);
+  });
+
+  it('rejects ++ on matrices, booleans and structs', () => {
+    const S = d.struct({ a: d.u32 });
+    const onMat = () => {
+      'use gpu';
+      let m = d.mat2x2f();
+      // @ts-expect-error: not allowed on matrices
+      m++;
+    };
+    const onBool = () => {
+      'use gpu';
+      let b = d.bool(true);
+      // @ts-expect-error: not allowed on booleans
+      b++;
+    };
+    const onStruct = () => {
+      'use gpu';
+      let s = S();
+      // @ts-expect-error: not allowed on structs
+      s++;
+    };
+
+    expect(() => tgpu.resolve([onMat])).toThrow(/requires a numeric scalar operand/);
+    expect(() => tgpu.resolve([onBool])).toThrow(/requires a numeric scalar operand/);
+    expect(() => tgpu.resolve([onStruct])).toThrow(/requires a numeric scalar operand/);
+  });
+
+  it('keeps ++ on decorated integer struct members', () => {
+    const S = d.struct({ a: d.align(16, d.u32), b: d.f32 });
+    const fn = () => {
+      'use gpu';
+      const s = S();
+      s.a++;
+      s.b--;
+    };
+
+    expect(tgpu.resolve([fn])).toContain('s.a++;');
+    expect(tgpu.resolve([fn])).toContain('s.b -= 1f;');
+  });
+});
