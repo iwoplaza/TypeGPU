@@ -1562,7 +1562,7 @@ Try 'return ${typeStr}(${str});' instead.
     return this._declareLocal(rawId, eq, varOrigin, varType);
   }
 
-  private _assertDeterminableType(
+  protected _assertDeterminableType(
     declaration: string,
     eqNode: tinyest.Expression,
     eq: Snippet,
@@ -1579,7 +1579,7 @@ Try 'return ${typeStr}(${str});' instead.
    * Declares a new local variable holding the value of `eq`.
    * A `'<deferred>'` keyword is decided after the whole function is generated.
    */
-  private _declareLocal(
+  protected _declareLocal(
     rawId: string,
     eq: Snippet,
     origin: Origin,
