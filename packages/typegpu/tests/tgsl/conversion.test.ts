@@ -25,7 +25,7 @@ describe('convertToCommonType', () => {
   });
 
   it('performs implicit casts and warns', () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    using consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const fn = () => {
       'use gpu';
@@ -47,8 +47,6 @@ describe('convertToCommonType', () => {
         ],
       ]
     `);
-
-    consoleSpy.mockRestore();
   });
 
   it('performs pointer dereferencing', () => {
@@ -148,7 +146,7 @@ describe('convertToCommonType', () => {
   });
 
   it('maps values requiring implicit casts and warns', () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    using consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const fn = () => {
       'use gpu';
@@ -186,8 +184,6 @@ describe('convertToCommonType', () => {
         ],
       ]
     `);
-
-    consoleSpy.mockRestore();
   });
 
   it('throws on missing property', () => {

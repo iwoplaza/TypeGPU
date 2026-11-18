@@ -7,7 +7,7 @@ import { countDispatches } from './utils.ts';
 
 describe('bitonic sort', () => {
   it('emits no warnings for any key type', ({ root }) => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    using warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     for (const keyType of [d.u32, d.i32, d.f32] as const) {
       const keys = root.createBuffer(d.arrayOf(keyType, 256)).$usage('storage');
@@ -17,7 +17,6 @@ describe('bitonic sort', () => {
     }
 
     expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
   it('specializes the comparator per key type', () => {

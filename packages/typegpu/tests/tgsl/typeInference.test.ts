@@ -217,7 +217,7 @@ describe('wgsl generator type inference', () => {
   });
 
   it('converts float to int implicitly with a warning', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    using warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const myFn = tgpu.fn(
       [],

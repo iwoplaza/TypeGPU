@@ -1,14 +1,10 @@
-import { beforeEach, expect, type MockInstance, vi } from 'vitest';
+import { expect, vi } from 'vitest';
 import { it } from 'typegpu-testing-utility';
 import { tgpu, d } from 'typegpu';
 
-let warnSpy: MockInstance<typeof console.warn>;
-
-beforeEach(() => {
-  warnSpy = vi.spyOn(console, 'warn');
-});
-
 it('implicitly casts right-hand side, with a warning', () => {
+  using warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
   const foo = tgpu.fn(
     [d.f32],
     d.i32,

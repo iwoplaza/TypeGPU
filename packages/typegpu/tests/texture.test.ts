@@ -1820,7 +1820,7 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
           })
           .$usage('render');
 
-        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        using consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         // Base mip level 3 would result in 0 mip levels to generate, so it should return early
         expect(() => texture.generateMipmaps(3)).not.toThrow();
@@ -1831,8 +1831,6 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
             "generateMipmaps is a no-op: would generate 0 mip levels (base: 3, total: 3)",
           ]
         `);
-
-        consoleSpy.mockRestore();
       });
 
       it('warns when generateMipmaps would generate only 1 mip level', ({ root }) => {
@@ -1844,7 +1842,7 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
           })
           .$usage('render');
 
-        const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        using consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         // Base mip level 2 would result in 1 mip level to generate (3-2=1), so it should warn and return early
         expect(() => texture.generateMipmaps(2)).not.toThrow();
@@ -1855,8 +1853,6 @@ Overload 3 of 4, '(schema: "(Error) Texture not usable as storage, call $usage('
             "generateMipmaps is a no-op: would generate 1 mip levels (base: 2, total: 3)",
           ]
         `);
-
-        consoleSpy.mockRestore();
       });
 
       it('throws an error and warns on the type level when the required render usage is missing', ({
