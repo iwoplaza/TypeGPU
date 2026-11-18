@@ -23,6 +23,115 @@ const createTextureMock = (descriptor: GPUTextureDescriptor) => {
 
 type ExperimentalTgpuRoot = TgpuRoot & TgpuRoot['~unstable'];
 
+/**
+ * A small subset of the WebGPU spec's buffer validation, so that tests catch invalid API usage.
+ * Real implementations report most of these as asynchronous validation errors; the mock throws
+ * right away instead.
+ */
+class MockValidationError extends Error {
+  constructor(message: string) {
+    super(`[typegpu-testing-utility mock] ${message}`);
+    this.name = 'MockValidationError';
+  }
+}
+
+interface MockBufferState {
+  destroyed: boolean;
+  /** The [start, end) byte range of the current mapping, if there is one */
+  mappedRange: [number, number] | undefined;
+  /** The [start, end) byte ranges already returned by `getMappedRange` for the current mapping */
+  views: [number, number][];
+}
+
+/** Bookkeeping kept off the mock buffers, so that it doesn't show up in snapshots */
+const mockBufferStates = new WeakMap<object, MockBufferState>();
+
+function validateBufferDescriptor({ size, usage, mappedAtCreation, label }: GPUBufferDescriptor) {
+  const name = `createBuffer(${label ?? ''})`;
+
+  // https://gpuweb.github.io/gpuweb/#dom-gpudevice-createbuffer
+  if (mappedAtCreation && size % 4 !== 0) {
+    throw new RangeError(
+      `[typegpu-testing-utility mock] ${name}: mappedAtCreation requires size (${size}) to be a multiple of 4`,
+    );
+  }
+  if (usage === 0) {
+    throw new MockValidationError(`${name}: usage must not be 0`);
+  }
+  if (
+    usage & GPUBufferUsage.MAP_READ &&
+    usage & ~(GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST)
+  ) {
+    throw new MockValidationError(
+      `${name}: MAP_READ can only be combined with COPY_DST (usage: ${usage})`,
+    );
+  }
+  if (
+    usage & GPUBufferUsage.MAP_WRITE &&
+    usage & ~(GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC)
+  ) {
+    throw new MockValidationError(
+      `${name}: MAP_WRITE can only be combined with COPY_SRC (usage: ${usage})`,
+    );
+  }
+}
+
+function validateWriteBuffer(
+  buffer: GPUBuffer,
+  bufferOffset: number,
+  data: AllowSharedBufferSource,
+  dataOffset = 0,
+  size?: number,
+) {
+  const state = mockBufferStates.get(buffer);
+  if (!state) {
+    // Not created by the mock device, nothing to check against
+    return;
+  }
+
+  const name = `writeBuffer(${buffer.label})`;
+  // https://gpuweb.github.io/gpuweb/#dom-gpuqueue-writebuffer
+  const bytesPerElement =
+    ArrayBuffer.isView(data) && 'BYTES_PER_ELEMENT' in data
+      ? (data.BYTES_PER_ELEMENT as number)
+      : 1;
+  const dataSize = data.byteLength / bytesPerElement;
+  const contentsSize = size ?? dataSize - dataOffset;
+  const contentsByteSize = contentsSize * bytesPerElement;
+
+  if (contentsSize < 0 || dataOffset + contentsSize > dataSize) {
+    throw new MockValidationError(
+      `${name}: range [${dataOffset}, ${dataOffset + contentsSize}) is out of bounds of data with ${dataSize} elements`,
+    );
+  }
+  if (contentsByteSize % 4 !== 0) {
+    throw new MockValidationError(
+      `${name}: written byte size (${contentsByteSize}) must be a multiple of 4`,
+    );
+  }
+  if (state.destroyed) {
+    throw new MockValidationError(`${name}: buffer is destroyed`);
+  }
+  if (buffer.mapState !== 'unmapped') {
+    throw new MockValidationError(
+      `${name}: buffer must be unmapped (mapState: ${buffer.mapState})`,
+    );
+  }
+  if (!(buffer.usage & GPUBufferUsage.COPY_DST)) {
+    throw new MockValidationError(`${name}: usage (${buffer.usage}) must include COPY_DST`);
+  }
+  if (bufferOffset % 4 !== 0) {
+    throw new MockValidationError(
+      `${name}: bufferOffset (${bufferOffset}) must be a multiple of 4`,
+    );
+  }
+  if (bufferOffset + contentsByteSize > buffer.size) {
+    throw new MockValidationError(
+      `${name}: write of ${contentsByteSize} bytes at offset ${bufferOffset} exceeds buffer size (${buffer.size})`,
+    );
+  }
+}
+
 function createRenderPassEncoderMock() {
   const mockRenderPassEncoder = {
     get mock() {
@@ -131,22 +240,98 @@ function createDeviceMock(
     createBindGroupLayout: vi.fn(
       (_descriptor: GPUBindGroupLayoutDescriptor) => 'mockBindGroupLayout',
     ),
-    createBuffer: vi.fn(({ size, usage, mappedAtCreation, label }: GPUBufferDescriptor) => {
+    createBuffer: vi.fn((descriptor: GPUBufferDescriptor) => {
+      validateBufferDescriptor(descriptor);
+
+      const { size, usage, mappedAtCreation, label } = descriptor;
+      const state: MockBufferState = {
+        destroyed: false,
+        mappedRange: mappedAtCreation ? [0, size] : undefined,
+        views: [],
+      };
+      const name = label ?? '';
+
       const mockBuffer = {
         mapState: mappedAtCreation ? 'mapped' : 'unmapped',
         size,
         usage,
-        label: label ?? '',
-        getMappedRange: vi.fn(() => new ArrayBuffer(size)),
+        label: name,
+        // https://gpuweb.github.io/gpuweb/#dom-gpubuffer-getmappedrange
+        getMappedRange: vi.fn((offset = 0, rangeSize?: number) => {
+          if (!state.mappedRange) {
+            throw new MockValidationError(`getMappedRange(${name}): buffer is not mapped`);
+          }
+          const end = offset + (rangeSize ?? Math.max(0, size - offset));
+          if (offset % 8 !== 0 || (end - offset) % 4 !== 0) {
+            throw new MockValidationError(
+              `getMappedRange(${name}): offset (${offset}) must be a multiple of 8 and size (${end - offset}) a multiple of 4`,
+            );
+          }
+          if (offset < state.mappedRange[0] || end > state.mappedRange[1]) {
+            throw new MockValidationError(
+              `getMappedRange(${name}): range [${offset}, ${end}) is outside the mapped range [${state.mappedRange[0]}, ${state.mappedRange[1]})`,
+            );
+          }
+          const overlapping = state.views.find(
+            ([start, viewEnd]) => offset < viewEnd && start < end,
+          );
+          if (overlapping) {
+            throw new MockValidationError(
+              `getMappedRange(${name}): range [${offset}, ${end}) overlaps an already returned range [${overlapping[0]}, ${overlapping[1]})`,
+            );
+          }
+          state.views.push([offset, end]);
+          return new ArrayBuffer(size);
+        }),
         unmap: vi.fn(() => {
+          state.mappedRange = undefined;
+          state.views = [];
           mockBuffer.mapState = 'unmapped';
         }),
-        mapAsync: vi.fn(() => {
+        // https://gpuweb.github.io/gpuweb/#dom-gpubuffer-mapasync
+        mapAsync: vi.fn((mode: GPUMapModeFlags, offset = 0, rangeSize?: number) => {
+          const end = offset + (rangeSize ?? Math.max(0, size - offset));
+          if (mockBuffer.mapState !== 'unmapped') {
+            throw new MockValidationError(
+              `mapAsync(${name}): buffer must be unmapped (mapState: ${mockBuffer.mapState})`,
+            );
+          }
+          if (state.destroyed) {
+            throw new MockValidationError(`mapAsync(${name}): buffer is destroyed`);
+          }
+          if (mode !== GPUMapMode.READ && mode !== GPUMapMode.WRITE) {
+            throw new MockValidationError(
+              `mapAsync(${name}): mode (${mode}) must be exactly one of READ or WRITE`,
+            );
+          }
+          if (mode === GPUMapMode.READ && !(usage & GPUBufferUsage.MAP_READ)) {
+            throw new MockValidationError(
+              `mapAsync(${name}): READ requires MAP_READ usage (usage: ${usage})`,
+            );
+          }
+          if (mode === GPUMapMode.WRITE && !(usage & GPUBufferUsage.MAP_WRITE)) {
+            throw new MockValidationError(
+              `mapAsync(${name}): WRITE requires MAP_WRITE usage (usage: ${usage})`,
+            );
+          }
+          if (offset % 8 !== 0 || (end - offset) % 4 !== 0 || end > size) {
+            throw new MockValidationError(
+              `mapAsync(${name}): invalid range [${offset}, ${end}) for a buffer of size ${size}`,
+            );
+          }
+          state.mappedRange = [offset, end];
           mockBuffer.mapState = 'mapped';
         }),
-        destroy: vi.fn(),
+        // https://gpuweb.github.io/gpuweb/#dom-gpubuffer-destroy
+        destroy: vi.fn(() => {
+          state.destroyed = true;
+          state.mappedRange = undefined;
+          state.views = [];
+          mockBuffer.mapState = 'unmapped';
+        }),
       };
 
+      mockBufferStates.set(mockBuffer, state);
       return mockBuffer;
     }),
     createCommandEncoder: vi.fn(function () {
@@ -181,7 +366,7 @@ function createDeviceMock(
       copyExternalImageToTexture: vi.fn(),
       onSubmittedWorkDone: vi.fn(() => Promise.resolve()),
       submit: vi.fn(),
-      writeBuffer: vi.fn(),
+      writeBuffer: vi.fn(validateWriteBuffer),
       writeTexture: vi.fn(),
     },
     limits: {
