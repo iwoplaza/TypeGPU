@@ -170,7 +170,7 @@ describe('"use gpu" marked arrow function, assigned to a const', () => {
       const addGPU = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a, b) => {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: "addGPU",
@@ -199,7 +199,7 @@ describe('"use gpu" marked arrow function, assigned to a const', () => {
           // another comment
           const addGPU = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((a, b) => {
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: "addGPU",
@@ -240,7 +240,7 @@ describe('marked arrow functions passed to shells', () => {
       shell(/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a, b) => {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: undefined,
@@ -270,7 +270,7 @@ describe('marked arrow functions passed to shells', () => {
 
           shell((/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((a, b) => {
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: undefined,
@@ -309,7 +309,7 @@ describe('marked anonymous function expressions passed to shells', () => {
       shell(/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function (a, b) {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: undefined,
@@ -339,7 +339,7 @@ describe('marked anonymous function expressions passed to shells', () => {
 
           shell((/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function(a, b){
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: undefined,
@@ -378,7 +378,7 @@ describe('marked named function expressions passed to shells', () => {
       shell(/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function addGPU(a, b) {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: "addGPU",
@@ -408,7 +408,7 @@ describe('marked named function expressions passed to shells', () => {
 
           shell((/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function addGPU(a, b){
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: "addGPU",
@@ -502,7 +502,7 @@ describe('marked function statements', () => {
         'use gpu';
 
         // hello there
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: "addGPU",
@@ -531,7 +531,7 @@ describe('marked function statements', () => {
           let addGPU = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function addGPU(a, b) {
             'use gpu';
             // hello there
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: "addGPU",
@@ -587,7 +587,7 @@ describe('marked object methods', () => {
         mod: /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a, b) => {
           'use gpu';
 
-          return __tsover_mod(a, b);
+          return (globalThis.__tsover_mod ??= (a, b) => a % b)(a, b);
         }, {
           v: 2,
           name: "mod",
@@ -642,7 +642,7 @@ describe('marked object methods', () => {
             /** MOD */
             mod: (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((a, b) => {
               'use gpu';
-              return __tsover_mod(a, b);
+              return (globalThis.__tsover_mod ??= (a, b) => a % b)(a, b);
             }), {
           v: 2,
           name: "mod",
@@ -707,9 +707,9 @@ describe('transforms numeric operations', () => {
       const main = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a, b) => {
         'use gpu';
 
-        let c = __tsover_add(__tsover_add(a, b), 2);
-        c = __tsover_add(c, __tsover_mul(2, b));
-        countMutable.$ = __tsover_add(countMutable.$, 3);
+        let c = (globalThis.__tsover_add ??= (a, b) => a + b)((globalThis.__tsover_add ??= (a, b) => a + b)(a, b), 2);
+        c = (globalThis.__tsover_add ??= (a, b) => a + b)(c, (globalThis.__tsover_mul ??= (a, b) => a * b)(2, b));
+        countMutable.$ = (globalThis.__tsover_add ??= (a, b) => a + b)(countMutable.$, 3);
       }, {
         v: 2,
         name: "main",
@@ -742,9 +742,9 @@ describe('transforms numeric operations', () => {
           // another comment
           const main = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((a, b) => {
             'use gpu';
-            let c = __tsover_add(__tsover_add(a, b), 2);
-            c = __tsover_add(c, __tsover_mul(2, b));
-            countMutable.$ = __tsover_add(countMutable.$, 3);
+            let c = (globalThis.__tsover_add ??= (a, b) => a + b)((globalThis.__tsover_add ??= (a, b) => a + b)(a, b), 2);
+            c = (globalThis.__tsover_add ??= (a, b) => a + b)(c, (globalThis.__tsover_mul ??= (a, b) => a * b)(2, b));
+            countMutable.$ = (globalThis.__tsover_add ??= (a, b) => a + b)(countMutable.$, 3);
           }), {
           v: 2,
           name: "main",
@@ -785,7 +785,7 @@ describe('hoists global function statements marked with "use gpu"', () => {
       let mul = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function mul(a, b) {
         'use gpu';
 
-        return __tsover_mul(a, b);
+        return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
       }, {
         v: 2,
         name: "mul",
@@ -806,7 +806,7 @@ describe('hoists global function statements marked with "use gpu"', () => {
       let add = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function add(a, b) {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: "add",
@@ -832,7 +832,7 @@ describe('hoists global function statements marked with "use gpu"', () => {
       // another comment
       let mul = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function mul(a, b) {
             'use gpu';
-            return __tsover_mul(a, b);
+            return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
           }), {
           v: 2,
           name: "mul",
@@ -844,7 +844,7 @@ describe('hoists global function statements marked with "use gpu"', () => {
       // another comment
       let add = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function add(a, b) {
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: "add",
@@ -874,7 +874,7 @@ describe('hoists function statements marked with "use gpu" that shadow their own
       "let miter = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function miter(a) {
         'use gpu';
 
-        const miter = __tsover_mul(a, 2);
+        const miter = (globalThis.__tsover_mul ??= (a, b) => a * b)(a, 2);
         return miter;
       }, {
         v: 2,
@@ -896,7 +896,7 @@ describe('hoists function statements marked with "use gpu" that shadow their own
     expect(await rollupTransform(code)).toMatchInlineSnapshot(`
       "let miter = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function miter(a) {
             'use gpu';
-            const miter = __tsover_mul(a, 2);
+            const miter = (globalThis.__tsover_mul ??= (a, b) => a * b)(a, 2);
             return miter;
           }), {
           v: 2,
@@ -940,7 +940,7 @@ describe('hoists function statements marked with "use gpu", scoped inside anothe
         let mul = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function mul(a, b) {
           'use gpu';
 
-          return __tsover_mul(a, b);
+          return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
         }, {
           v: 2,
           name: "mul",
@@ -961,7 +961,7 @@ describe('hoists function statements marked with "use gpu", scoped inside anothe
         let add = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function add(a, b) {
           'use gpu';
 
-          return __tsover_add(a, b);
+          return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
         }, {
           v: 2,
           name: "add",
@@ -989,7 +989,7 @@ describe('hoists function statements marked with "use gpu", scoped inside anothe
       // another comment
       let mul = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function mul(a, b) {
               'use gpu';
-              return __tsover_mul(a, b);
+              return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
             }), {
           v: 2,
           name: "mul",
@@ -1001,7 +1001,7 @@ describe('hoists function statements marked with "use gpu", scoped inside anothe
       // another comment
       let add = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function add(a, b) {
               'use gpu';
-              return __tsover_add(a, b);
+              return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
             }), {
           v: 2,
           name: "add",
@@ -1055,7 +1055,7 @@ describe('hoists function statements marked with "use gpu", scoped inside an arr
         let mul = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function mul(a, b) {
           'use gpu';
 
-          return __tsover_mul(a, b);
+          return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
         }, {
           v: 2,
           name: "mul",
@@ -1076,7 +1076,7 @@ describe('hoists function statements marked with "use gpu", scoped inside an arr
         let add = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function add(a, b) {
           'use gpu';
 
-          return __tsover_add(a, b);
+          return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
         }, {
           v: 2,
           name: "add",
@@ -1104,7 +1104,7 @@ describe('hoists function statements marked with "use gpu", scoped inside an arr
       // another comment
       let mul = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function mul(a, b) {
               'use gpu';
-              return __tsover_mul(a, b);
+              return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
             }), {
           v: 2,
           name: "mul",
@@ -1116,7 +1116,7 @@ describe('hoists function statements marked with "use gpu", scoped inside an arr
       // another comment
       let add = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function add(a, b) {
               'use gpu';
-              return __tsover_add(a, b);
+              return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
             }), {
           v: 2,
           name: "add",
@@ -1172,7 +1172,7 @@ describe('hoists function statements marked with "use gpu", scoped inside an if 
         let mul = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function mul(a, b) {
           'use gpu';
 
-          return __tsover_mul(__tsover_mul(a, b), c);
+          return (globalThis.__tsover_mul ??= (a, b) => a * b)((globalThis.__tsover_mul ??= (a, b) => a * b)(a, b), c);
         }, {
           v: 2,
           name: "mul",
@@ -1195,7 +1195,7 @@ describe('hoists function statements marked with "use gpu", scoped inside an if 
         let add = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function add(a, b) {
           'use gpu';
 
-          return __tsover_add(__tsover_add(a, b), c);
+          return (globalThis.__tsover_add ??= (a, b) => a + b)((globalThis.__tsover_add ??= (a, b) => a + b)(a, b), c);
         }, {
           v: 2,
           name: "add",
@@ -1226,7 +1226,7 @@ describe('hoists function statements marked with "use gpu", scoped inside an if 
       // another comment
       let mul = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function mul(a, b) {
               'use gpu';
-              return __tsover_mul(__tsover_mul(a, b), c);
+              return (globalThis.__tsover_mul ??= (a, b) => a * b)((globalThis.__tsover_mul ??= (a, b) => a * b)(a, b), c);
             }), {
           v: 2,
           name: "mul",
@@ -1238,7 +1238,7 @@ describe('hoists function statements marked with "use gpu", scoped inside an if 
       // another comment
       let add = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function add(a, b) {
               'use gpu';
-              return __tsover_add(__tsover_add(a, b), c);
+              return (globalThis.__tsover_add ??= (a, b) => a + b)((globalThis.__tsover_add ??= (a, b) => a + b)(a, b), c);
             }), {
           v: 2,
           name: "add",
@@ -1298,7 +1298,7 @@ describe('replaces function statements marked with "use gpu" in place when condi
           let add = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function add(a, b) {
             'use gpu';
 
-            return __tsover_add(__tsover_add(a, b), c);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)((globalThis.__tsover_add ??= (a, b) => a + b)(a, b), c);
           }, {
             v: 2,
             name: "add",
@@ -1323,7 +1323,7 @@ describe('replaces function statements marked with "use gpu" in place when condi
           let mul = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function mul(a, b) {
             'use gpu';
 
-            return __tsover_mul(__tsover_mul(a, b), c);
+            return (globalThis.__tsover_mul ??= (a, b) => a * b)((globalThis.__tsover_mul ??= (a, b) => a * b)(a, b), c);
           }, {
             v: 2,
             name: "mul",
@@ -1357,7 +1357,7 @@ describe('replaces function statements marked with "use gpu" in place when condi
               // another comment
               let add = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function add(a, b) {
                 'use gpu';
-                return __tsover_add(__tsover_add(a, b), c);
+                return (globalThis.__tsover_add ??= (a, b) => a + b)((globalThis.__tsover_add ??= (a, b) => a + b)(a, b), c);
               }), {
           v: 2,
           name: "add",
@@ -1372,7 +1372,7 @@ describe('replaces function statements marked with "use gpu" in place when condi
               // another comment
               let mul = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function mul(a, b) {
                 'use gpu';
-                return __tsover_mul(__tsover_mul(a, b), c);
+                return (globalThis.__tsover_mul ??= (a, b) => a * b)((globalThis.__tsover_mul ??= (a, b) => a * b)(a, b), c);
               }), {
           v: 2,
           name: "mul",
@@ -1412,7 +1412,7 @@ describe('hoists exported marked function statements', () => {
       let mul = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function mul(a, b) {
         'use gpu';
 
-        return __tsover_mul(a, b);
+        return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
       }, {
         v: 2,
         name: "mul",
@@ -1432,7 +1432,7 @@ describe('hoists exported marked function statements', () => {
       let add = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function add(a, b) {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: "add",
@@ -1460,7 +1460,7 @@ describe('hoists exported marked function statements', () => {
       "/** MUL */
       let mul = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function mul(a, b) {
             'use gpu';
-            return __tsover_mul(a, b);
+            return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
           }), {
           v: 2,
           name: "mul",
@@ -1471,7 +1471,7 @@ describe('hoists exported marked function statements', () => {
       /** ADD */
       let add = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function add(a, b) {
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: "add",
@@ -1505,7 +1505,7 @@ describe('hoists default exported marked function statement', () => {
       let add = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function add(a, b) {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: "add",
@@ -1531,7 +1531,7 @@ describe('hoists default exported marked function statement', () => {
       "/** ADD */
       let add = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function add(a, b) {
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: "add",
@@ -1623,7 +1623,7 @@ describe('export marked arrow function', () => {
       "export const add = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a, b) => {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: "add",
@@ -1642,7 +1642,7 @@ describe('export marked arrow function', () => {
       const increment = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = n => {
         'use gpu';
 
-        return __tsover_add(n, 1);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(n, 1);
       }, {
         v: 2,
         name: "increment",
@@ -1659,7 +1659,7 @@ describe('export marked arrow function', () => {
       const mul = /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a, b) => {
         'use gpu';
 
-        return __tsover_mul(a, b);
+        return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
       }, {
         v: 2,
         name: "mul",
@@ -1683,7 +1683,7 @@ describe('export marked arrow function', () => {
     expect(await rollupTransform(code)).toMatchInlineSnapshot(`
       "const add = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((a, b) => {
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: "add",
@@ -1693,7 +1693,7 @@ describe('export marked arrow function', () => {
 
           const increment = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((n) => {
             'use gpu';
-            return __tsover_add(n, 1);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(n, 1);
           }), {
           v: 2,
           name: "increment",
@@ -1703,7 +1703,7 @@ describe('export marked arrow function', () => {
           
           const mul = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((a, b) => {
             'use gpu';
-            return __tsover_mul(a, b);
+            return (globalThis.__tsover_mul ??= (a, b) => a * b)(a, b);
           }), {
           v: 2,
           name: "mul",
@@ -1730,7 +1730,7 @@ describe('anonymous default export marked function statement', () => {
       "export default /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = function (a, b) {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: undefined,
@@ -1753,7 +1753,7 @@ describe('anonymous default export marked function statement', () => {
     expect(await rollupTransform(code)).toMatchInlineSnapshot(`
       "var _virtual_code = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (function (a, b) {
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: undefined,
@@ -1780,7 +1780,7 @@ describe('anonymous default export marked arrow function', () => {
       "export default /*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = (a, b) => {
         'use gpu';
 
-        return __tsover_add(a, b);
+        return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
       }, {
         v: 2,
         name: undefined,
@@ -1803,7 +1803,7 @@ describe('anonymous default export marked arrow function', () => {
     expect(await rollupTransform(code)).toMatchInlineSnapshot(`
       "var _virtual_code = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((a, b) => {
             'use gpu';
-            return __tsover_add(a, b);
+            return (globalThis.__tsover_add ??= (a, b) => a + b)(a, b);
           }), {
           v: 2,
           name: undefined,

@@ -31,7 +31,7 @@ describe('plugin obfuscation', () => {
           'use gpu';
 
           const variable = 3;
-          return __tsover_add(__tsover_add(external.n, argument), variable);
+          return (globalThis.__tsover_add ??= (a, b) => a + b)((globalThis.__tsover_add ??= (a, b) => a + b)(external.n, argument), variable);
         }, {
           v: 2,
           name: "fn",
@@ -58,7 +58,7 @@ describe('plugin obfuscation', () => {
               const fn = (/*#__PURE__*/($ => (globalThis.__TYPEGPU_META__ ??= new WeakMap()).set($.f = ((argument) => {
                 'use gpu';
                 const variable = 3;
-                return __tsover_add(__tsover_add(external.n, argument), variable);
+                return (globalThis.__tsover_add ??= (a, b) => a + b)((globalThis.__tsover_add ??= (a, b) => a + b)(external.n, argument), variable);
               }), {
             v: 2,
             name: "fn",

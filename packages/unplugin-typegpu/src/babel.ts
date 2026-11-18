@@ -142,22 +142,51 @@ function wrapInAutoName(path: NodePath<t.Expression>, name: string): void {
   path.replaceWith(callExpr);
 }
 
+/**
+ * The runtime function is only installed if `tsover-runtime` was evaluated, which a tree-shaken
+ * bundle might not do. Without it, nothing can have overloaded the operator, so the native one is
+ * installed in its place. `tsover-runtime` assigns its functions unconditionally, so it still takes
+ * over if it's evaluated later.
+ */
+function overloadedOperatorCall(
+  runtimeFn: string,
+  operator: t.BinaryExpression['operator'],
+  lhs: t.Expression,
+  rhs: t.Expression,
+): t.CallExpression {
+  // (globalThis.<runtimeFn> ??= (a, b) => a <operator> b)(<lhs>, <rhs>)
+  return t.callExpression(
+    t.assignmentExpression(
+      '??=',
+      t.memberExpression(i('globalThis'), i(runtimeFn)),
+      t.arrowFunctionExpression([i('a'), i('b')], t.binaryExpression(operator, i('a'), i('b'))),
+    ),
+    [lhs, rhs],
+  );
+}
+
 function replaceWithAssignmentOverload(
   path: NodePath<t.AssignmentExpression>,
   runtimeFn: string,
 ): void {
+  const operator = path.node.operator.slice(0, -1) as t.BinaryExpression['operator'];
   path.replaceWith(
     t.assignmentExpression(
       '=',
       path.node.left,
-      t.callExpression(i(runtimeFn), [path.node.left as t.Expression, path.node.right]),
+      overloadedOperatorCall(runtimeFn, operator, path.node.left as t.Expression, path.node.right),
     ),
   );
 }
 
 function replaceWithBinaryOverload(path: NodePath<t.BinaryExpression>, runtimeFn: string): void {
   path.replaceWith(
-    t.callExpression(i(runtimeFn), [path.node.left as t.Expression, path.node.right]),
+    overloadedOperatorCall(
+      runtimeFn,
+      path.node.operator,
+      path.node.left as t.Expression,
+      path.node.right,
+    ),
   );
 }
 
