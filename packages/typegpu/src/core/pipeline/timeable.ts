@@ -115,7 +115,10 @@ async function readTimestamps(
     const end = result[priors.timestampWrites?.endOfPassWriteIndex ?? 1];
 
     if (start === undefined || end === undefined) {
-      throw new Error('QuerySet did not return valid timestamps.');
+      console.error(
+        'QuerySet did not return valid timestamps, skipping the performance callback (withPerformanceCallback).',
+      );
+      continue;
     }
 
     try {
