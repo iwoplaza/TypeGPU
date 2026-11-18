@@ -174,6 +174,39 @@ export const VectorOps = {
     <T extends wgsl.AnyMatInstance>(v: wgsl.vBaseForMat<T>, m: T) => wgsl.vBaseForMat<T>
   >,
 
+  determinant: {
+    mat2x2f: (m: wgsl.m2x2f) => {
+      const [a, b] = m.columns;
+      return a.x * b.y - b.x * a.y;
+    },
+
+    mat3x3f: (m: wgsl.m3x3f) => {
+      const [a, b, c] = m.columns;
+      return (
+        a.x * (b.y * c.z - c.y * b.z) -
+        b.x * (a.y * c.z - c.y * a.z) +
+        c.x * (a.y * b.z - b.y * a.z)
+      );
+    },
+
+    mat4x4f: (m: wgsl.m4x4f) => {
+      const [a, b, c, d] = m.columns;
+      const s0 = a.x * b.y - b.x * a.y;
+      const s1 = a.x * c.y - c.x * a.y;
+      const s2 = a.x * d.y - d.x * a.y;
+      const s3 = b.x * c.y - c.x * b.y;
+      const s4 = b.x * d.y - d.x * b.y;
+      const s5 = c.x * d.y - d.x * c.y;
+      const c5 = c.z * d.w - d.z * c.w;
+      const c4 = b.z * d.w - d.z * b.w;
+      const c3 = b.z * c.w - c.z * b.w;
+      const c2 = a.z * d.w - d.z * a.w;
+      const c1 = a.z * c.w - c.z * a.w;
+      const c0 = a.z * b.w - b.z * a.w;
+      return s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+    },
+  } as Record<MatKind, (m: wgsl.AnyMatInstance) => number>,
+
   dot: {
     vec2f: dotVec2,
     vec2h: dotVec2,
