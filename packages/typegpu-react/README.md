@@ -8,10 +8,15 @@
 
 # Basic usage
 
-```ts
+```tsx
+import { useMemo } from 'react';
 import { d, common } from 'typegpu';
 import { hsvToRgb } from '@typegpu/color';
 import { useFrame, useRoot, useUniform, useMirroredUniform, useConfigureContext } from '@typegpu/react';
+
+interface Props {
+  color: d.v3f;
+}
 
 const App = (props: Props) => {
   const time = useUniform(d.f32);
@@ -25,7 +30,8 @@ const App = (props: Props) => {
         // Executed per pixel on the GPU 🌈
         fragment: ({ uv }) => {
           'use gpu';
-          return hsvToRgb(time.$, uv.x, uv.y) * color.$;
+          const rgb = hsvToRgb(d.vec3f(time.$ + uv.x, uv.y, 1)) * color.$;
+          return d.vec4f(rgb, 1);
         },
       }),
     [root, time, color]
