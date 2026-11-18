@@ -416,6 +416,8 @@ const babelSpecificTranspilers = {
   TSAsExpression: tsFallthrough,
   TSSatisfiesExpression: tsFallthrough,
   TSNonNullExpression: tsFallthrough,
+  TSTypeAssertion: tsFallthrough,
+  TSInstantiationExpression: tsFallthrough,
 } satisfies Transpilers<babel.Node>;
 
 export const babelTranspilers = {
