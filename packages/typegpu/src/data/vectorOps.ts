@@ -19,6 +19,20 @@ const dotVec2 = (lhs: v2, rhs: v2) => lhs.x * rhs.x + lhs.y * rhs.y;
 const dotVec3 = (lhs: v3, rhs: v3) => lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
 const dotVec4 = (lhs: v4, rhs: v4) => lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z + lhs.w * rhs.w;
 
+// Integer dot products wrap modulo 2^32, like the GPU computes them
+const dotVec2i = (lhs: v2, rhs: v2) => (Math.imul(lhs.x, rhs.x) + Math.imul(lhs.y, rhs.y)) | 0;
+const dotVec3i = (lhs: v3, rhs: v3) =>
+  (Math.imul(lhs.x, rhs.x) + Math.imul(lhs.y, rhs.y) + Math.imul(lhs.z, rhs.z)) | 0;
+const dotVec4i = (lhs: v4, rhs: v4) =>
+  (Math.imul(lhs.x, rhs.x) +
+    Math.imul(lhs.y, rhs.y) +
+    Math.imul(lhs.z, rhs.z) +
+    Math.imul(lhs.w, rhs.w)) |
+  0;
+const dotVec2u = (lhs: v2, rhs: v2) => dotVec2i(lhs, rhs) >>> 0;
+const dotVec3u = (lhs: v3, rhs: v3) => dotVec3i(lhs, rhs) >>> 0;
+const dotVec4u = (lhs: v4, rhs: v4) => dotVec4i(lhs, rhs) >>> 0;
+
 type BinaryOp = (a: number, b: number) => number;
 
 const binaryComponentWise2u = (op: BinaryOp) => (a: wgsl.v2u, b: wgsl.v2u) =>
@@ -177,16 +191,16 @@ export const VectorOps = {
   dot: {
     vec2f: dotVec2,
     vec2h: dotVec2,
-    vec2i: dotVec2,
-    vec2u: dotVec2,
+    vec2i: dotVec2i,
+    vec2u: dotVec2u,
     vec3f: dotVec3,
     vec3h: dotVec3,
-    vec3i: dotVec3,
-    vec3u: dotVec3,
+    vec3i: dotVec3i,
+    vec3u: dotVec3u,
     vec4f: dotVec4,
     vec4h: dotVec4,
-    vec4i: dotVec4,
-    vec4u: dotVec4,
+    vec4i: dotVec4i,
+    vec4u: dotVec4u,
   } as Record<VecKind, <T extends vBase>(lhs: T, rhs: T) => number>,
 
   cross: {

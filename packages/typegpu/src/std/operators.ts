@@ -154,6 +154,22 @@ export const sub = dualImpl({
   sideEffects: false,
 });
 
+const floatMul = (a: number, b: number) => a * b;
+const i32Mul = (a: number, b: number) => Math.imul(a, b);
+const u32Mul = (a: number, b: number) => Math.imul(a, b) >>> 0;
+
+// Integer products wrap modulo 2^32, and a double-precision product loses
+// the low bits once it exceeds 2^53, so integer vectors need Math.imul.
+function componentMulFor(v: NumVec | Mat) {
+  if (isUint32VecInstance(v)) {
+    return u32Mul;
+  }
+  if (isInteger32VecInstance(v)) {
+    return i32Mul;
+  }
+  return floatMul;
+}
+
 function cpuMul(lhs: number, rhs: number): number; // default multiplication
 function cpuMul<MV extends NumVec | Mat>(lhs: number, rhs: MV): MV; // scale
 function cpuMul<MV extends NumVec | Mat>(lhs: MV, rhs: number): MV; // scale
@@ -179,14 +195,16 @@ function cpuMul(lhs: number | NumVec | Mat, rhs: number | NumVec | Mat) {
     return lhs * rhs; // default multiplication
   }
   if (typeof lhs === 'number' && (isVecInstance(rhs) || isMatInstance(rhs))) {
-    return generalizeFn((e) => lhs * e, [rhs]); // scale
+    const componentMul = Number.isInteger(lhs) ? componentMulFor(rhs) : floatMul;
+    return generalizeFn((e) => componentMul(lhs, e), [rhs]); // scale
   }
   if ((isVecInstance(lhs) || isMatInstance(lhs)) && typeof rhs === 'number') {
-    return generalizeFn((e) => e * rhs, [lhs]); // scale
+    const componentMul = Number.isInteger(rhs) ? componentMulFor(lhs) : floatMul;
+    return generalizeFn((e) => componentMul(e, rhs), [lhs]); // scale
   }
   if (isVecInstance(lhs) && isVecInstance(rhs)) {
     assertEqualKinds(lhs, rhs);
-    return generalizeFn((a, b) => a * b, [lhs, rhs]); // component-wise
+    return generalizeFn(componentMulFor(lhs), [lhs, rhs]); // component-wise
   }
   if (isFloat32VecInstance(lhs) && isMatInstance(rhs)) {
     if (lhs.length !== rhs.columns.length) {

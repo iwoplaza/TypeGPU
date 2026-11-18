@@ -17,6 +17,13 @@ import {
 import { sub } from 'typegpu/std';
 
 describe('sub', () => {
+  it('wraps differences of integer vectors at the extremes', () => {
+    expect(sub(vec2i(-2147483648), vec2i(1))).toStrictEqual(vec2i(2147483647));
+    expect(sub(vec3i(2147483647), vec3i(-1))).toStrictEqual(vec3i(-2147483648));
+    expect(sub(vec4u(0), vec4u(1))).toStrictEqual(vec4u(0xffffffff));
+    expect(sub(vec2u(0), vec2u(0xffffffff))).toStrictEqual(vec2u(1));
+  });
+
   it('computes difference of two vec2f', () => {
     expect(sub(vec2f(0, 0), vec2f(0, 0))).toStrictEqual(vec2f(0, 0));
     expect(sub(vec2f(1.2, 0), vec2f(1.0, 0)).x).toBeCloseTo(0.2);
