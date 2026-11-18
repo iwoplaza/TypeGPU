@@ -19,10 +19,23 @@ describe('atomics in buffer bindings', () => {
   });
 
   it('rejects atomics nested in arrays and decorated struct props', ({ root }) => {
-    expect(() => root.createUniform(d.arrayOf(d.atomic(d.i32), 4))).toThrow(/contains atomics/);
+    expect(() =>
+      root.createUniform(d.arrayOf(d.atomic(d.i32), 4)),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot create a 'uniform' binding of a buffer with schema arrayOf(atomic<i32>, 4), as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
+    );
     expect(() =>
       root.createReadonly(d.struct({ inner: d.struct({ a: d.align(16, d.atomic(d.u32)) }) })),
     ).toThrow(/contains atomics/);
+  });
+
+  it('rejects bare atomics in uniform and readonly bindings', ({ root }) => {
+    expect(() => root.createUniform(d.atomic(d.u32))).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot create a 'uniform' binding of a buffer with schema atomic<u32>, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
+    );
+    expect(() => root.createReadonly(d.atomic(d.i32))).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Cannot create a 'readonly' binding of a buffer with schema atomic<i32>, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.]`,
+    );
   });
 
   it('allows atomics in mutable bindings', ({ root }) => {

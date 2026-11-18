@@ -66,4 +66,8 @@ class AtomicImpl<TSchema extends U32 | I32> implements Atomic<TSchema> {
   constructor(inner: TSchema) {
     this.inner = inner;
   }
+
+  toString(): string {
+    return `atomic<${String(this.inner)}>`;
+  }
 }
