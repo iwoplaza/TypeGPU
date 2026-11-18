@@ -1345,6 +1345,43 @@ describe('GlslGenerator - entry point generation with JS functions', () => {
     `);
     expect(warnSpy).not.toHaveBeenCalled();
   });
+
+  it('converts number literals to the declared fragment output types', () => {
+    const fragFn = tgpu.fragmentFn({
+      out: { color: d.vec4f, depth: d.builtin.fragDepth },
+    })(() => {
+      'use gpu';
+      return { color: d.vec4f(1), depth: 0.5 };
+    });
+
+    const result = tgpu.resolve([fragFn], dualGlOptions().fragment);
+    expect(result).toMatch(/ = vec4\(1\);/);
+    expect(result).toMatch(/ = 0\.5;/);
+  });
+
+  it('converts number literals to the declared vertex output types', () => {
+    const vertFn = tgpu.vertexFn({
+      out: { position: d.builtin.position, weight: d.f32, scale: d.location(3, d.f32) },
+    })(() => {
+      'use gpu';
+      return { position: d.vec4f(), weight: 1, scale: 0.25 };
+    });
+
+    expect(tgpu.resolve([vertFn], dualGlOptions().vertex)).toMatchInlineSnapshot(`
+      "out float vary_weight;
+
+      out float vary_scale;
+
+      void main() {
+        {
+          gl_Position = vec4(0);
+          vary_weight = 1.0;
+          vary_scale = 0.25;
+          return;
+        }
+      }"
+    `);
+  });
 });
 
 describe('GlslGenerator - GL syntax', () => {

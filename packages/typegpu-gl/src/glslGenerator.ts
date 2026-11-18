@@ -1210,7 +1210,13 @@ export class GlslGenerator extends WgslGenerator {
     for (const prop of properties) {
       const key = resolveUniqueKey(prop);
       const rhsNode = prop[1];
-      const rhsExpr = this._expression(rhsNode);
+      const propType =
+        expectedReturnType && d.isWgslStruct(expectedReturnType)
+          ? expectedReturnType.propTypes[key]
+          : undefined;
+      const rhsExpr = propType
+        ? this._expressionWithTypeConversion(rhsNode, propType)
+        : this._expression(rhsNode);
       const dataType = rhsExpr.dataType as d.BaseData;
       const rhsStr = this.ctx.resolve(rhsExpr.value, dataType).value;
 
