@@ -1651,6 +1651,89 @@ describe('root.createRenderPipeline', () => {
       }"
     `);
   });
+
+  it('throws when an entry function returns an object on one path and nothing on another', ({
+    root,
+  }) => {
+    const valueFirst = root.createRenderPipeline({
+      // @ts-expect-error: the types already reject a bare `return` here
+      vertex: ({ $vertexIndex }) => {
+        'use gpu';
+        if ($vertexIndex === 0) {
+          return { $position: d.vec4f() };
+        }
+        if ($vertexIndex === 1) {
+          return;
+        }
+        return { $position: d.vec4f(1) };
+      },
+      fragment: () => {
+        'use gpu';
+        return d.vec4f(1);
+      },
+    });
+
+    const bareFirst = root.createRenderPipeline({
+      // @ts-expect-error: the types already reject a bare `return` here
+      vertex: ({ $vertexIndex }) => {
+        'use gpu';
+        if ($vertexIndex === 0) {
+          return;
+        }
+        return { $position: d.vec4f() };
+      },
+      fragment: () => {
+        'use gpu';
+        return d.vec4f(1);
+      },
+    });
+
+    expect(() => tgpu.resolve([valueFirst])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - renderPipeline:valueFirst
+      - renderPipelineCore
+      - autoVertexFn: Expected function to have a single return type, got [struct:VertexOut, void]. Cast explicitly to the desired type.]
+    `);
+    expect(() => tgpu.resolve([bareFirst])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - renderPipeline:bareFirst
+      - renderPipelineCore
+      - autoVertexFn: Expected function to have a single return type, got [void, struct:VertexOut]. Cast explicitly to the desired type.]
+    `);
+  });
+
+  it('throws when a fragment function returns an object on one path and nothing on another', ({
+    root,
+  }) => {
+    const pipeline = root.createRenderPipeline({
+      vertex: () => {
+        'use gpu';
+        return { $position: d.vec4f() };
+      },
+      // @ts-expect-error: the types already reject a bare `return` here
+      fragment: ({ $position }) => {
+        'use gpu';
+        if ($position.x > 0) {
+          return { color: d.vec4f(1) };
+        }
+        if ($position.y > 0) {
+          return;
+        }
+        return { color: d.vec4f() };
+      },
+      targets: { color: { format: 'rgba8unorm' } },
+    });
+
+    expect(() => tgpu.resolve([pipeline])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - renderPipeline:pipeline
+      - renderPipelineCore
+      - autoFragmentFn: Expected function to have a single return type, got [struct:FragmentOut, void]. Cast explicitly to the desired type.]
+    `);
+  });
 });
 
 describe('TgpuRenderPipeline', () => {

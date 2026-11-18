@@ -774,7 +774,8 @@ export class ResolutionCtxImpl implements ResolutionCtx {
             // We're expecting an "auto" return type, so if there were structs returned,
             // we accept the struct, otherwise we let the rest of the code unify on a
             // primitive type.
-            if (isWgslStruct(scope.reportedReturnTypes.values().next().value)) {
+            const reportedTypes = [...scope.reportedReturnTypes];
+            if (reportedTypes.length > 0 && reportedTypes.every((type) => isWgslStruct(type))) {
               returnType = returnType.completeStruct;
             } else {
               returnType = undefined;
