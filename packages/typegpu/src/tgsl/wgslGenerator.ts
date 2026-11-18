@@ -1454,6 +1454,13 @@ Try 'return ${typeStr}(${str});' instead.
       );
     }
 
+    return this._emitBareReturn();
+  }
+
+  /**
+   * Creates a `return;` statement, without checking if the function is expected to return a value.
+   */
+  protected _emitBareReturn(): string {
     this.ctx.reportReturnType(wgsl.Void);
     return `${this.ctx.pre}return;`;
   }

@@ -40,8 +40,7 @@ class ExtractingGenerator extends WgslGenerator {
       this.returnedSnippet = expectedReturnType
         ? this._expressionWithTypeConversion(statement[1], expectedReturnType)
         : this._expression(statement[1]);
-      this.ctx.reportReturnType(d.Void);
-      return `${this.ctx.pre}return;`;
+      return this._emitBareReturn();
     }
 
     // Proceed as usual

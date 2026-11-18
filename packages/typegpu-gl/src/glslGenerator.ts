@@ -1100,8 +1100,28 @@ export class GlslGenerator extends WgslGenerator {
     return node;
   }
 
+  /**
+   * Set while generating a block that assigns the returned value to stage outputs,
+   * and then returns nothing.
+   */
+  #returningThroughOutputs = false;
+
+  #outputAssignmentBlock(...args: Parameters<WgslGenerator['_block']>) {
+    const prev = this.#returningThroughOutputs;
+    this.#returningThroughOutputs = true;
+    try {
+      return super._block(...args);
+    } finally {
+      this.#returningThroughOutputs = prev;
+    }
+  }
+
   override _return(statement: Return): string {
     const exprNode = statement[1];
+
+    if (exprNode === undefined && this.#returningThroughOutputs) {
+      return this._emitBareReturn();
+    }
 
     if (
       exprNode === undefined ||
@@ -1145,7 +1165,7 @@ export class GlslGenerator extends WgslGenerator {
         expr.dataType as d.AnyData,
         'private',
       );
-      const block = super._block(
+      const block = this.#outputAssignmentBlock(
         [NODE.block, [[NODE.assignmentExpr, name, '=', exprNode], [NODE.return]]],
         /* allowInlining */ true,
         { [name]: colorSnippet.$ },
@@ -1159,7 +1179,7 @@ export class GlslGenerator extends WgslGenerator {
       exprType.startsWith('vec')
     ) {
       // Vertex returning a vec directly -> gl_Position.
-      const block = super._block(
+      const block = this.#outputAssignmentBlock(
         [NODE.block, [[NODE.assignmentExpr, 'gl_Position', '=', exprNode], [NODE.return]]],
         /* allowInlining */ true,
         { gl_Position: gl_PositionSnippet.$ },
