@@ -266,9 +266,7 @@ function resolveStruct(ctx: ResolutionCtx, struct: d.WgslStruct) {
   ctx.addDeclaration(`\
 struct ${id} {
 ${Object.entries(struct.propTypes)
-  .map(
-    ([prop, type]) => `  ${ctx.resolve(type).value} ${prop}${resolveArraySizeSuffix(type)};\n`,
-  )
+  .map(([prop, type]) => `  ${ctx.resolve(type).value} ${prop}${resolveArraySizeSuffix(type)};\n`)
   .join('')}\
 };`);
 
