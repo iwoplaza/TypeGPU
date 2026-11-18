@@ -631,13 +631,10 @@ export interface TgpuRoot extends Unwrapper, WithBinding {
   ): TgpuReadonly<TData>;
 
   createTexture<
-    TWidth extends number,
-    THeight extends number,
-    TDepth extends number,
-    TSize extends
-      | readonly [TWidth]
-      | readonly [TWidth, THeight]
-      | readonly [TWidth, THeight, TDepth],
+    const TSize extends
+      | readonly [number]
+      | readonly [number, number]
+      | readonly [number, number, number],
     TFormat extends GPUTextureFormat,
     TMipLevelCount extends number,
     TSampleCount extends number,
@@ -799,13 +796,10 @@ export interface ExperimentalTgpuRoot
 
   /** @deprecated Use `root.createTexture` instead. */
   createTexture<
-    TWidth extends number,
-    THeight extends number,
-    TDepth extends number,
-    TSize extends
-      | readonly [TWidth]
-      | readonly [TWidth, THeight]
-      | readonly [TWidth, THeight, TDepth],
+    const TSize extends
+      | readonly [number]
+      | readonly [number, number]
+      | readonly [number, number, number],
     TFormat extends GPUTextureFormat,
     TMipLevelCount extends number,
     TSampleCount extends number,
