@@ -449,6 +449,7 @@ function render() {
 }
 
 let lastTime: number | null = null;
+let animationFrameId: number;
 function frame(timestamp: number) {
   const deltaTime = Math.min(lastTime !== null ? (timestamp - lastTime) / 1000 : 0, 0.1);
   lastTime = timestamp;
@@ -471,9 +472,9 @@ function frame(timestamp: number) {
 
   currentTexture = 1 - currentTexture;
 
-  requestAnimationFrame(frame);
+  animationFrameId = requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+animationFrameId = requestAnimationFrame(frame);
 
 const autoResizer = common.attachAutoResizer({
   root,
@@ -636,6 +637,7 @@ export const controls = defineControls({
 });
 
 export function onCleanup() {
+  cancelAnimationFrame(animationFrameId);
   autoResizer.detach();
   root.destroy();
 }

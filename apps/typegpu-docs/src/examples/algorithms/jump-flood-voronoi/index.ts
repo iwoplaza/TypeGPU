@@ -294,6 +294,7 @@ export const controls = defineControls({
 });
 
 export function onCleanup() {
+  currentRunId++;
   autoResizer.detach();
   root.destroy();
 }
