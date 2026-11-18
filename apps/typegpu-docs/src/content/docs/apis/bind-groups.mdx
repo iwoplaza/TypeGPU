@@ -38,7 +38,8 @@ in the layout.
 To access the entries in `fooLayout` from a shader, the corresponding WGSL code would look like this:
 ```wgsl
 @group(...) @binding(0) var<uniform> foo: vec3f;
-@group(...) @binding(1) var bar: texture_2d;
+
+@group(...) @binding(1) var bar: texture_2d<f32>;
 ```
 
 Where `@group(...)` would contain the group index given when creating the pipeline layout.
@@ -67,6 +68,27 @@ const fooLayout = tgpu.bindGroupLayout({
   key0: { ... },
   key1: { ... },
   // ...
+});
+```
+
+### Visibility
+
+Every layout entry accepts an optional `visibility` property, which limits the shader stages that can access the resource:
+```ts
+{
+  visibility?: ('compute' | 'vertex' | 'fragment')[];
+}
+```
+
+When omitted, mutable storage buffers (`access: 'mutable'`) and storage textures default to `['compute', 'fragment']`,
+and every other resource defaults to `['compute', 'vertex', 'fragment']`.
+
+```ts twoslash
+import { tgpu, d } from 'typegpu';
+// ---cut---
+const fooLayout = tgpu.bindGroupLayout({
+  // only accessible in compute shaders
+  counter: { storage: d.u32, access: 'mutable', visibility: ['compute'] },
 });
 ```
 
@@ -130,14 +152,16 @@ Runtime-sized arrays are only usable with **storage** buffers.
 ```ts
 // main.ts
 const Filter = (n: number) =>
-  d.struct({
-    clamp: d.f32,
-    values: d.arrayOf(d.f32, n),
-  });
+  d
+    .struct({
+      clamp: d.f32,
+      values: d.arrayOf(d.f32, n),
+    })
+    .$name('Filter');
 
 const fooLayout = tgpu.bindGroupLayout({
   factors: { storage: (n: number) => d.arrayOf(d.f32, n) },
-  filter: { storage: Filter },
+  filterParams: { storage: Filter },
   // ...
 });
 ```
@@ -147,16 +171,18 @@ You don't have to write arrow functions every time, `d.arrayOf(schema)` is a con
 ```diff lang="ts"
 // main.ts
 const Filter = (n: number) =>
-  d.struct({
-    clamp: d.f32,
-    // Unfortunately, in structs, you cannot simply write d.arrayOf(d.f32)
-    values: d.arrayOf(d.f32, n),
-  });
+  d
+    .struct({
+      clamp: d.f32,
+      // Unfortunately, in structs, you cannot simply write d.arrayOf(d.f32)
+      values: d.arrayOf(d.f32, n),
+    })
+    .$name('Filter');
 
 const fooLayout = tgpu.bindGroupLayout({
 -  factors: { storage: (n: number) => d.arrayOf(d.f32, n) },
 +  factors: { storage: d.arrayOf(d.f32) },
-  filter: { storage: Filter },
+  filterParams: { storage: Filter },
   // ...
 });
 ```
@@ -164,13 +190,14 @@ const fooLayout = tgpu.bindGroupLayout({
 Matching WGSL code:
 ```wgsl
 // shader.wgsl
+@group(...) @binding(0) var<storage, read> factors: array<f32>;
+
 struct Filter {
   clamp: f32,
-  values: array<f32>;
+  values: array<f32>,
 }
 
-@group(...) @binding(0) var<storage, read> factors: array<f32>;
-@group(...) @binding(1) var<storage, read> filter: Filter;
+@group(...) @binding(1) var<storage, read> filterParams: Filter;
 // ...
 ```
 
@@ -195,8 +222,12 @@ To be able to sample a texture in a shader, create a property with the correspon
   // texture: d.textureCubeArray(d.f32);
   // texture: d.texture3d(d.i32);
 
-  /** @default 'float' */
-  sampleType?: 'float' | 'unfilterable-float'; // only for float textures
+  /**
+   * @default the first sample type valid for the schema:
+   * 'float' for f32 textures, 'sint' for i32, 'uint' for u32
+   * and 'depth' for depth textures
+   */
+  sampleType?: GPUTextureSampleType;
 }
 ```
 
@@ -207,11 +238,13 @@ To be able to operate on textures more directly in a shader, create a property w
 {
   storageTexture: d.WgslStorageTexture;
   // for example:
-  // storageTexture: d.storageTexture2d('rgba8unorm');
-  // storageTexture: d.storageTextureCube('r32float', 'read-write');
-  // storageTexture: d.storageTexture2dArray('rgba16float', 'read-only');
+  // storageTexture: d.textureStorage2d('rgba8unorm'); // 'write-only' by default
+  // storageTexture: d.textureStorage3d('r32float', 'read-write');
+  // storageTexture: d.textureStorage2dArray('rgba16float', 'read-only');
 }
 ```
+The available schemas are `d.textureStorage1d`, `d.textureStorage2d`, `d.textureStorage2dArray` and `d.textureStorage3d`.
+Each takes a texel format and an access mode (`'write-only'`, `'read-only'` or `'read-write'`), which defaults to `'write-only'`.
 You can see the list of supported storage texture formats [here](https://www.w3.org/TR/WGSL/#storage-texel-formats).
 
 ### External Textures
@@ -277,19 +310,31 @@ const fooBindGroup1 = root.createBindGroup(fooLayout, {
 If you accidentally pass the wrong type of resource, the TypeScript compiler will catch the error at compile time.
 
 - **Uniform** bindings with schema `TData` accept:
+  - `TgpuUniform<TData>` - created with `root.createUniform(...)`,
   - `TgpuBuffer<TData> & UniformFlag` - buffers of type `TData` with `'uniform'` usage,
   - `GPUBuffer` - raw WebGPU buffers.
 - **Storage** bindings with schema `TData` accept:
+  - `TgpuReadonly<TData>` (for `access: 'readonly'`, the default) - created with `root.createReadonly(...)`,
+  - `TgpuMutable<TData>` (for `access: 'mutable'`) - created with `root.createMutable(...)`,
   - `TgpuBuffer<TData> & StorageFlag` - buffers of type `TData` with `'storage'` usage,
   - `GPUBuffer` - raw WebGPU buffers.
-- **Texture** bindings:
-  - `GPUTextureView` - views of raw WebGPU textures.
-- **Storage Texture** bindings:
-  - `GPUTextureView` - views of raw WebGPU textures.
+- **Texture** bindings accept:
+  - `TgpuTexture & SampledFlag` - textures matching the schema, with `'sampled'` usage,
+  - `TgpuTextureView` - created with `texture.createView(...)`,
+  - `GPUTexture` and `GPUTextureView` - raw WebGPU textures and their views.
+- **Storage Texture** bindings accept:
+  - `TgpuTexture & StorageFlag` - textures matching the schema, with `'storage'` usage,
+  - `TgpuTextureView` - created with `texture.createView(...)`,
+  - `GPUTexture` and `GPUTextureView` - raw WebGPU textures and their views.
 - **Sampler** bindings:
   - `sampler === 'comparison'`
+    - `TgpuComparisonSampler` - created with `root.createComparisonSampler(...)`,
     - `GPUSampler` - raw WebGPU samplers created *with* a `compare` function.
   - `sampler === 'filtering'` or `sampler === 'non-filtering'`
+    - `TgpuSampler` - created with `root.createSampler(...)`,
     - `GPUSampler` - raw WebGPU samplers created *without* a `compare` function.
-- **External Texture** bindings:
-  - `GPUExternalTexture` - imported with `device.importExternalTexture(...)`.
+- **External Texture** bindings accept:
+  - `GPUExternalTexture` - imported with `device.importExternalTexture(...)`,
+  - `TgpuTexture & SampledFlag` - textures with `'sampled'` usage and an `'rgba8unorm'`, `'bgra8unorm'` or `'rgba16float'` format,
+  - `TgpuTextureView` - `texture_2d<f32>` views, created with `texture.createView(...)`,
+  - `GPUTexture` and `GPUTextureView` - raw WebGPU textures and their views.
