@@ -1,6 +1,6 @@
 import { describe, expect, vi } from 'vitest';
 import { tgpu, d, std } from 'typegpu';
-import { dualGlOptions, glOptions } from '@typegpu/gl';
+import { dualGlOptions, glOptions, initWithGL } from '@typegpu/gl';
 import { translateWgslTypeToGlsl } from '../src/glslGenerator.ts';
 import { it } from './utils/extendedTest.ts';
 
@@ -1344,6 +1344,117 @@ describe('GlslGenerator - entry point generation with JS functions', () => {
       }"
     `);
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('converts number literals to the declared fragment output types', () => {
+    const fragFn = tgpu.fragmentFn({
+      out: { color: d.vec4f, depth: d.builtin.fragDepth },
+    })(() => {
+      'use gpu';
+      return { color: d.vec4f(1), depth: 0.5 };
+    });
+
+    expect(tgpu.resolve([fragFn], dualGlOptions().fragment)).toMatch(/ = 0\.5;/);
+  });
+
+  it('converts number literals to the declared vertex output types', () => {
+    const vertFn = tgpu.vertexFn({
+      out: { position: d.builtin.position, weight: d.f32, scale: d.location(3, d.f32) },
+    })(() => {
+      'use gpu';
+      return { position: d.vec4f(), weight: 1, scale: 0.25 };
+    });
+
+    expect(tgpu.resolve([vertFn], dualGlOptions().vertex)).toMatchInlineSnapshot(`
+      "out float vary_weight;
+
+      out float vary_scale;
+
+      void main() {
+        {
+          gl_Position = vec4(0);
+          vary_weight = 1.0;
+          vary_scale = 0.25;
+          return;
+        }
+      }"
+    `);
+  });
+
+  it('converts other values to the declared output types', () => {
+    const vertFn = tgpu.vertexFn({
+      out: { position: d.builtin.position, weight: d.f32 },
+    })(() => {
+      'use gpu';
+      const count = d.i32(2);
+      return { position: d.vec4f(), weight: count };
+    });
+
+    expect(tgpu.resolve([vertFn], dualGlOptions().vertex)).toMatch(/vary_weight = float\(count\);/);
+  });
+
+  it('makes number literals concrete in inferred vertex outputs', ({ gl }) => {
+    const root = initWithGL({ gl });
+    root.createRenderPipeline({
+      vertex: () => {
+        'use gpu';
+        return { $position: d.vec4f(), weight: 1, scale: 0.5 };
+      },
+      fragment: ({ weight, scale }) => {
+        'use gpu';
+        return d.vec4f(d.f32(weight) * scale);
+      },
+    });
+
+    const [vertexSource] = vi.mocked(gl.shaderSource).mock.calls.map(([, source]) => source);
+    expect(vertexSource).toMatch(/\bint vary_weight;/);
+    expect(vertexSource).toMatch(/\bfloat vary_scale;/);
+    expect(vertexSource).toContain('vary_weight = 1;');
+    expect(vertexSource).toContain('vary_scale = 0.5;');
+  });
+
+  it('converts later returns to the type the first one gave an inferred output', ({ gl }) => {
+    const root = initWithGL({ gl });
+    root.createRenderPipeline({
+      vertex: () => {
+        'use gpu';
+        const c = d.f32(1);
+        if (c > 0) {
+          return { $position: d.vec4f(), weight: 1, scale: 0.5 };
+        }
+        return { $position: d.vec4f(), weight: 2.5, scale: 2 };
+      },
+      fragment: ({ weight, scale }) => {
+        'use gpu';
+        return d.vec4f(d.f32(weight) * scale);
+      },
+    });
+
+    const [vertexSource] = vi.mocked(gl.shaderSource).mock.calls.map(([, source]) => source);
+    expect(vertexSource).toMatch(/\bint vary_weight;/);
+    expect(vertexSource).toMatch(/\bfloat vary_scale;/);
+    expect(vertexSource).toContain('vary_weight = 1;');
+    expect(vertexSource).toContain('vary_weight = 2;');
+    expect(vertexSource).toContain('vary_scale = 0.5;');
+    expect(vertexSource).toContain('vary_scale = 2.0;');
+  });
+
+  it('makes number literals concrete in inferred fragment outputs', ({ gl }) => {
+    const root = initWithGL({ gl });
+    root.createRenderPipeline({
+      vertex: () => {
+        'use gpu';
+        return { $position: d.vec4f() };
+      },
+      fragment: () => {
+        'use gpu';
+        return { color: d.vec4f(1), $fragDepth: 0.5, $sampleMask: 1 };
+      },
+    });
+
+    const [, fragmentSource] = vi.mocked(gl.shaderSource).mock.calls.map(([, source]) => source);
+    expect(fragmentSource).toMatch(/ = 0\.5;/);
+    expect(fragmentSource).toMatch(/ = 1u;/);
   });
 });
 

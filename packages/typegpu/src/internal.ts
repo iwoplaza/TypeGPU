@@ -8,6 +8,7 @@ export { getName, setName } from './shared/meta.ts';
 export { WgslGenerator } from './tgsl/wgslGenerator.ts';
 export { snip, withValue, withDataType, withSideEffects } from './data/snippet.ts';
 export { stringifyNode, stringifyObjectProperty } from './shared/tseynit.ts';
+export { concretize } from './tgsl/generationHelpers.ts';
 export { dualImpl } from './core/function/dualImpl.ts';
 export { getLogResources } from './core/pipeline/pipelineUtils.ts';
 export {
