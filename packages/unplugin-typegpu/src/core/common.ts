@@ -350,6 +350,11 @@ function isPureCall(node: t.Node, path: NodePath, state: PluginState): boolean {
 
   if (isShellImplementationCall(node, state)) {
     // tgpu.fn(...)(...)
+    const shellArg = (node.callee as t.CallExpression).arguments[0];
+    if (shellArg?.type !== 'ArrayExpression' && shellArg?.type !== 'ObjectExpression') {
+      // Could be a generic function (`tgpu.fn(callback)`), calling which runs code on the CPU
+      return false;
+    }
     return isPureCall(node.callee, path, state);
   }
 

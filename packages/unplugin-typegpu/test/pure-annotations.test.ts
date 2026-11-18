@@ -49,6 +49,7 @@ const sideEffectfulCode = `\
   const someSlot = tgpu.slot();
   const withSlot = tgpu.fn([])(() => {}).with(someSlot, 1);
   const layoutIdx = tgpu.bindGroupLayout({}).$idx(0);
+  const genericResult = tgpu.fn((x) => { console.log(x); return x; })(3);
 
   export function local(d) {
     const x = d.struct({});
@@ -85,6 +86,8 @@ function expectSideEffectsKept(output: string) {
   expect(output).toContain('.with(someSlot, 1)');
   expect(output).toContain('.$idx(0)');
   expect(output).toContain('d.struct({})');
+  // Calling a generic function runs it on the CPU
+  expect(output).toMatch(/tgpu\.fn\(.*\)\(3\)/s);
 }
 
 describe('[BABEL] pure annotations', () => {
