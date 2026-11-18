@@ -1327,6 +1327,10 @@ The generated shader will evaluate them in declaration order.`,
       return snip(`${value}u`, schema, /* origin */ 'constant', false);
     }
     if (schema.type === 'i32') {
+      if (value === -2147483648) {
+        // `2147483648i` is out of range, so the minimum cannot be written as a negated literal
+        return snip(`i32(${value})`, schema, /* origin */ 'constant', false);
+      }
       return snip(`${value}i`, schema, /* origin */ 'constant', false);
     }
 

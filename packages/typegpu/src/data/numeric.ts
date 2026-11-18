@@ -12,7 +12,7 @@ import {
 } from './wgslTypes.ts';
 import { callableSchema } from '../core/function/createCallableSchema.ts';
 import { FiniteMathAssumptionError, SignatureNotSupportedError, WgslTypeError } from '../errors.ts';
-import { isSnippetNumeric } from './snippet.ts';
+import { isSnippetNumeric, type Snippet } from './snippet.ts';
 import { UnknownData } from './dataTypes.ts';
 
 const boolCast = callableSchema({
@@ -72,6 +72,47 @@ export const bool: Bool = Object.assign(boolCast, {
   type: 'bool',
 }) as unknown as Bool;
 
+type FloatType = 'f32' | 'f16' | 'abstractFloat';
+
+/**
+ * The largest and smallest integers in the target type's range that are also
+ * exactly representable in the source float type.
+ * @see https://www.w3.org/TR/WGSL/#floating-point-conversion
+ */
+const floatToIntBounds = {
+  f32: { u32Max: 4294967040, i32Min: -2147483648, i32Max: 2147483520 },
+  f16: { u32Max: 65504, i32Min: -65504, i32Max: 65504 },
+  abstractFloat: { u32Max: 4294967295, i32Min: -2147483648, i32Max: 2147483647 },
+} as const;
+
+function floatTypeOf(snippet: Snippet | undefined): FloatType | undefined {
+  const type = snippet && snippet.dataType !== UnknownData ? snippet.dataType.type : undefined;
+  return type === 'f32' || type === 'f16' || type === 'abstractFloat' ? type : undefined;
+}
+
+/**
+ * Converts a float to u32 the way WGSL does: rounds toward zero, then clamps to the
+ * range of u32 values representable in the source float type.
+ */
+export function floatToU32(value: number, sourceType: FloatType): number {
+  if (!Number.isFinite(value)) {
+    throw new FiniteMathAssumptionError(value, u32);
+  }
+  return Math.min(Math.max(Math.trunc(value), 0), floatToIntBounds[sourceType].u32Max) >>> 0;
+}
+
+/**
+ * Converts a float to i32 the way WGSL does: rounds toward zero, then clamps to the
+ * range of i32 values representable in the source float type.
+ */
+export function floatToI32(value: number, sourceType: FloatType): number {
+  if (!Number.isFinite(value)) {
+    throw new FiniteMathAssumptionError(value, i32);
+  }
+  const { i32Min, i32Max } = floatToIntBounds[sourceType];
+  return Math.min(Math.max(Math.trunc(value), i32Min), i32Max) | 0;
+}
+
 const u32Cast = callableSchema({
   name: 'u32',
   schema: () => u32,
@@ -98,6 +139,12 @@ const u32Cast = callableSchema({
     }
     // Integer input: treat as bit reinterpretation (i32 -> u32)
     return (v & 0xffffffff) >>> 0;
+  },
+  comptimeImpl(v) {
+    const floatType = floatTypeOf(v);
+    return floatType
+      ? floatToU32(v?.value as number, floatType)
+      : u32(v?.value as number | boolean | undefined);
   },
   codegenImpl: (ctx, [v]) => ctx.gen.typeInstantiation(u32, v ? [v] : []),
 });
@@ -138,6 +185,12 @@ const i32Cast = callableSchema({
       throw new FiniteMathAssumptionError(v, i32);
     }
     return v | 0;
+  },
+  comptimeImpl(v) {
+    const floatType = floatTypeOf(v);
+    return floatType
+      ? floatToI32(v?.value as number, floatType)
+      : i32(v?.value as number | boolean | undefined);
   },
   codegenImpl: (ctx, [v]) => ctx.gen.typeInstantiation(i32, v ? [v] : []),
 });
@@ -335,7 +388,7 @@ const f16Cast = callableSchema({
  * @example
  * const value = f16(); // 0
  * @example
- * const value = f32(1.23); // 1.23
+ * const value = f16(1.23); // 1.23046875
  * @example
  * const value = f16(true); // 1
  * @example
