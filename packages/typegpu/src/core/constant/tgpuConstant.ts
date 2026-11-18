@@ -1,3 +1,4 @@
+import { containsAtomic } from '../../data/atomic.ts';
 import { isData, type AnyData } from '../../data/dataTypes.ts';
 import { snip } from '../../data/snippet.ts';
 import { type AnyWgslData, type BaseData, type WgslArray } from '../../data/wgslTypes.ts';
@@ -6,6 +7,7 @@ import { makeResolvable } from '../../tgsl/makeResolvable.ts';
 import type { TgpuNamable } from '../../shared/meta.ts';
 import { getName, setName } from '../../shared/meta.ts';
 import type { InferGPU } from '../../shared/repr.ts';
+import { safeStringify } from '../../shared/stringify.ts';
 import type { TgpuSoul } from '../../shared/soul.ts';
 import { $gpuValueOf, $internal, $soul } from '../../shared/symbols.ts';
 
@@ -137,6 +139,11 @@ class TgpuConstImpl<TDataType extends BaseData> implements TgpuConst<TDataType> 
   }
 
   constructor(dataType: TDataType, value: InferGPU<TDataType>) {
+    if (containsAtomic(dataType)) {
+      throw new Error(
+        `Cannot create a constant with schema ${safeStringify(dataType)}, as it contains atomics. Atomics can only be used in mutable storage buffers and workgroup variables.`,
+      );
+    }
     this[$soul] = {
       type: 'const',
       dataType,
