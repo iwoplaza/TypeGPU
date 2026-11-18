@@ -246,6 +246,45 @@ describe('TgpuComputePipeline', () => {
     expect(onUnhandled).not.toHaveBeenCalled();
   });
 
+  it('logs missing timestamps and still fires the other performance callbacks', async ({
+    root,
+  }) => {
+    using consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const entryFn = tgpu.computeFn({ workgroupSize: [1] })(() => {});
+    const querySet = root.createQuerySet('timestamp', 1);
+    const callback1 = vi.fn();
+    const callback2 = vi.fn();
+    const onUnhandled = vi.fn();
+    process.on('unhandledRejection', onUnhandled);
+
+    const encoder = root.createCommandEncoder();
+
+    root
+      .createComputePipeline({ compute: entryFn })
+      .withTimestampWrites({ querySet, beginningOfPassWriteIndex: 0 })
+      .withPerformanceCallback(callback1)
+      .with(encoder)
+      .dispatchWorkgroups(1);
+
+    root
+      .createComputePipeline({ compute: entryFn })
+      .withTimestampWrites({ querySet, endOfPassWriteIndex: 0 })
+      .withPerformanceCallback(callback2)
+      .with(encoder)
+      .dispatchWorkgroups(1);
+
+    encoder.submit();
+    await new Promise((resolve) => setTimeout(resolve));
+    process.off('unhandledRejection', onUnhandled);
+
+    expect(onUnhandled).not.toHaveBeenCalled();
+    expect(callback1).not.toHaveBeenCalled();
+    expect(callback2).toHaveBeenCalledWith(0n, 0n);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'QuerySet did not return valid timestamps, skipping the performance callback (withPerformanceCallback).',
+    );
+  });
+
   it('logs errors thrown from the performance callback', async ({ root }) => {
     using consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const entryFn = tgpu.computeFn({ workgroupSize: [1] })(() => {});
