@@ -1016,12 +1016,12 @@ export class GlslGenerator extends WgslGenerator {
         : isBoolVec(rhs.dataType)
           ? rhs.dataType
           : undefined;
-      if (!boolVec) {
-        return `(${lhsStr} ${op}${op} ${rhsStr})`;
-      }
-      // GLSL has no component-wise and/or on boolean vectors, but has bitwise ones on integer vectors
-      const uintVec = this.emitTypeAnnotation(correspondingUintVectorSchema(boolVec));
-      return `${this.emitTypeAnnotation(boolVec)}(${uintVec}(${lhsStr}) ${op} ${uintVec}(${rhsStr}))`;
+      // GLSL's `&` and `|` only take integers, and `&&` / `||` would short-circuit where WGSL doesn't
+      const boolType = boolVec ?? d.bool;
+      const uintType = this.emitTypeAnnotation(
+        boolVec ? correspondingUintVectorSchema(boolVec) : d.u32,
+      );
+      return `${this.emitTypeAnnotation(boolType)}(${uintType}(${lhsStr}) ${op} ${uintType}(${rhsStr}))`;
     }
 
     if (op === '%' && (isF32VecfSchema(lhs.dataType) || isF32VecfSchema(rhs.dataType))) {

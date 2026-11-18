@@ -4,22 +4,55 @@ import { test } from './utils/extendedTest.ts';
 import { describe, expect } from 'vitest';
 
 describe('std.and, std.or and std.not', () => {
-  test('keep logical operators on scalars', () => {
+  test('evaluate both operands on scalars', () => {
     // `std.and` and `std.or` are typed for boolean vectors, but accept scalars at runtime
     const and = std.and as unknown as (a: boolean, b: boolean) => boolean;
     const or = std.or as unknown as (a: boolean, b: boolean) => boolean;
+
+    const counter = tgpu.privateVar(d.u32);
+    const sideEffect = tgpu.fn(
+      [],
+      d.bool,
+    )(() => {
+      'use gpu';
+      counter.$ += 1;
+      return true;
+    });
 
     const fn = tgpu.fn(
       [d.bool, d.bool],
       d.bool,
     )((a, b) => {
       'use gpu';
-      return std.not(and(a, or(a, b)));
+      return std.not(and(a, or(b, sideEffect())));
+    });
+
+    expect(tgpu.resolve([fn], glOptions())).toMatchInlineSnapshot(`
+      "uint counter;
+
+      bool sideEffect() {
+        counter += 1u;
+        return true;
+      }
+
+      bool fn_1(bool a, bool b) {
+        return !(bool(uint(a) & uint(bool(uint(b) | uint(sideEffect())))));
+      }"
+    `);
+  });
+
+  test('keep logical operators as they are', () => {
+    const fn = tgpu.fn(
+      [d.bool, d.bool],
+      d.bool,
+    )((a, b) => {
+      'use gpu';
+      return a && (b || !a);
     });
 
     expect(tgpu.resolve([fn], glOptions())).toMatchInlineSnapshot(`
       "bool fn_1(bool a, bool b) {
-        return !((a && (a || b)));
+        return (a && (b || !(a)));
       }"
     `);
   });
