@@ -1,6 +1,6 @@
 import { callableSchema } from '../core/function/createCallableSchema.ts';
 import { $internal, $repr } from '../shared/symbols.ts';
-import { bool, f16, f32, i32, u32 } from './numeric.ts';
+import { bool, f16, f32, floatToI32, floatToU32, i32, u32 } from './numeric.ts';
 import {
   Vec2bImpl,
   Vec2fImpl,
@@ -285,6 +285,8 @@ function makeVecSchema<TValue, S extends number | boolean>(
   const { kind: type, length } = new VecImpl();
   const componentCount = length as 2 | 3 | 4;
 
+  const floatToInt = primitive === u32 ? floatToU32 : primitive === i32 ? floatToI32 : undefined;
+
   const cpuConstruct = (...args: (S | AnyVecInstance)[]): TValue => {
     const values: S[] = Array.from({ length: args.length });
 
@@ -293,8 +295,15 @@ function makeVecSchema<TValue, S extends number | boolean>(
       if (typeof arg === 'number' || typeof arg === 'boolean') {
         values[j++] = arg;
       } else {
+        const floatType = arg.kind.endsWith('f')
+          ? 'f32'
+          : arg.kind.endsWith('h')
+            ? 'f16'
+            : undefined;
         for (let c = 0; c < arg.length; ++c) {
-          values[j++] = arg[c] as S;
+          values[j++] = (
+            floatToInt && floatType ? floatToInt(arg[c] as number, floatType) : arg[c]
+          ) as S;
         }
       }
     }

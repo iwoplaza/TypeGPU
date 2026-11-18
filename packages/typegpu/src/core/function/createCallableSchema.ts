@@ -18,6 +18,11 @@ interface CallableSchemaOptions<T extends AnyFn> {
   readonly name: string;
   readonly schema: () => BaseData;
   readonly normalImpl: T;
+  /**
+   * Used in place of `normalImpl` when all arguments are known at compile time,
+   * for implementations whose result depends on the arguments' data types.
+   */
+  readonly comptimeImpl?: (...args: MapValueToSnippet<Parameters<T>>) => ReturnType<T>;
   readonly codegenImpl: (
     ctx: ResolutionCtx,
     args: MapValueToSnippet<Parameters<T>>,
@@ -59,7 +64,9 @@ export function callableSchema<T extends AnyFn>(options: CallableSchemaOptions<T
       ctx.pushMode(new NormalState());
       try {
         result = snip(
-          options.normalImpl(...(comptimeArgs.map((s) => s.value) as never[])),
+          options.comptimeImpl
+            ? options.comptimeImpl(...(comptimeArgs as MapValueToSnippet<Parameters<T>>))
+            : options.normalImpl(...(comptimeArgs.map((s) => s.value) as never[])),
           options.schema(),
           // Functions give up ownership of their return value
           /* origin */ 'constant',
