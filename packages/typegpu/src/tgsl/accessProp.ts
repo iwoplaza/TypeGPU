@@ -17,7 +17,7 @@ import {
 import { asComptime } from '../types.ts';
 import { coerceToSnippet, numericLiteralToSnippet } from './generationHelpers.ts';
 import { isValidSwizzle, Swizzle } from './swizzle.ts';
-import { InfixDispatch, type InfixOperatorName, infixOperators } from './infixDispatch.ts';
+import { InfixDispatch, type InfixOperatorName, infixOperatorImpls } from './infixDispatch.ts';
 import { accessStructProp } from './accessStructProp.ts';
 import { getName, isNamable, setName } from '../shared/meta.ts';
 
@@ -40,10 +40,9 @@ const infixKinds = [
 ];
 
 export function accessProp(target: Snippet, propName: string): Snippet | undefined {
-  if (infixKinds.includes((target.dataType as BaseData).type) && propName in infixOperators) {
-    const operator = infixOperators[propName as InfixOperatorName];
+  if (infixKinds.includes((target.dataType as BaseData).type) && propName in infixOperatorImpls) {
     return snip(
-      new InfixDispatch(target, operator),
+      new InfixDispatch(target, propName as InfixOperatorName),
       UnknownData,
       /* origin */ target.origin,
       target.possibleSideEffects,
