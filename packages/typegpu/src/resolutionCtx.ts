@@ -1053,9 +1053,16 @@ export class ResolutionCtxImpl implements ResolutionCtx {
     const instances = this.#namespaceInternal.memoizedResolves.get(item) ?? [];
 
     this._itemStateStack.pushItem();
-    const inProgress = this.#instancesInProgress.get(item) ?? [];
-    inProgress.push(this._itemStateStack.topItem);
-    this.#instancesInProgress.set(item, inProgress);
+    // Only functions are checked for recursion
+    let inProgress: ItemLayer[] | undefined;
+    if (isTgpuFn(item) || isShelllessImpl(item)) {
+      inProgress = this.#instancesInProgress.get(item);
+      if (!inProgress) {
+        inProgress = [];
+        this.#instancesInProgress.set(item, inProgress);
+      }
+      inProgress.push(this._itemStateStack.topItem);
+    }
 
     try {
       for (const instance of instances) {
@@ -1119,7 +1126,7 @@ export class ResolutionCtxImpl implements ResolutionCtx {
 
       throw new ResolutionError(err, [item]);
     } finally {
-      inProgress.pop();
+      inProgress?.pop();
       this._itemStateStack.pop('item');
     }
   }
