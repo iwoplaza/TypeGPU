@@ -22,6 +22,8 @@ interface ResourceCache<TSchema, TResource> {
   committed: ResourceEntry<TSchema, TResource> | undefined;
   /** Every entry that hasn't been destroyed yet, including ones from renders that never committed */
   live: Set<ResourceEntry<TSchema, TResource>>;
+  /** Destroys every live entry, scheduled by the insertion effect cleanup */
+  releaseTimer: ReturnType<typeof setTimeout> | undefined;
 }
 
 function destroyEntry<TResource>(
@@ -55,6 +57,7 @@ export function useRootResource<TSchema, TResource>(
   const [cache] = useState<ResourceCache<TSchema, TResource>>(() => ({
     committed: undefined,
     live: new Set(),
+    releaseTimer: undefined,
   }));
   const [, rerender] = useReducer((epoch: number) => epoch + 1, 0);
 
@@ -78,17 +81,21 @@ export function useRootResource<TSchema, TResource>(
   }
 
   // Insertion effects are the only ones React doesn't clean up when hiding a subtree with
-  // <Activity> or when simulating an unmount in StrictMode, so this only runs on a real unmount.
-  useInsertionEffect(
-    () => () => {
-      setTimeout(() => {
+  // <Activity> or when simulating an unmount in StrictMode, so this cleanup only runs on a real
+  // unmount, or on a Fast Refresh hot update. The latter runs the setup again right away, which
+  // cancels the release.
+  useInsertionEffect(() => {
+    clearTimeout(cache.releaseTimer);
+    cache.releaseTimer = undefined;
+
+    return () => {
+      cache.releaseTimer = setTimeout(() => {
         for (const live of cache.live) {
           destroyEntry(cache, live);
         }
       }, RELEASE_DELAY_MS);
-    },
-    [cache],
-  );
+    };
+  }, [cache]);
 
   const current = entry;
   useEffect(() => {
