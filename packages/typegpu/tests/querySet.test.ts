@@ -102,6 +102,44 @@ describe('TgpuQuerySet', () => {
     await readResult;
   });
 
+  it('should throw when reading while a read is in flight', async ({ root, device }) => {
+    // Model WebGPU rejecting `mapAsync` on a buffer that is already being mapped
+    const createBuffer = device.mock.createBuffer.getMockImplementation();
+    device.mock.createBuffer.mockImplementation((descriptor: GPUBufferDescriptor) => {
+      const buffer = createBuffer?.(descriptor) as unknown as {
+        mapState: GPUBufferMapState;
+        mapAsync: () => Promise<void>;
+      };
+      buffer.mapAsync = vi.fn(async () => {
+        if (buffer.mapState !== 'unmapped') {
+          throw new Error('Buffer is already mapped or has a pending map.');
+        }
+        buffer.mapState = 'pending';
+        await Promise.resolve();
+        buffer.mapState = 'mapped';
+      });
+      return buffer as never;
+    });
+
+    const querySet = root.createQuerySet('timestamp', 2);
+    querySet.resolve();
+
+    const firstRead = querySet.read();
+    await expect(querySet.read()).rejects.toThrow('This QuerySet is busy resolving or reading.');
+    await expect(firstRead).resolves.toHaveLength(2);
+
+    expect(querySet.available).toBe(true);
+    await expect(querySet.read()).resolves.toHaveLength(2);
+  });
+
+  it('should throw when reading a destroyed query set', async ({ root }) => {
+    const querySet = root.createQuerySet('timestamp', 2);
+    querySet.resolve();
+    querySet.destroy();
+
+    await expect(querySet.read()).rejects.toThrow('This QuerySet has been destroyed.');
+  });
+
   it('should work with external query set', ({ root, device }) => {
     const externalQuerySet = device.createQuerySet({
       type: 'timestamp',

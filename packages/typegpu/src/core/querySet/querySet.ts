@@ -154,6 +154,12 @@ class TgpuQuerySetImpl<T extends GPUQueryType> implements TgpuQuerySet<T> {
   }
 
   async read(): Promise<bigint[]> {
+    if (this.#destroyed) {
+      throw new Error('This QuerySet has been destroyed.');
+    }
+    if (!this.#available) {
+      throw new Error('This QuerySet is busy resolving or reading.');
+    }
     if (!this.#resolveBuffer) {
       throw new Error('QuerySet must be resolved before reading.');
     }
