@@ -10,7 +10,6 @@ import React, {
   useState,
 } from 'react';
 import { tgpu, type InitOptions, type TgpuRoot } from 'typegpu';
-import { useDeferredCleanup } from './helper-hooks.ts';
 import { useBailOnServer } from './use-bail-on-server.ts';
 
 function attachPromiseStatus<T>(
@@ -90,12 +89,18 @@ type RootContextResult =
 
 interface RootContext {
   initOrGetRoot(): RootContextResult;
-  unmount(): void;
 }
 
+/**
+ * Lives as long as the <Root> provider that owns it, including while it's hidden by
+ * <Activity>, so that the same root is provided when it becomes visible again.
+ * The root is intentionally never destroyed. Canvas contexts from an unmounted tree can stay
+ * configured with its device until they're garbage collected, and releasing a surface
+ * configured on a destroyed device crashes some implementations (e.g. Dawn on Vulkan).
+ * The device gets released once it's no longer referenced.
+ */
 class OwnRootContext implements RootContext {
   #result: RootContextResult | undefined;
-  #destroyed: boolean = false;
   readonly #options: InitOptions | undefined;
 
   constructor(options?: InitOptions) {
@@ -103,25 +108,12 @@ class OwnRootContext implements RootContext {
   }
 
   initOrGetRoot(): RootContextResult {
-    if (this.#destroyed) {
-      console.warn(`[@typegpu/react]: Tried to init an already destroyed root.`);
-      const reason = new Error('Already destroyed');
-      const settled = { status: 'rejected' as const, reason };
-      const settledPromise = Promise.resolve(settled);
-      markFulfilled(settledPromise, settled);
-      return { status: 'rejected', reason, settledPromise };
-    }
-
     if (!this.#result) {
       const promise = tgpu.init(this.#options).then(
         (root) => {
           markFulfilled(promise, root);
           markFulfilled(settledPromise, { status: 'fulfilled', value: root });
-          if (this.#destroyed) {
-            this.#result = undefined;
-          } else {
-            this.#result = { status: 'fulfilled', promise, settledPromise, value: root };
-          }
+          this.#result = { status: 'fulfilled', promise, settledPromise, value: root };
 
           return root;
         },
@@ -147,15 +139,6 @@ class OwnRootContext implements RootContext {
 
     return this.#result;
   }
-
-  unmount(): void {
-    this.#destroyed = true;
-    // The root is intentionally not destroyed. Canvas contexts from the unmounted tree can stay
-    // configured with its device until they're garbage collected, and releasing a surface
-    // configured on a destroyed device crashes some implementations (e.g. Dawn on Vulkan).
-    // The device gets released once it's no longer referenced.
-    this.#result = undefined;
-  }
 }
 
 class ExistingRootContext implements RootContext {
@@ -172,10 +155,6 @@ class ExistingRootContext implements RootContext {
 
   initOrGetRoot(): RootContextResult {
     return this.result;
-  }
-
-  unmount(): void {
-    // Nothing to do on unmount
   }
 }
 
@@ -237,10 +216,6 @@ export const Root = ({ children, options, root, disableWorklets = false }: RootP
     }
     return undefined;
   }, [root]);
-
-  useDeferredCleanup(() => {
-    ownCtx.unmount();
-  });
 
   return (
     <rootContext.Provider value={existingRootCtx ?? ownCtx}>

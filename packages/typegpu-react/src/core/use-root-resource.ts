@@ -1,11 +1,11 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useInsertionEffect, useReducer, useState } from 'react';
 import { d, type TgpuRoot } from 'typegpu';
 
 import { useRoot } from './root-context.tsx';
 
 /**
- * How long a released resource is kept around, so that React's StrictMode can
- * unmount and remount effects without recreating it.
+ * How long resources are kept around after their component unmounts, so that work scheduled
+ * before the unmount (e.g. a frame that runs before passive effects are cleaned up) can finish.
  */
 const RELEASE_DELAY_MS = 200;
 
@@ -15,7 +15,6 @@ interface ResourceEntry<TSchema, TResource> {
   readonly resource: TResource;
   readonly destroy: (resource: TResource) => void;
   destroyed: boolean;
-  timeout: ReturnType<typeof setTimeout> | undefined;
 }
 
 interface ResourceCache<TSchema, TResource> {
@@ -23,13 +22,14 @@ interface ResourceCache<TSchema, TResource> {
   committed: ResourceEntry<TSchema, TResource> | undefined;
   /** Every entry that hasn't been destroyed yet, including ones from renders that never committed */
   live: Set<ResourceEntry<TSchema, TResource>>;
+  /** Destroys every live entry, scheduled by the insertion effect cleanup */
+  releaseTimer: ReturnType<typeof setTimeout> | undefined;
 }
 
 function destroyEntry<TResource>(
   cache: ResourceCache<unknown, TResource>,
   entry: ResourceEntry<unknown, TResource>,
 ) {
-  clearTimeout(entry.timeout);
   cache.live.delete(entry);
   entry.destroyed = true;
   entry.destroy(entry.resource);
@@ -40,7 +40,8 @@ function destroyEntry<TResource>(
  * changes (schemas are compared structurally).
  *
  * Resources are only destroyed once React is done with them: when an effect claims a newer one,
- * or after the effect that claimed them is cleaned up and not set up again.
+ * or when the component unmounts. Being hidden by `<Activity>` (or StrictMode's simulated
+ * unmount) runs effect cleanups too, but keeps the component around, so it doesn't count.
  * Resources created by renders that never commit are destroyed along with the others, unless the
  * component never mounted at all, then they're left to the garbage collector. A timer can't tell
  * a discarded render apart from one that's just slow to commit.
@@ -56,6 +57,7 @@ export function useRootResource<TSchema, TResource>(
   const [cache] = useState<ResourceCache<TSchema, TResource>>(() => ({
     committed: undefined,
     live: new Set(),
+    releaseTimer: undefined,
   }));
   const [, rerender] = useReducer((epoch: number) => epoch + 1, 0);
 
@@ -74,20 +76,35 @@ export function useRootResource<TSchema, TResource>(
       resource: create(root, schema),
       destroy,
       destroyed: false,
-      timeout: undefined,
     };
     cache.live.add(entry);
   }
 
+  // Insertion effects are the only ones React doesn't clean up when hiding a subtree with
+  // <Activity> or when simulating an unmount in StrictMode, so this cleanup only runs on a real
+  // unmount, or on a Fast Refresh hot update. The latter runs the setup again right away, which
+  // cancels the release.
+  useInsertionEffect(() => {
+    clearTimeout(cache.releaseTimer);
+    cache.releaseTimer = undefined;
+
+    return () => {
+      cache.releaseTimer = setTimeout(() => {
+        for (const live of cache.live) {
+          destroyEntry(cache, live);
+        }
+      }, RELEASE_DELAY_MS);
+    };
+  }, [cache]);
+
   const current = entry;
   useEffect(() => {
     if (current.destroyed) {
-      // Released while the component was hidden (e.g. by <Activity>), rendering again with a fresh one
+      // Should not happen, but if it does, rendering again with a fresh one
       rerender();
       return;
     }
 
-    clearTimeout(current.timeout);
     cache.committed = current;
     for (const other of cache.live) {
       if (other !== current) {
@@ -95,13 +112,6 @@ export function useRootResource<TSchema, TResource>(
         destroyEntry(cache, other);
       }
     }
-
-    return () => {
-      for (const live of cache.live) {
-        clearTimeout(live.timeout);
-        live.timeout = setTimeout(() => destroyEntry(cache, live), RELEASE_DELAY_MS);
-      }
-    };
   }, [cache, current]);
 
   return [current.resource, current.schema];
