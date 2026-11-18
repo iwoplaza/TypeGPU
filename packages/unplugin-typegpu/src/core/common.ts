@@ -55,8 +55,6 @@ export type MetadatableFunction =
   | t.ArrowFunctionExpression;
 
 export interface TransformMethods {
-  warn(message: string): void;
-
   /**
    * For function statements to have metadata assigned, they first have to be manually hoisted
    * to the top of their scope, then replaced with a variable declaration.

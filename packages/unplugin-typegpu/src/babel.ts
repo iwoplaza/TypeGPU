@@ -167,7 +167,6 @@ export default function TypeGPUPlugin() {
     pre(this: PluginState) {
       this.opts = checkOpts(defu(this.opts, defaultOptions));
       initPluginState(this, {
-        warn: (message) => console.warn(message),
         assignMetadata,
         wrapInAutoName,
         replaceWithAssignmentOverload,

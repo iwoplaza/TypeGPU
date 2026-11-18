@@ -186,7 +186,6 @@ export const unpluginFactory = ((rawOptions, _meta) => {
         } as UnpluginPluginState;
 
         initPluginState(state, {
-          warn: (message) => this.warn(message),
           assignMetadata,
           wrapInAutoName,
           replaceWithAssignmentOverload,
