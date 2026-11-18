@@ -36,15 +36,11 @@ console.log(tgpu.resolve([pipeline]));
 // resolved WGSL
 @group(0) @binding(0) var<storage, read_write> counter: vec3f;
 
-struct increment_Input {
-  @builtin(num_workgroups) num: vec3u,
-}
-
-@compute @workgroup_size(1) fn increment(input: increment_Input) {
-  var tmp = counter.x;
+@compute @workgroup_size(1) fn increment(@builtin(num_workgroups) num: vec3u) {
+  let tmp = counter.x;
   counter.x = counter.y;
   counter.y += tmp;
-  counter.z += f32(input.num.x);
+  counter.z += f32(num.x);
 }
 ```
 

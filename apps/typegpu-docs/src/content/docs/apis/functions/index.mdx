@@ -71,11 +71,11 @@ The contents of the `wgsl` variable would contain the following:
 ```wgsl
 // Generated WGSL
 fn neighborhood(a: f32, r: f32) -> vec2f {
-  return vec2f(a - r, a + r);
+  return vec2f((a - r), (a + r));
 }
 
 fn main() -> vec2f {
-  return neighborhood(1.1, 0.5);
+  return neighborhood(1.1f, 0.5f);
 }
 
 // ...
@@ -88,10 +88,12 @@ You can already notice a few things about TypeGPU functions:
 
 :::caution[Using numeric literals]
 Be mindful when using numeric literals. Numbers with nothing after the decimal point (those that pass the `Number.isInteger` test) are inferred as integers, the rest as floats.
+Constants keep the literal abstract, and it becomes an `i32` or `f32` once it's used:
 ```js
-const foo = 1.1; // generates: const foo = 1.1f;
-const bar = 1.0; // generates: const bar = 1i;
-const baz = 123; // generates: const baz = 123i;
+const foo = 1.1; // generates: const foo = 1.1;
+const bar = 1.0; // generates: const bar = 1;
+const baz = 123; // generates: const baz = 123;
+let qux = bar;   // generates: let qux = bar; (qux is an i32)
 ```
 To ensure that a literal will be coerced to a specific type, you can wrap them in a schema:
 ```js
@@ -124,7 +126,7 @@ const neighborhood = (a: number, r: number) => {
 ```wgsl
 // WGSL
 fn neighborhood(a: f32, r: f32) -> vec2f {
-  return vec2f(a - r, a + r);
+  return vec2f((a - r), (a + r));
 }
 ```
 
@@ -172,16 +174,16 @@ const main = () => {
 ```wgsl
 // WGSL
 fn neighborhood(a: i32, r: i32) -> vec2f {
-  return vec2f(f32(a - r), f32(a + r));
+  return vec2f(f32((a - r)), f32((a + r)));
 }
 
-fn neighborhood2(a: u32, r: f16) -> vec2f {
-  return vec2f(f32(f16(a) - r), f32(f16(a) + r));
+fn neighborhood_1(a: u32, r: f16) -> vec2f {
+  return vec2f(f32((f16(a) - r)), f32((f16(a) + r)));
 }
 
 fn main() {
-  var a = neighborhood(0, 1);
-  var b = neighborhood2(1, 5.25);
+  let a = neighborhood(0i, 1i);
+  let b = neighborhood_1(1u, 5.25h);
 }
 ```
 
@@ -228,7 +230,7 @@ const getColor = (t: number) => {
 The above generates the following WGSL:
 ```wgsl
 fn getColor(t: f32) -> vec3f {
-  if (t > 0.5) {
+  if ((t > 0.5f)) {
     return vec3f(0.5, 0.5, 0);
   }
   return mix(vec3f(1, 0, 0), vec3f(0, 1, 0), t);
@@ -453,17 +455,17 @@ You can see for yourself what `getGradientColor` resolves to by calling [`tgpu.r
 ```wgsl
 // results of calling tgpu.resolve([getGradientColor])
 
-fn getBlue_1() -> vec4f{
+fn getBlue() -> vec4f {
   return vec4f(0.114, 0.447, 0.941, 1);
 }
 
-fn getGradientColor_0(ratio: f32) -> vec4f {
-  return mix(vec4f(0.769, 0.392, 1, 1), getBlue_1(), ratio);
+fn getGradientColor(ratio: f32) -> vec4f {
+  return mix(vec4f(0.7689999938011169, 0.3919999897480011, 1, 1), getBlue(), ratio);
 }
 ```
 
 Notice how `purple` was inlined in the final shader, and the reference to `get_blue` was replaced with
-the function's eventual name of `getBlue_1`.
+the function's eventual name of `getBlue`.
 
 ### When to use JavaScript / WGSL
 Writing shader code in JavaScript has a few significant advantages.

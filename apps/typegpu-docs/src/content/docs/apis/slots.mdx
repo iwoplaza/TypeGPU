@@ -75,13 +75,13 @@ const filterWithGreen = tgpu.fn(filter)
 In the example above, after resolution we are left with two different WGSL functions:
 
 ```wgsl
-fn filter_0(color: vec3f) ->  vec3f{
-  var filterColor = vec3f(1, 0, 0);
+fn filter_1(color: vec3f) -> vec3f {
+  let filterColor = vec3f(1, 0, 0);
   return (color * filterColor);
 }
 
-fn filter_1(color: vec3f) ->  vec3f{
-  var filterColor = vec3f(0, 1, 0);
+fn filter_2(color: vec3f) -> vec3f {
+  let filterColor = vec3f(0, 1, 0);
   return (color * filterColor);
 }
 ```
@@ -110,10 +110,10 @@ const pipeline = root
 The pipeline above resolves to the following WGSL:
 
 ```wgsl
-@group(0) @binding(0) var<storage, read_write> resultBuffer_1: i32;
+@group(0) @binding(0) var<storage, read_write> resultBuffer: i32;
 
-@compute @workgroup_size(1) fn computeMultiply_0(){
-  resultBuffer_1 = (resultBuffer_1 * 3);
+@compute @workgroup_size(1) fn computeMultiply() {
+  resultBuffer = (resultBuffer * 3i);
 }
 ```
 

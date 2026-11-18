@@ -70,7 +70,7 @@ TypeGPU's APIs.
 ```ts
 const rawBuffer = device.createBuffer({
   size: (Float32Array.BYTES_PER_ELEMENT * 4) * 2, // (xyz + padding) * 2
-  usage: GPUBufferUsage.COPT_DST | GPUBufferUsage.UNIFORM,
+  usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM,
 });
 
 const Schema = d.arrayOf(d.vec3f, 2);

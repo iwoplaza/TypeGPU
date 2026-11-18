@@ -209,13 +209,13 @@ const RED = d.vec3f(1, 0, 0);
 // ---cut---
 const colorAccess = tgpu.accessor(d.vec3f);
 
-function getColor() {
+const getColor = tgpu.fn([], d.vec3f)(() => {
   'use gpu';
   return colorAccess.$;
-}
+});
 
 const redUniform = root.createUniform(d.vec3f, RED);
-const getRed = tgpu.fn(getColor).with(colorAccess, redUniform);
+const getRed = getColor.with(colorAccess, redUniform);
 ```
 
 ```wgsl
