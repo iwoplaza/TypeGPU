@@ -1,4 +1,5 @@
 import { dualImpl } from '../core/function/dualImpl.ts';
+import { getExecMode, getResolutionCtx } from '../execMode.ts';
 import { stitch } from '../core/resolve/stitch.ts';
 import { abstractFloat, f16, f32, u32 } from '../data/numeric.ts';
 import { vec2i, vec2u, vec3i, vec3u, vec4i, vec4u } from '../data/vector.ts';
@@ -222,6 +223,45 @@ export const mul = dualImpl({
   sideEffects: false,
 });
 
+const I32_MIN = -(2 ** 31);
+
+/**
+ * When a shader is being generated and all operands are known, the result gets baked into the shader.
+ * WGSL treats a const-expression that divides an integer by zero (or the most negative i32 by -1)
+ * as a shader-creation error, so it should not silently turn into a value.
+ */
+function assertNotFoldingIntoShader(a: number, op: '/' | '%', b: number): void {
+  if (getResolutionCtx() && getExecMode().type === 'normal') {
+    throw new Error(
+      `Cannot evaluate '${a} ${op} ${b}' while generating a shader. ${
+        b === 0 ? 'Integer division by zero' : 'Dividing the most negative i32 by -1'
+      } is only well-defined at runtime.`,
+    );
+  }
+}
+
+/**
+ * Integer division with WGSL's runtime semantics: `e1 / 0` and `I32_MIN / -1` evaluate to `e1`.
+ */
+export function intDivComponent(a: number, b: number): number {
+  if (b === 0 || (a === I32_MIN && b === -1)) {
+    assertNotFoldingIntoShader(a, '/', b);
+    return a;
+  }
+  return Math.trunc(a / b);
+}
+
+/**
+ * Integer remainder with WGSL's runtime semantics: `e1 % 0` and `I32_MIN % -1` evaluate to `0`.
+ */
+function intModComponent(a: number, b: number): number {
+  if (b === 0 || (a === I32_MIN && b === -1)) {
+    assertNotFoldingIntoShader(a, '%', b);
+    return 0;
+  }
+  return a % b;
+}
+
 function cpuDiv(lhs: number, rhs: number): number; // default js division
 function cpuDiv<T extends NumVec>(lhs: T, rhs: T): T; // component-wise division
 function cpuDiv<T extends NumVec>(lhs: number, rhs: T): T; // mixed division
@@ -230,6 +270,9 @@ function cpuDiv(lhs: NumVec | number, rhs: NumVec | number): NumVec | number {
   assertKind([lhs, rhs], numericKind);
   const cast = upCast([lhs, rhs]);
   assertEqualKinds(...cast);
+  if (isInteger32VecInstance(cast[0])) {
+    return generalizeFn(intDivComponent, cast);
+  }
   return generalizeFn((a, b) => a / b, cast);
 }
 
@@ -260,6 +303,9 @@ export const mod = dualImpl({
     assertKind([a, b], numericKind);
     const cast = upCast([a, b]);
     assertEqualKinds(...cast);
+    if (isInteger32VecInstance(cast[0])) {
+      return generalizeFn(intModComponent, cast);
+    }
     return generalizeFn((a, b) => a % b, cast);
   }) as ModOverload,
   codegenImpl: (ctx, [lhs, rhs]) => ctx.gen.emitBinaryOp(lhs, '%', rhs),

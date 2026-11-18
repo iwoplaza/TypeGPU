@@ -155,3 +155,10 @@ test('intdiv throws with vector arguments', () => {
     - fn:intdiv: Unsupported data types: abstractInt, vec3i. Supported types are: i32, u32, abstractInt.]
   `);
 });
+
+test('intdiv follows WGSL runtime semantics for division by 0 and I32_MIN / -1', () => {
+  expect(std.intdiv(7, 0)).toBe(7);
+  expect(std.intdiv(-7, 0)).toBe(-7);
+  expect(std.intdiv(-2147483648, -1)).toBe(-2147483648);
+  expect(std.intdiv(-7, 2)).toBe(-3);
+});

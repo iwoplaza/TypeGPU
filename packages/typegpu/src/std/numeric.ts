@@ -59,7 +59,7 @@ import type { Infer } from '../shared/repr.ts';
 import { assertExhaustive } from '../shared/utilityTypes.ts';
 import { unify } from '../tgsl/conversion.ts';
 import { asComptime, type ResolutionCtx } from '../types.ts';
-import { mul, sub } from './operators.ts';
+import { intDivComponent, mul, sub } from './operators.ts';
 
 type NumVec = AnyNumericVecInstance;
 
@@ -1339,13 +1339,14 @@ function cpuIntdiv(lhs: number, rhs: number): number {
   if (typeof lhs !== 'number' || typeof rhs !== 'number') {
     throw new Error('std.intdiv called with invalid arguments.');
   }
-  return Math.trunc(Math.trunc(lhs) / Math.trunc(rhs));
+  return intDivComponent(Math.trunc(lhs), Math.trunc(rhs));
 }
 
 /**
  * Performs integer division on the passed in scalars.
  * Equivalent to `trunc(trunc(lhs) / trunc(rhs))`. Coerces both
  * arguments to integers if they're floating point.
+ * Like in WGSL, dividing by zero or `-2147483648 / -1` returns `lhs`.
  */
 export const intdiv = dualImpl({
   name: 'intdiv',

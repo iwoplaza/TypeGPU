@@ -88,6 +88,22 @@ describe('mod', () => {
     expect(mod(vec4u(5, 10, 15, 20), vec4u(3, 4, 5, 6))).toEqual(vec4u(2, 2, 0, 2));
     expect(mod(vec4u(0, 10, 7, 16), vec4u(3, 3, 4, 5))).toEqual(vec4u(0, 1, 3, 1));
   });
+
+  it('follows WGSL runtime semantics for integer remainder by 0', () => {
+    expect(mod(vec2i(7, 7), vec2i(0, 2))).toStrictEqual(vec2i(0, 1));
+    expect(mod(vec3i(7, -7, 0), 0)).toStrictEqual(vec3i(0, 0, 0));
+    expect(mod(vec2u(7, 7), vec2u(0, 2))).toStrictEqual(vec2u(0, 1));
+    expect(mod(vec4u(1, 2, 8, 9), 0)).toStrictEqual(vec4u(0, 0, 0, 0));
+  });
+
+  it('follows WGSL runtime semantics for I32_MIN % -1', () => {
+    const I32_MIN = -2147483648;
+    expect(mod(vec2i(I32_MIN, I32_MIN), vec2i(-1, 7))).toStrictEqual(vec2i(0, -2));
+  });
+
+  it('takes the sign of the dividend for integer remainder', () => {
+    expect(mod(vec4i(7, -7, 7, -7), vec4i(3, 3, -3, -3))).toStrictEqual(vec4i(1, -1, 1, -1));
+  });
 });
 
 describe('mod overload', () => {
