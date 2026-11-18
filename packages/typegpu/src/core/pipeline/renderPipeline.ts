@@ -19,7 +19,6 @@ import {
   type WgslStruct,
 } from '../../data/wgslTypes.ts';
 import { invariant } from '../../errors.ts';
-import { resolve } from '../../resolutionCtx.ts';
 import type { TgpuNamable } from '../../shared/meta.ts';
 import { getName, PERF, setName } from '../../shared/meta.ts';
 import type { InferInput } from '../../shared/repr.ts';
@@ -36,7 +35,6 @@ import {
 import type { LogResources } from '../../tgsl/consoleLog/types.ts';
 import type { ResolutionCtx, SelfResolvable } from '../../types.ts';
 import { isGPUBuffer } from '../../types.ts';
-import { wgslEnableExtensions, wgslEnableExtensionToFeatureName } from '../../wgslExtensions.ts';
 import {
   type AnyAutoCustoms,
   AutoFragmentFn,
@@ -48,7 +46,6 @@ import {
 } from '../function/autoIO.ts';
 import type { TgpuFragmentFn } from '../function/tgpuFragmentFn.ts';
 import type { TgpuVertexFn } from '../function/tgpuVertexFn.ts';
-import { namespace } from '../resolve/namespace.ts';
 import type { ExperimentalTgpuRoot } from '../root/rootTypes.ts';
 import type { TgpuSlot } from '../slot/slotTypes.ts';
 import { connectAttributesToShader } from '../vertexLayout/connectAttributesToShader.ts';
@@ -66,7 +63,6 @@ import {
   type ImmediateSnapshot,
   isImmediateVar,
   type TgpuImmediateVar,
-  validateImmediateUsage,
 } from '../immediate/immediateVar.ts';
 import {
   INTERNAL_adoptRenderCommands,
@@ -89,7 +85,7 @@ import {
 } from './timeable.ts';
 import { nonTransferablePriorsOf } from './priors.ts';
 import { type PrimitiveOffsetInfo } from '../../data/offsetUtils.ts';
-import { warnIfOverflow } from './webgpuLimitations.ts';
+import { createPipelineLayout, resolvePipelineShader } from './pipelineShader.ts';
 import {
   collectBindGroupPairs,
   collectVertexBufferPairs,
@@ -972,39 +968,12 @@ class RenderPipelineCore implements SelfResolvable {
     if (!tgpuDescriptor) {
       throw new Error('Precompiled pipelines are never resolved again.');
     }
-    const device = root.device;
-    const enableExtensions = wgslEnableExtensions.filter((extension) =>
-      root.enabledFeatures.has(wgslEnableExtensionToFeatureName[extension]),
+    const { resolutionResult, module, immediateSize } = resolvePipelineShader(
+      this,
+      root,
+      this.#performanceTracker,
     );
-
-    // Resolving code
-    const ns = namespace({ names: root.nameRegistrySetting });
-    const resolutionResult = this.#performanceTracker.measureResolve(() =>
-      resolve(this, {
-        namespace: ns,
-        minify: root.minify,
-        enableExtensions,
-        shaderGenerator: root.shaderGeneratorClass ? new root.shaderGeneratorClass() : undefined,
-        root,
-      }),
-    );
-
-    const { code, usedBindGroupLayouts, catchall, usedImmediate } = resolutionResult;
-
-    if (catchall !== undefined) {
-      usedBindGroupLayouts[catchall[0]]?.$name(
-        `${getName(this) ?? '<unnamed>'} - Automatic Bind Group & Layout`,
-      );
-    }
-
-    warnIfOverflow(usedBindGroupLayouts, device.limits);
-
-    const immediateSize = usedImmediate ? validateImmediateUsage(usedImmediate, root) : 0;
-
-    const module = device.createShaderModule({
-      label: `${getName(this) ?? '<unnamed>'} - Shader`,
-      code,
-    });
+    const { usedBindGroupLayouts } = resolutionResult;
 
     const { vertex, fragment, attribs = {}, targets } = tgpuDescriptor;
     const connectedAttribs = connectAttributesToShader(
@@ -1021,11 +990,7 @@ class RenderPipelineCore implements SelfResolvable {
     const connectedTargets = fragmentOut ? connectTargetsToShader(fragmentOut, targets) : [];
 
     const descriptor: GPURenderPipelineDescriptor = {
-      layout: device.createPipelineLayout({
-        label: `${getName(this) ?? '<unnamed>'} - Pipeline Layout`,
-        bindGroupLayouts: usedBindGroupLayouts.map((l) => root.unwrap(l)),
-        immediateSize,
-      }),
+      layout: createPipelineLayout(this, root, usedBindGroupLayouts, immediateSize),
       vertex: {
         module,
         buffers: connectedAttribs.bufferDefinitions,

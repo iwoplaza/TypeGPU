@@ -3,7 +3,6 @@ import type { TgpuQuerySet } from '../querySet/querySet.ts';
 import { type ResolvedSnippet, snip } from '../../data/snippet.ts';
 import type { AnyWgslData } from '../../data/wgslTypes.ts';
 import { Void } from '../../data/wgslTypes.ts';
-import { resolve } from '../../resolutionCtx.ts';
 import type { TgpuNamable } from '../../shared/meta.ts';
 import { getName, PERF, setName } from '../../shared/meta.ts';
 import type { InferInput } from '../../shared/repr.ts';
@@ -28,7 +27,6 @@ import {
   type ImmediateSnapshot,
   isImmediateVar,
   type TgpuImmediateVar,
-  validateImmediateUsage,
 } from '../immediate/immediateVar.ts';
 import { emitComputeDispatch, finalizeOwnEncoder } from './drawState.ts';
 import {
@@ -39,15 +37,13 @@ import {
 } from './typeGuards.ts';
 import type { LogResources } from '../../tgsl/consoleLog/types.ts';
 import { isGPUBuffer, type ResolutionCtx, type SelfResolvable } from '../../types.ts';
-import { wgslEnableExtensions, wgslEnableExtensionToFeatureName } from '../../wgslExtensions.ts';
 import type { IORecord } from '../function/fnTypes.ts';
 import type { TgpuComputeFn } from '../function/tgpuComputeFn.ts';
-import { namespace } from '../resolve/namespace.ts';
 import type { ExperimentalTgpuRoot } from '../root/rootTypes.ts';
 import type { TgpuSlot } from '../slot/slotTypes.ts';
 
 import type { PrimitiveOffsetInfo } from '../../data/offsetUtils.ts';
-import { warnIfOverflow } from './webgpuLimitations.ts';
+import { createPipelineLayout, resolvePipelineShader } from './pipelineShader.ts';
 import {
   collectBindGroupPairs,
   DISPATCH_INDIRECT_SIZE,
@@ -516,11 +512,7 @@ class ComputePipelineCore implements SelfResolvable {
       this.#initAsyncPromise = device
         .createComputePipelineAsync({
           label: getName(this) ?? '<unnamed>',
-          layout: device.createPipelineLayout({
-            label: `${getName(this) ?? '<unnamed>'} - Pipeline Layout`,
-            bindGroupLayouts: usedBindGroupLayouts.map((l) => this.root.unwrap(l)),
-            immediateSize,
-          }),
+          layout: createPipelineLayout(this, this.root, usedBindGroupLayouts, immediateSize),
           compute: { module },
         })
         .then((pipeline) => {
@@ -550,11 +542,7 @@ class ComputePipelineCore implements SelfResolvable {
     this.#memo = {
       pipeline: device.createComputePipeline({
         label: getName(this) ?? '<unnamed>',
-        layout: device.createPipelineLayout({
-          label: `${getName(this) ?? '<unnamed>'} - Pipeline Layout`,
-          bindGroupLayouts: usedBindGroupLayouts.map((l) => this.root.unwrap(l)),
-          immediateSize,
-        }),
+        layout: createPipelineLayout(this, this.root, usedBindGroupLayouts, immediateSize),
         compute: { module },
       }),
       usedBindGroupLayouts,
@@ -572,41 +560,6 @@ class ComputePipelineCore implements SelfResolvable {
   }
 
   private resolveAndCreateShaderModule() {
-    const device = this.root.device;
-    const enableExtensions = wgslEnableExtensions.filter((extension) =>
-      this.root.enabledFeatures.has(wgslEnableExtensionToFeatureName[extension]),
-    );
-
-    // Resolving code
-    const ns = namespace({ names: this.root.nameRegistrySetting });
-    const resolutionResult = this.#performanceTracker.measureResolve(() =>
-      resolve(this, {
-        namespace: ns,
-        minify: this.root.minify,
-        enableExtensions,
-        shaderGenerator: this.root.shaderGeneratorClass
-          ? new this.root.shaderGeneratorClass()
-          : undefined,
-        root: this.root,
-      }),
-    );
-    const { code, usedBindGroupLayouts, catchall, usedImmediate } = resolutionResult;
-
-    if (catchall !== undefined) {
-      usedBindGroupLayouts[catchall[0]]?.$name(
-        `${getName(this) ?? '<unnamed>'} - Automatic Bind Group & Layout`,
-      );
-    }
-
-    warnIfOverflow(usedBindGroupLayouts, device.limits);
-
-    const immediateSize = usedImmediate ? validateImmediateUsage(usedImmediate, this.root) : 0;
-
-    const module = device.createShaderModule({
-      label: `${getName(this) ?? '<unnamed>'} - Shader`,
-      code,
-    });
-
-    return { resolutionResult, module, immediateSize };
+    return resolvePipelineShader(this, this.root, this.#performanceTracker);
   }
 }
