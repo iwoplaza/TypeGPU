@@ -1457,3 +1457,73 @@ describe('GlslGenerator - GL syntax', () => {
     });
   });
 });
+
+describe('GlslGenerator - built-in function names', () => {
+  it('does not name functions after GLSL built-in functions', () => {
+    const inverse = tgpu.fn(
+      [d.mat2x2f],
+      d.mat2x2f,
+    )((m) => {
+      'use gpu';
+      return d.mat2x2f(m);
+    });
+
+    const foo = tgpu.fn(
+      [],
+      d.f32,
+    )(() => {
+      'use gpu';
+      return inverse(d.mat2x2f()).columns[0].x;
+    });
+
+    expect(tgpu.resolve([foo], glOptions())).toMatchInlineSnapshot(`
+      "mat2 inverse_1(mat2 m) {
+        return m;
+      }
+
+      float foo() {
+        return inverse_1(mat2(0, 0, 0, 0))[0].x;
+      }"
+    `);
+  });
+
+  it('does not let locals shadow GLSL built-in functions', () => {
+    const texture = tgpu.privateVar(d.f32);
+
+    const foo = tgpu.fn(
+      [],
+      d.f32,
+    )(() => {
+      'use gpu';
+      const texelFetch = d.f32(1);
+      const lessThan = texelFetch + texture.$;
+      return lessThan;
+    });
+
+    expect(tgpu.resolve([foo], glOptions())).toMatchInlineSnapshot(`
+      "float texture_1;
+
+      float foo() {
+        float texelFetch_1 = 1.0;
+        float lessThan_1 = (texelFetch_1 + texture_1);
+        return lessThan_1;
+      }"
+    `);
+  });
+
+  it('does not let parameters shadow GLSL built-in functions', () => {
+    const foo = tgpu.fn(
+      [d.f32, d.vec2f],
+      d.f32,
+    )((texture, outerProduct) => {
+      'use gpu';
+      return texture + outerProduct.x;
+    });
+
+    expect(tgpu.resolve([foo], glOptions())).toMatchInlineSnapshot(`
+      "float foo(float texture_1, vec2 outerProduct_1) {
+        return (texture_1 + outerProduct_1.x);
+      }"
+    `);
+  });
+});
