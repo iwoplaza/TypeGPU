@@ -282,28 +282,6 @@ struct fragment_Output {
     `);
   });
 
-  // TODO: handle nested structs
-  // it('adds return type nested struct definitions when resolving wgsl-defined functions', () => {
-  //   const Point = d.struct({ a: d.u32 }).$name('P');
-
-  //   const func = tgpu
-  //     .fn([d.arrayOf(Point, 4)])(/* wgsl */ `(a: array<MyPoint, 4>) {
-  //       return;
-  //     }`)
-  //     .$name('f');
-
-  //   expect(parseResolved({ func })).toBe(
-  //     parse(`
-  //   struct P {
-  //     a: u32,
-  //   }
-
-  //   fn f(a: array<P, 4>) {
-  //     return;
-  //   }`),
-  //   );
-  // });
-
   it('resolves object externals and replaces their usages in code', () => {
     const getColor = tgpu
       .fn(

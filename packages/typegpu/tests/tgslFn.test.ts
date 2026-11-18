@@ -808,20 +808,16 @@ describe('tgpu.fn arguments', () => {
     expect(clone.nested).not.toBe(struct.nested);
   });
 
-  // TODO: make it work
-  // it('returns a deep copy of an array', () => {
-  //   const array = [d.vec2f(), d.vec2f()];
-  //   const fn = tgpu.fn(
-  //     [d.arrayOf(d.vec2f, 2)],
-  //     d.arrayOf(d.vec2f, 2),
-  //   )((e) => e);
+  it('returns a deep copy of an array', () => {
+    const array = [d.vec2f(), d.vec2f()];
+    const fn = tgpu.fn([d.arrayOf(d.vec2f, 2)], d.arrayOf(d.vec2f, 2))((e) => e);
 
-  //   const clone = fn(array);
+    const clone = fn(array);
 
-  //   expect(clone).toStrictEqual(array);
-  //   expect(clone).not.toBe(array);
-  //   expect(clone[0]).not.toBe(array[0]);
-  // });
+    expect(clone).toStrictEqual(array);
+    expect(clone).not.toBe(array);
+    expect(clone[0]).not.toBe(array[0]);
+  });
 
   it('does not modify its argument', () => {
     const vec = d.vec3f();
