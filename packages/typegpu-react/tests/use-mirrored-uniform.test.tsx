@@ -65,9 +65,7 @@ describe('useMirroredUniform', () => {
 
     expect(createUniformSpy).toHaveBeenCalledTimes(2);
     expect(createUniformSpy).toHaveBeenCalledWith(d.vec2f, d.vec2f(1, 2));
-    // Destroyed only after the new one has been committed, and the cleanup delay has passed
-    expect(destroyUniformSpy).not.toHaveBeenCalled();
-    vi.runAllTimers();
+    // Destroyed as soon as the new one has been committed
     expect(destroyUniformSpy).toHaveBeenCalledTimes(1);
   });
 
