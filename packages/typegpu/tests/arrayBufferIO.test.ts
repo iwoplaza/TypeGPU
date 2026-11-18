@@ -254,7 +254,7 @@ describe('arrayBufferIO', () => {
         return result;
       };
 
-      expect(() => tgpu.resolve([fn])).toThrow();
+      expect(() => tgpu.resolve([fn])).toThrow('Finite Math Assumption');
     });
   });
 
