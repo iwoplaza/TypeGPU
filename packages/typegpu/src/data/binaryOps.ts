@@ -14,7 +14,19 @@ import {
   type AnyMatInstance,
   type AnyNumericVecInstance,
   type AnyVecInstance,
+  type m2x2f,
+  type m3x3f,
+  type m4x4f,
   type mBaseForVec,
+  type v2f,
+  type v2i,
+  type v2u,
+  type v3f,
+  type v3i,
+  type v3u,
+  type v4f,
+  type v4i,
+  type v4u,
   type vBaseForMat,
   type vecIToVecU,
   isFloat32VecInstance,
@@ -31,57 +43,118 @@ import {
 
 type NumVec = AnyNumericVecInstance;
 type Mat = AnyMatInstance;
+type MatKind = 'mat2x2f' | 'mat3x3f' | 'mat4x4f';
 
-function sameTypeAs<T extends AnyVecInstance | Mat>(value: T, components: number[]): T {
-  const schema = WORKAROUND_getSchema(value) as unknown as (...args: number[]) => T;
-  return schema(...components);
+function constructorOf<T extends AnyVecInstance | Mat>(value: T): (...components: number[]) => T {
+  return WORKAROUND_getSchema(value) as unknown as (...components: number[]) => T;
 }
 
-function at(vector: NumVec | undefined, index: number): number {
-  return (vector as NumVec)[index] as number;
-}
+const mulMxM = {
+  mat2x2f: (a: m2x2f, b: m2x2f) => {
+    const a_ = a.columns;
+    const b_ = b.columns;
 
-function sumOfProducts(length: number, product: (k: number) => number): number {
-  let sum = product(0);
-  for (let k = 1; k < length; k++) {
-    sum += product(k);
-  }
-  return sum;
-}
+    return constructorOf(a)(
+      a_[0].x * b_[0].x + a_[1].x * b_[0].y,
+      a_[0].y * b_[0].x + a_[1].y * b_[0].y,
+      a_[0].x * b_[1].x + a_[1].x * b_[1].y,
+      a_[0].y * b_[1].x + a_[1].y * b_[1].y,
+    );
+  },
 
-function mulMxM<M extends Mat>(a: M, b: M): M {
-  const a_ = a.columns as readonly NumVec[];
-  const b_ = b.columns as readonly NumVec[];
-  const n = a_.length;
-  return sameTypeAs(
-    a,
-    Array.from({ length: n * n }, (_, i) => {
-      const column = Math.floor(i / n);
-      const row = i % n;
-      return sumOfProducts(n, (k) => at(a_[k], row) * at(b_[column], k));
-    }),
-  );
-}
+  mat3x3f: (a: m3x3f, b: m3x3f) => {
+    const a_ = a.columns;
+    const b_ = b.columns;
 
-function mulMxV<V extends NumVec>(m: Mat, v: V): V {
-  const m_ = m.columns as readonly NumVec[];
-  return sameTypeAs(
-    v,
-    Array.from({ length: v.length }, (_, row) =>
-      sumOfProducts(v.length, (k) => at(m_[k], row) * at(v, k)),
-    ),
-  );
-}
+    return constructorOf(a)(
+      a_[0].x * b_[0].x + a_[1].x * b_[0].y + a_[2].x * b_[0].z,
+      a_[0].y * b_[0].x + a_[1].y * b_[0].y + a_[2].y * b_[0].z,
+      a_[0].z * b_[0].x + a_[1].z * b_[0].y + a_[2].z * b_[0].z,
+      a_[0].x * b_[1].x + a_[1].x * b_[1].y + a_[2].x * b_[1].z,
+      a_[0].y * b_[1].x + a_[1].y * b_[1].y + a_[2].y * b_[1].z,
+      a_[0].z * b_[1].x + a_[1].z * b_[1].y + a_[2].z * b_[1].z,
+      a_[0].x * b_[2].x + a_[1].x * b_[2].y + a_[2].x * b_[2].z,
+      a_[0].y * b_[2].x + a_[1].y * b_[2].y + a_[2].y * b_[2].z,
+      a_[0].z * b_[2].x + a_[1].z * b_[2].y + a_[2].z * b_[2].z,
+    );
+  },
 
-function mulVxM<V extends NumVec>(v: V, m: Mat): V {
-  const m_ = m.columns as readonly NumVec[];
-  return sameTypeAs(
-    v,
-    Array.from({ length: v.length }, (_, column) =>
-      sumOfProducts(v.length, (k) => at(v, k) * at(m_[column], k)),
-    ),
-  );
-}
+  mat4x4f: (a: m4x4f, b: m4x4f) => {
+    const a_ = a.columns;
+    const b_ = b.columns;
+
+    return constructorOf(a)(
+      a_[0].x * b_[0].x + a_[1].x * b_[0].y + a_[2].x * b_[0].z + a_[3].x * b_[0].w,
+      a_[0].y * b_[0].x + a_[1].y * b_[0].y + a_[2].y * b_[0].z + a_[3].y * b_[0].w,
+      a_[0].z * b_[0].x + a_[1].z * b_[0].y + a_[2].z * b_[0].z + a_[3].z * b_[0].w,
+      a_[0].w * b_[0].x + a_[1].w * b_[0].y + a_[2].w * b_[0].z + a_[3].w * b_[0].w,
+      a_[0].x * b_[1].x + a_[1].x * b_[1].y + a_[2].x * b_[1].z + a_[3].x * b_[1].w,
+      a_[0].y * b_[1].x + a_[1].y * b_[1].y + a_[2].y * b_[1].z + a_[3].y * b_[1].w,
+      a_[0].z * b_[1].x + a_[1].z * b_[1].y + a_[2].z * b_[1].z + a_[3].z * b_[1].w,
+      a_[0].w * b_[1].x + a_[1].w * b_[1].y + a_[2].w * b_[1].z + a_[3].w * b_[1].w,
+      a_[0].x * b_[2].x + a_[1].x * b_[2].y + a_[2].x * b_[2].z + a_[3].x * b_[2].w,
+      a_[0].y * b_[2].x + a_[1].y * b_[2].y + a_[2].y * b_[2].z + a_[3].y * b_[2].w,
+      a_[0].z * b_[2].x + a_[1].z * b_[2].y + a_[2].z * b_[2].z + a_[3].z * b_[2].w,
+      a_[0].w * b_[2].x + a_[1].w * b_[2].y + a_[2].w * b_[2].z + a_[3].w * b_[2].w,
+      a_[0].x * b_[3].x + a_[1].x * b_[3].y + a_[2].x * b_[3].z + a_[3].x * b_[3].w,
+      a_[0].y * b_[3].x + a_[1].y * b_[3].y + a_[2].y * b_[3].z + a_[3].y * b_[3].w,
+      a_[0].z * b_[3].x + a_[1].z * b_[3].y + a_[2].z * b_[3].z + a_[3].z * b_[3].w,
+      a_[0].w * b_[3].x + a_[1].w * b_[3].y + a_[2].w * b_[3].z + a_[3].w * b_[3].w,
+    );
+  },
+} as Record<MatKind, <T extends Mat>(a: T, b: T) => T>;
+
+const mulMxV = {
+  mat2x2f: (m: m2x2f, v: v2f) => {
+    const m_ = m.columns;
+    return constructorOf(v)(m_[0].x * v.x + m_[1].x * v.y, m_[0].y * v.x + m_[1].y * v.y);
+  },
+
+  mat3x3f: (m: m3x3f, v: v3f) => {
+    const m_ = m.columns;
+    return constructorOf(v)(
+      m_[0].x * v.x + m_[1].x * v.y + m_[2].x * v.z,
+      m_[0].y * v.x + m_[1].y * v.y + m_[2].y * v.z,
+      m_[0].z * v.x + m_[1].z * v.y + m_[2].z * v.z,
+    );
+  },
+
+  mat4x4f: (m: m4x4f, v: v4f) => {
+    const m_ = m.columns;
+    return constructorOf(v)(
+      m_[0].x * v.x + m_[1].x * v.y + m_[2].x * v.z + m_[3].x * v.w,
+      m_[0].y * v.x + m_[1].y * v.y + m_[2].y * v.z + m_[3].y * v.w,
+      m_[0].z * v.x + m_[1].z * v.y + m_[2].z * v.z + m_[3].z * v.w,
+      m_[0].w * v.x + m_[1].w * v.y + m_[2].w * v.z + m_[3].w * v.w,
+    );
+  },
+} as Record<MatKind, <V extends NumVec>(m: Mat, v: V) => V>;
+
+const mulVxM = {
+  mat2x2f: (v: v2f, m: m2x2f) => {
+    const m_ = m.columns;
+    return constructorOf(v)(v.x * m_[0].x + v.y * m_[0].y, v.x * m_[1].x + v.y * m_[1].y);
+  },
+
+  mat3x3f: (v: v3f, m: m3x3f) => {
+    const m_ = m.columns;
+    return constructorOf(v)(
+      v.x * m_[0].x + v.y * m_[0].y + v.z * m_[0].z,
+      v.x * m_[1].x + v.y * m_[1].y + v.z * m_[1].z,
+      v.x * m_[2].x + v.y * m_[2].y + v.z * m_[2].z,
+    );
+  },
+
+  mat4x4f: (v: v4f, m: m4x4f) => {
+    const m_ = m.columns;
+    return constructorOf(v)(
+      v.x * m_[0].x + v.y * m_[0].y + v.z * m_[0].z + v.w * m_[0].w,
+      v.x * m_[1].x + v.y * m_[1].y + v.z * m_[1].z + v.w * m_[1].w,
+      v.x * m_[2].x + v.y * m_[2].y + v.z * m_[2].z + v.w * m_[2].w,
+      v.x * m_[3].x + v.y * m_[3].y + v.z * m_[3].z + v.w * m_[3].w,
+    );
+  },
+} as Record<MatKind, <V extends NumVec>(v: V, m: Mat) => V>;
 
 export function cpuAdd(lhs: number, rhs: number): number; // default addition
 export function cpuAdd<T extends NumVec>(lhs: number, rhs: T): T; // mixed addition
@@ -173,7 +246,7 @@ export function cpuMul(lhs: number | NumVec | Mat, rhs: number | NumVec | Mat) {
         `Unsupported signature. Kind '${kindOf(lhs)}' cannot be multiplied by '${kindOf(rhs)}'.`,
       );
     }
-    return mulVxM(lhs, rhs); // row-vector-matrix
+    return mulVxM[rhs.kind](lhs, rhs); // row-vector-matrix
   }
   if (isMatInstance(lhs) && isFloat32VecInstance(rhs)) {
     if (lhs.columns.length !== rhs.length) {
@@ -181,11 +254,11 @@ export function cpuMul(lhs: number | NumVec | Mat, rhs: number | NumVec | Mat) {
         `Unsupported signature. Kind '${kindOf(lhs)}' cannot be multiplied by '${kindOf(rhs)}'.`,
       );
     }
-    return mulMxV(lhs, rhs); // matrix-column-vector
+    return mulMxV[lhs.kind](lhs, rhs); // matrix-column-vector
   }
   if (isMatInstance(lhs) && isMatInstance(rhs)) {
     assertEqualKinds(lhs, rhs);
-    return mulMxM(lhs, rhs); // matrix multiplication
+    return mulMxM[lhs.kind](lhs, rhs); // matrix multiplication
   }
 
   throw new WgslTypeError(
@@ -218,20 +291,41 @@ export const cpuMod = (<T extends NumVec | number>(a: T, b: T): T => {
   return generalizeFn((a, b) => a % b, cast);
 }) as ModOverload;
 
-function bitShift<T extends AnyIntegerVecInstance>(
-  lhs: T,
-  rhs: number | AnyIntegerVecInstance,
-  op: (a: number, b: number) => number,
-): T {
-  // A scalar shift is cast the same way an unsigned vector's components are
-  const shiftBy = typeof rhs === 'number' ? u32(rhs) : undefined;
-  return sameTypeAs(
-    lhs,
-    Array.from({ length: lhs.length }, (_, i) =>
-      op(at(lhs, i), shiftBy ?? at(rhs as AnyIntegerVecInstance, i)),
-    ),
-  );
-}
+type ShiftOp = (a: number, b: number) => number;
+type IntVec = AnyIntegerVecInstance;
+
+const shift2 = (op: ShiftOp) => (a: v2i | v2u, b: v2u | number) =>
+  typeof b === 'number'
+    ? constructorOf(a)(op(a.x, b), op(a.y, b))
+    : constructorOf(a)(op(a.x, b.x), op(a.y, b.y));
+
+const shift3 = (op: ShiftOp) => (a: v3i | v3u, b: v3u | number) =>
+  typeof b === 'number'
+    ? constructorOf(a)(op(a.x, b), op(a.y, b), op(a.z, b))
+    : constructorOf(a)(op(a.x, b.x), op(a.y, b.y), op(a.z, b.z));
+
+const shift4 = (op: ShiftOp) => (a: v4i | v4u, b: v4u | number) =>
+  typeof b === 'number'
+    ? constructorOf(a)(op(a.x, b), op(a.y, b), op(a.z, b), op(a.w, b))
+    : constructorOf(a)(op(a.x, b.x), op(a.y, b.y), op(a.z, b.z), op(a.w, b.w));
+
+const bitShiftLeftByKind = {
+  vec2i: shift2((a, b) => a << b),
+  vec2u: shift2((a, b) => a << b),
+  vec3i: shift3((a, b) => a << b),
+  vec3u: shift3((a, b) => a << b),
+  vec4i: shift4((a, b) => a << b),
+  vec4u: shift4((a, b) => a << b),
+} as Record<IntVec['kind'], <T extends IntVec>(a: T, b: IntVec | number) => T>;
+
+const bitShiftRightByKind = {
+  vec2i: shift2((a, b) => a >> b),
+  vec2u: shift2((a, b) => a >>> b),
+  vec3i: shift3((a, b) => a >> b),
+  vec3u: shift3((a, b) => a >>> b),
+  vec4i: shift4((a, b) => a >> b),
+  vec4u: shift4((a, b) => a >>> b),
+} as Record<IntVec['kind'], <T extends IntVec>(a: T, b: IntVec | number) => T>;
 
 export function cpuBitShiftLeft<T extends AnyIntegerVecInstance>(
   lhs: T,
@@ -241,7 +335,8 @@ export function cpuBitShiftLeft<T extends AnyIntegerVecInstance>(
     isInteger32VecInstance(lhs) &&
     ((isUint32VecInstance(rhs) && lhs.length == rhs.length) || typeof rhs === 'number')
   ) {
-    return bitShift(lhs, rhs, (a, b) => a << b);
+    // A scalar shift is cast the same way an unsigned vector's components are
+    return bitShiftLeftByKind[lhs.kind](lhs, typeof rhs === 'number' ? u32(rhs) : rhs);
   }
 
   throw new Error(
@@ -257,9 +352,7 @@ export function cpuBitShiftRight<T extends AnyIntegerVecInstance>(
     isInteger32VecInstance(lhs) &&
     ((isUint32VecInstance(rhs) && lhs.length == rhs.length) || typeof rhs === 'number')
   ) {
-    return isUint32VecInstance(lhs)
-      ? bitShift(lhs, rhs, (a, b) => a >>> b)
-      : bitShift(lhs, rhs, (a, b) => a >> b);
+    return bitShiftRightByKind[lhs.kind](lhs, typeof rhs === 'number' ? u32(rhs) : rhs);
   }
 
   throw new Error(
