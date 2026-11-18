@@ -4,7 +4,12 @@ import * as p from '@clack/prompts';
 import { pmFromUserAgent, pmInstall } from './utils/pm.ts';
 import { cancelExit, confirmStep, failAndExit, rgbText } from './utils/prompts.ts';
 import { scaffoldProject, prepareDirectory } from './utils/files.ts';
-import { getProjectName, isValidPackageName, getPackageName } from './utils/inputs.ts';
+import {
+  getProjectName,
+  isValidPackageName,
+  isValidProjectPath,
+  getPackageName,
+} from './utils/inputs.ts';
 import { detect, resolveCommand } from 'package-manager-detector';
 import { addAgentSkills, askForAgentSkills } from './steps/skills.ts';
 import {
@@ -34,6 +39,11 @@ function getDefaultPackageName(cwd: string, projectName: string) {
   return isValidPackageName(candidate) ? candidate : undefined;
 }
 
+// Double quotes are understood by POSIX shells, cmd.exe and PowerShell alike
+function quoteForShell(arg: string) {
+  return /^[\w@%+=:,./\\-]+$/.test(arg) ? arg : `"${arg}"`;
+}
+
 async function promptProjectTemplate(): Promise<ProjectTemplate> {
   const projectTemplate = await p.select({
     message: 'Select a template:',
@@ -50,6 +60,10 @@ export async function createProject(cwd: string, options?: CreateProjectOptions)
   p.intro('Creating a new TypeGPU project.');
 
   const nonInteractive = options?.nonInteractive ?? false;
+  if (options?.projectDir !== undefined && !isValidProjectPath(cwd, options.projectDir)) {
+    failAndExit(`Invalid project directory: ${options.projectDir}`);
+  }
+
   const projectName =
     options?.projectDir ??
     (nonInteractive ? DEFAULT_PROJECT_DIR : await getProjectName(DEFAULT_PROJECT_DIR));
@@ -121,7 +135,7 @@ export async function createProject(cwd: string, options?: CreateProjectOptions)
   const steps: string[] = [];
   const shouldCd = (!shouldInstall && !!installCmd) || !!runCmd || !!cdPath;
   if (shouldCd && cdPath) {
-    steps.push(`   cd ${cdPath}`);
+    steps.push(`   cd ${quoteForShell(cdPath)}`);
   }
   if (!shouldInstall && installCmd) {
     steps.push(`   ${installCmd.command} ${installCmd.args.join(' ')}`);
