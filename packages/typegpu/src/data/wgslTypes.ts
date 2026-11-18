@@ -1203,6 +1203,7 @@ export interface WgslArray<out TElement extends BaseData = BaseData>
   readonly elementCount: number;
   readonly elementType: TElement;
 
+  // Generic, because `Infer<TElement>[]` conflicts with the `out TElement` variance annotation (TS2636)
   <T extends TElement>(elements: Infer<T>[]): Infer<T>[];
   (): Infer<TElement>[];
 
@@ -1251,8 +1252,8 @@ export interface WgslStruct<
   readonly [$inRepr]: Prettify<InferInputRecord<TProps>>;
   readonly [$gpuRepr]: Prettify<InferGPURecord<TProps>>;
   readonly [$memIdent]: WgslStruct<Prettify<MemIdentityRecord<TProps>>>;
-  readonly [$reprPartial]: Prettify<Partial<InferPartialRecord<TProps>>> | undefined;
-  readonly [$reprPatch]: Prettify<Partial<InferPatchRecord<TProps>>> | undefined;
+  readonly [$reprPartial]: Prettify<InferPartialRecord<TProps>> | undefined;
+  readonly [$reprPatch]: Prettify<InferPatchRecord<TProps>> | undefined;
   readonly [$invalidSchemaReason]: SwapNever<
     {
       [K in keyof TProps]: ExtractInvalidSchemaError<

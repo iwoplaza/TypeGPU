@@ -2,7 +2,7 @@ import type { AnyBuiltin, OmitBuiltins } from '../../builtin.ts';
 import type { IndexFlag, IndirectFlag, TgpuBuffer, VertexFlag } from '../buffer/buffer.ts';
 import type { TgpuQuerySet } from '../querySet/querySet.ts';
 import { isBuiltin } from '../../data/attributes.ts';
-import { type Disarray, getCustomLocation, type UndecorateRecord } from '../../data/dataTypes.ts';
+import { type Disarray, getCustomLocation } from '../../data/dataTypes.ts';
 import { sizeOf } from '../../data/sizeOf.ts';
 import { type ResolvedSnippet, snip } from '../../data/snippet.ts';
 import { formatToWGSLType } from '../../data/vertexFormatData.ts';
@@ -365,10 +365,7 @@ export type FragmentOutToColorAttachment<T> = T extends {
 }
   ? ColorAttachment
   : T extends Record<string, unknown>
-    ? {
-        // Stripping all decorated properties
-        [Key in keyof UndecorateRecord<T>]: ColorAttachment;
-      }
+    ? { [Key in keyof T]: ColorAttachment }
     : Record<string, never>;
 
 export type AnyFragmentTargets = TgpuColorTargetState | Record<string, TgpuColorTargetState>;
