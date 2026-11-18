@@ -279,6 +279,16 @@ export function operatorReference({ op, lt, rt, pos }: Record<string, string>): 
     if (common) {
       lType = lType.startsWith('abstract') && common.startsWith('abstract') ? lType : common;
       rType = rType.startsWith('abstract') && common.startsWith('abstract') ? rType : common;
+    } else if (pos !== 'compound' && ['+', '-', '*', '/'].includes(op as string)) {
+      // These go through `std`, which casts a scalar next to a vector to the component type
+      const component = (typeName: string) =>
+        ({ f: 'f32', h: 'f16', i: 'i32', u: 'u32' })[/^vec\d([fhiu])$/.exec(typeName)?.[1] ?? ''];
+      const [lComponent, rComponent] = [component(lType), component(rType)];
+      if (lComponent && numericScalars.has(rType)) {
+        rType = lComponent;
+      } else if (rComponent && numericScalars.has(lType)) {
+        lType = rComponent;
+      }
     }
   }
   const params: string[] = [];
