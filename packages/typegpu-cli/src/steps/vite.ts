@@ -3,7 +3,11 @@ import path from 'node:path';
 import * as p from '@clack/prompts';
 import type { Agent } from 'package-manager-detector';
 import { loadFile, writeFile, type ProxifiedModule } from 'magicast';
-import { addVitePlugin, getDefaultExportOptions } from 'magicast/helpers';
+import {
+  addVitePlugin,
+  getConfigFromVariableDeclaration,
+  getDefaultExportOptions,
+} from 'magicast/helpers';
 
 import { findConfig } from '../utils/config.ts';
 import { hasDependency } from '../utils/pkg.ts';
@@ -31,14 +35,102 @@ export default defineConfig({
 const PLUGIN_PACKAGE = 'unplugin-typegpu';
 const PLUGIN_DOCS_URL = 'https://docs.swmansion.com/TypeGPU/tooling/unplugin-typegpu/';
 
+// Entry points whose default export can be used as a Vite plugin (Vite runs Rollup and Rolldown plugins too)
+const VITE_COMPATIBLE_ENTRIES = ['vite', 'rollup', 'rolldown'].map(
+  (entry) => `${PLUGIN_PACKAGE}/${entry}`,
+);
+const VITE_COMPATIBLE_ROOT_EXPORTS = [
+  'default',
+  '*',
+  'vitePlugin',
+  'rollupPlugin',
+  'rolldownPlugin',
+];
+
+type AstNode = { type: string; [key: string]: unknown };
+
+function isAstNode(value: unknown): value is AstNode {
+  return typeof value === 'object' && value !== null && typeof (value as AstNode).type === 'string';
+}
+
+function someAstNode(node: AstNode, predicate: (node: AstNode) => boolean): boolean {
+  if (predicate(node)) {
+    return true;
+  }
+  return Object.entries(node).some(([key, value]) => {
+    if (key === 'loc' || key === 'original' || key === 'comments' || key === 'tokens') {
+      return false;
+    }
+    const children = Array.isArray(value) ? value : [value];
+    return children.some((child) => isAstNode(child) && someAstNode(child, predicate));
+  });
+}
+
+function getDynamicImportSource(node: AstNode) {
+  const source =
+    node.type === 'ImportExpression'
+      ? node.source
+      : node.type === 'CallExpression' && isAstNode(node.callee) && node.callee.type === 'Import'
+        ? (node.arguments as unknown[])[0]
+        : undefined;
+  return isAstNode(source) && typeof source.value === 'string' ? source.value : undefined;
+}
+
 function importsPlugin(config: ProxifiedModule) {
-  return Object.values(config.imports).some(
-    (item) => item.from === PLUGIN_PACKAGE || item.from.startsWith(`${PLUGIN_PACKAGE}/`),
+  const staticImport = config.imports.$items.some((item) => {
+    if (
+      item.$declaration.importKind === 'type' ||
+      (item.$ast.type === 'ImportSpecifier' && item.$ast.importKind === 'type')
+    ) {
+      return false;
+    }
+    return (
+      VITE_COMPATIBLE_ENTRIES.includes(item.from) ||
+      (item.from === PLUGIN_PACKAGE && VITE_COMPATIBLE_ROOT_EXPORTS.includes(item.imported))
+    );
+  });
+
+  return (
+    staticImport ||
+    someAstNode(config.$ast as AstNode, (node) => {
+      const source = getDynamicImportSource(node);
+      return source === PLUGIN_PACKAGE || VITE_COMPATIBLE_ENTRIES.includes(source ?? '');
+    })
   );
 }
 
+function isEditableConfig(config: ProxifiedModule) {
+  if (!config.exports.default) {
+    return false;
+  }
+
+  const options = getDefaultExportOptions(config);
+  if (options.$type === 'object') {
+    return true;
+  }
+  if (options.$type !== 'identifier') {
+    return false;
+  }
+
+  // Mirrors the declaration shapes that `addVitePlugin` knows how to write back
+  let declaration;
+  try {
+    declaration = getConfigFromVariableDeclaration(config);
+  } catch {
+    return false;
+  }
+  const init =
+    declaration.declaration.init?.type === 'TSSatisfiesExpression'
+      ? declaration.declaration.init.expression
+      : declaration.declaration.init;
+  const writable =
+    init?.type === 'ObjectExpression' ||
+    (init?.type === 'CallExpression' && init.callee.type === 'Identifier');
+  return writable && declaration.config?.$type === 'object';
+}
+
 /**
- * Adds unplugin-typegpu to the Vite config, unless the config already imports it.
+ * Adds unplugin-typegpu to the Vite config, unless the config already uses it.
  * @returns whether the config was modified
  */
 export function addTypegpuPlugin(config: ProxifiedModule) {
@@ -46,8 +138,7 @@ export function addTypegpuPlugin(config: ProxifiedModule) {
     return false;
   }
 
-  const options = config.exports.default && getDefaultExportOptions(config);
-  if (options?.$type !== 'object' && options?.$type !== 'identifier') {
+  if (!isEditableConfig(config)) {
     throw new Error('Expected the default export to be a config object.');
   }
 
@@ -55,6 +146,13 @@ export function addTypegpuPlugin(config: ProxifiedModule) {
   return true;
 }
 
+export function manualSetupMessage(fileName: string) {
+  return `Add \`typegpuPlugin()\` from 'unplugin-typegpu/vite' to the \`plugins\` array in ${fileName} yourself: ${PLUGIN_DOCS_URL}`;
+}
+
+/**
+ * @returns whether unplugin-typegpu still has to be added to the config manually
+ */
 async function setupViteConfig(filePath: string) {
   const fileName = path.basename(filePath);
   let config;
@@ -67,16 +165,17 @@ async function setupViteConfig(filePath: string) {
   try {
     if (!addTypegpuPlugin(config)) {
       p.log.info(`unplugin-typegpu is already configured in ${fileName}.`);
-      return;
+      return false;
     }
     await writeFile(config, filePath);
   } catch (error) {
-    failAndExit(
-      `Could not add unplugin-typegpu to ${fileName}. Set it up manually: ${PLUGIN_DOCS_URL}`,
-      error instanceof Error ? error.message : String(error),
+    p.log.warn(
+      `Could not add unplugin-typegpu to ${fileName} automatically (${error instanceof Error ? error.message : String(error)}).\n${manualSetupMessage(fileName)}`,
     );
+    return true;
   }
   p.log.success(`Updated ${fileName}.`);
+  return false;
 }
 
 function createViteConfig(cwd: string) {
@@ -89,7 +188,7 @@ export async function setupVite(
   pm: Agent,
   pkg: PackageJson,
   options: { createConfigIfMissing?: boolean } = {},
-) {
+): Promise<string | undefined> {
   if (hasDependency(pkg, 'unplugin-typegpu')) {
     p.log.info('unplugin-typegpu is already installed.');
   } else {
@@ -98,19 +197,25 @@ export async function setupVite(
 
   const viteConfigPath = findConfig(cwd, VITE_CONFIG_NAMES);
   if (viteConfigPath) {
-    await setupViteConfig(viteConfigPath);
+    if (await setupViteConfig(viteConfigPath)) {
+      return path.basename(viteConfigPath);
+    }
   } else if (options.createConfigIfMissing) {
     createViteConfig(cwd);
   }
+  return undefined;
 }
 
+/**
+ * @returns the name of the Vite config that unplugin-typegpu still has to be added to manually, if any
+ */
 export async function askForVite(cwd: string, pm: Agent, pkg: PackageJson) {
   if (!(await confirmStep('Install unplugin-typegpu and configure vite?'))) {
-    return;
+    return undefined;
   }
 
   const viteConfigPath = findConfig(cwd, VITE_CONFIG_NAMES);
-  await setupVite(cwd, pm, pkg, {
+  return await setupVite(cwd, pm, pkg, {
     createConfigIfMissing: !viteConfigPath
       ? await confirmStep('No vite config found. Create vite.config.ts?')
       : false,
