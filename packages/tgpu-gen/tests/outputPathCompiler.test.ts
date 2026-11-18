@@ -217,4 +217,36 @@ describe('createOutputPathCompiler', () => {
       expected: 'generated/nested/hello.frag.ts',
     });
   });
+
+  it('keeps every directory matched by ** when * comes before it', () => {
+    test({
+      inputPattern: '*/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/a/b/x.wgsl',
+      expected: 'generated/a/b/x.ts',
+    });
+
+    test({
+      inputPattern: 'src/*/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/a/b/c/x.wgsl',
+      expected: 'generated/b/c/x.ts',
+    });
+
+    test({
+      inputPattern: 'src/?/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/a/b/x.wgsl',
+      expected: 'generated/b/x.ts',
+    });
+  });
+
+  it('ignores a leading ./ in the input pattern', () => {
+    test({
+      inputPattern: './src/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/a/x.wgsl',
+      expected: 'generated/a/x.ts',
+    });
+  });
 });
