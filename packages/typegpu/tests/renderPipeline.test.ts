@@ -1686,6 +1686,147 @@ describe('TgpuRenderPipeline', () => {
     helper(pipeline);
   });
 
+  describe('pipeline state passed to WebGPU', () => {
+    const fragment = tgpu.fragmentFn({ out: d.vec4f })(() => {
+      'use gpu';
+      return d.vec4f(1);
+    });
+
+    it('forwards primitive, depth-stencil and multisample state', ({ root, device }) => {
+      const pipeline = root.createRenderPipeline({
+        vertex: common.fullScreenTriangle,
+        fragment,
+        targets: { format: 'rgba8unorm' },
+        primitive: { topology: 'line-strip', cullMode: 'back', frontFace: 'cw' },
+        depthStencil: {
+          format: 'depth24plus',
+          depthWriteEnabled: true,
+          depthCompare: 'less',
+        },
+        multisample: { count: 4 },
+      });
+      root.unwrap(pipeline);
+
+      const descriptor = vi.mocked(device.createRenderPipeline).mock.calls[0]![0];
+      expect(descriptor.primitive).toStrictEqual({
+        topology: 'line-strip',
+        cullMode: 'back',
+        frontFace: 'cw',
+      });
+      expect(descriptor.depthStencil).toStrictEqual({
+        format: 'depth24plus',
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+      });
+      expect(descriptor.multisample).toStrictEqual({ count: 4 });
+    });
+
+    it('maps a strip index format schema to a GPUIndexFormat', ({ root, device }) => {
+      for (const stripIndexFormat of [d.u16, d.u32]) {
+        root.unwrap(
+          root.createRenderPipeline({
+            vertex: common.fullScreenTriangle,
+            fragment,
+            targets: { format: 'rgba8unorm' },
+            primitive: { topology: 'triangle-strip', stripIndexFormat },
+          }),
+        );
+      }
+
+      const primitives = vi
+        .mocked(device.createRenderPipeline)
+        .mock.calls.map(([descriptor]) => descriptor.primitive);
+      expect(primitives).toStrictEqual([
+        { topology: 'triangle-strip', stripIndexFormat: 'uint16' },
+        { topology: 'triangle-strip', stripIndexFormat: 'uint32' },
+      ]);
+    });
+
+    it('forwards color target state', ({ root, device }) => {
+      const blend: GPUBlendState = {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+        alpha: { srcFactor: 'one', dstFactor: 'zero', operation: 'add' },
+      };
+
+      root.unwrap(
+        root.createRenderPipeline({
+          vertex: common.fullScreenTriangle,
+          fragment,
+          targets: { format: 'rgba8unorm', blend, writeMask: 0x1 },
+        }),
+      );
+
+      const multiFragment = tgpu.fragmentFn({
+        out: { colorA: d.location(0, d.vec4f), colorB: d.location(1, d.vec4f) },
+      })(() => {
+        'use gpu';
+        return { colorA: d.vec4f(), colorB: d.vec4f() };
+      });
+
+      root.unwrap(
+        root.createRenderPipeline({
+          vertex: common.fullScreenTriangle,
+          fragment: multiFragment,
+          targets: {
+            colorA: { format: 'rgba8unorm', blend },
+            colorB: { format: 'r16float', writeMask: 0x2 },
+          },
+        }),
+      );
+
+      const targets = vi
+        .mocked(device.createRenderPipeline)
+        .mock.calls.map(([descriptor]) => descriptor.fragment?.targets);
+      expect(targets).toStrictEqual([
+        [{ format: 'rgba8unorm', blend, writeMask: 0x1 }],
+        [
+          { format: 'rgba8unorm', blend },
+          { format: 'r16float', writeMask: 0x2 },
+        ],
+      ]);
+    });
+
+    it('creates a pipeline layout from the used bind group layouts', ({ root, device }) => {
+      const layout = tgpu.bindGroupLayout({ tint: { uniform: d.vec4f } });
+      const tintedFragment = tgpu.fragmentFn({ out: d.vec4f })(() => {
+        'use gpu';
+        return layout.$.tint;
+      });
+
+      const pipeline = root
+        .createRenderPipeline({
+          vertex: common.fullScreenTriangle,
+          fragment: tintedFragment,
+          targets: { format: 'rgba8unorm' },
+        })
+        .$name('tinted');
+      root.unwrap(pipeline);
+
+      expect(device.mock.createPipelineLayout).toHaveBeenCalledExactlyOnceWith({
+        label: 'tinted - Pipeline Layout',
+        bindGroupLayouts: [root.unwrap(layout)],
+        immediateSize: 0,
+      });
+      expect(vi.mocked(device.createRenderPipeline).mock.calls[0]![0].layout).toBe(
+        device.mock.createPipelineLayout.mock.results[0]!.value,
+      );
+    });
+
+    it('omits state that was not specified', ({ root, device }) => {
+      const pipeline = root.createRenderPipeline({
+        vertex: common.fullScreenTriangle,
+        fragment,
+        targets: { format: 'rgba8unorm' },
+      });
+      root.unwrap(pipeline);
+
+      const descriptor = vi.mocked(device.createRenderPipeline).mock.calls[0]![0];
+      expect(descriptor).not.toHaveProperty('primitive');
+      expect(descriptor).not.toHaveProperty('depthStencil');
+      expect(descriptor).not.toHaveProperty('multisample');
+    });
+  });
+
   describe('multiple targets', () => {
     const vertex = tgpu.vertexFn({ out: { pos: d.builtin.position } })`/* impl; */`;
     it('allows returning a struct', ({ root, device }) => {

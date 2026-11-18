@@ -34,6 +34,35 @@ describe('TgpuComputePipeline', () => {
     });
   });
 
+  it('creates a pipeline layout from the used bind group layouts', async ({ root, device }) => {
+    const layout = tgpu.bindGroupLayout({ alpha: { uniform: d.f32 } });
+    const entryFn = tgpu.computeFn({ workgroupSize: [1] })(() => {
+      layout.$.alpha;
+    });
+
+    root.unwrap(root.createComputePipeline({ compute: entryFn }).$name('sync'));
+    await root.createComputePipeline({ compute: entryFn }).$name('async').initAsync();
+
+    expect(device.mock.createPipelineLayout.mock.calls).toStrictEqual([
+      [
+        {
+          label: 'sync - Pipeline Layout',
+          bindGroupLayouts: [root.unwrap(layout)],
+          immediateSize: 0,
+        },
+      ],
+      [
+        {
+          label: 'async - Pipeline Layout',
+          bindGroupLayouts: [root.unwrap(layout)],
+          immediateSize: 0,
+        },
+      ],
+    ]);
+    expect(device.mock.createComputePipeline.mock.calls[0]![0].label).toBe('sync');
+    expect(device.mock.createComputePipelineAsync.mock.calls[0]![0].label).toBe('async');
+  });
+
   it('throws an error if bind groups are missing', ({ root }) => {
     const layout = tgpu.bindGroupLayout({ alpha: { uniform: d.f32 } });
 
