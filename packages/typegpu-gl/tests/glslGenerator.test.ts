@@ -1348,6 +1348,24 @@ describe('GlslGenerator - entry point generation with JS functions', () => {
 });
 
 describe('GlslGenerator - GL syntax', () => {
+  it('masks a constant vector shift amount with a GLSL vector', () => {
+    const amounts = tgpu.const(d.vec3u, d.vec3u(33, 1, 2));
+    const fn = (v: d.v3u) => {
+      'use gpu';
+      // @ts-expect-error: TypeScript does not know about shifting vectors
+      return v << amounts.$;
+    };
+
+    const main = tgpu.fn([d.vec3u])((v) => {
+      'use gpu';
+      const shifted = fn(v);
+    });
+
+    const result = tgpu.resolve([main], glOptions());
+    expect(result).toContain('(amounts & uvec3(31))');
+    expect(result).not.toContain('vec3u');
+  });
+
   describe('switch', () => {
     it('parses regular cases correctly', () => {
       const fn = () => {

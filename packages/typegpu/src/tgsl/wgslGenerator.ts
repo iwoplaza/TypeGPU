@@ -4,6 +4,7 @@ import { arrayOf } from '../data/array.ts';
 import { type AnyData, UnknownData, unptr } from '../data/dataTypes.ts';
 import { abstractInt, bool, i32, u32 } from '../data/numeric.ts';
 import { vec2u, vec3u, vec4u } from '../data/vector.ts';
+import { generalizeFn } from '../data/generalizeFn.ts';
 import {
   fallthroughCopyOrigin,
   isMutableOrigin,
@@ -326,6 +327,8 @@ export class WgslGenerator implements ShaderGenerator {
   // used to detect `continue` and `break` nodes in loop body, as well as label
   // unrolled blocks with comments
   #unrollingChain: number[] = [];
+  // local definitions emitted as WGSL `const`, their values are not known to us
+  #localConstants = new WeakSet<Snippet>();
 
   // prototype properties
   declare languageKey: string;
@@ -878,6 +881,36 @@ export class WgslGenerator implements ShaderGenerator {
         }
         convRhs = tryConvertSnippet(this.ctx, rhsExpr, rhsTarget, false);
         convLhs = lhsExpr;
+
+        // A constant shift amount has to be less than the bit width, while JS masks it to 5 bits
+        const knownRhs = asComptime(convRhs)?.value;
+        if (typeof knownRhs === 'number' || wgsl.isVecInstance(knownRhs)) {
+          const masked = generalizeFn((amount) => amount & 31, [knownRhs]);
+          convRhs = snip(
+            masked,
+            rhsTarget,
+            /* origin */ 'constant',
+            /* possibleSideEffects */ false,
+          );
+        } else if (
+          rhsExpr.origin === 'constant-immutable-def' ||
+          this.#localConstants.has(rhsExpr)
+        ) {
+          const mask = snip(
+            wgsl.isVec(rhsTarget)
+              ? (rhsTarget as typeof vec2u | typeof vec3u | typeof vec4u)(31)
+              : 31,
+            rhsTarget,
+            /* origin */ 'constant',
+            /* possibleSideEffects */ false,
+          );
+          convRhs = snip(
+            stitch`(${convRhs} & ${mask})`,
+            rhsTarget,
+            /* origin */ 'runtime',
+            /* possibleSideEffects */ false,
+          );
+        }
       } else {
         const forcedType = exprType === NODE.assignmentExpr ? [lhsExpr.dataType] : undefined;
         [convLhs, convRhs] = convertToCommonType(this.ctx, [lhsExpr, rhsExpr], forcedType) ?? [
@@ -1684,6 +1717,9 @@ Try 'return ${typeStr}(${str});' instead.
       false,
     );
     this.ctx.defineVariable(rawId, snippet);
+    if (varType === 'const') {
+      this.#localConstants.add(snippet);
+    }
 
     const rhsSnippet = tryConvertSnippet(this.ctx, eq, definitionDataType, false);
     const rhsStr = this.ctx.resolveSnippet(rhsSnippet).value;
