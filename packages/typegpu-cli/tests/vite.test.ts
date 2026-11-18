@@ -122,6 +122,35 @@ export default defineConfig({
   });
 
   it.each([
+    [`import type { Options } from 'unplugin-typegpu/vite';`, 'Options'],
+    [`import type typegpu from 'unplugin-typegpu/vite';`, 'typegpu'],
+  ])('adds a separate value import next to `%s`', (importLine, typeImport) => {
+    const { added, code } = apply(`\
+import { defineConfig } from 'vite';
+${importLine}
+
+export default defineConfig({
+  plugins: [],
+});`);
+
+    expect(added).toBe(true);
+    const imports = parseModule(code).imports.$items.filter(
+      (item) => item.from === 'unplugin-typegpu/vite',
+    );
+    expect(
+      imports.map((item) => ({
+        local: item.local,
+        typeOnly: item.$declaration.importKind === 'type',
+      })),
+    ).toStrictEqual([
+      { local: 'typegpuPlugin', typeOnly: false },
+      { local: typeImport, typeOnly: true },
+    ]);
+    expect(code).toContain(importLine);
+    expect(code).toContain('plugins: [typegpuPlugin()]');
+  });
+
+  it.each([
     `(await import('unplugin-typegpu/vite')).default()`,
     `import('unplugin-typegpu/vite').then((m) => m.default())`,
     `(await import('unplugin-typegpu')).vitePlugin()`,

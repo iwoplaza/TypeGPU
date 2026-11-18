@@ -129,6 +129,25 @@ function isEditableConfig(config: ProxifiedModule) {
   return writable && declaration.config?.$type === 'object';
 }
 
+// `addVitePlugin` merges the import into an existing declaration from the same entry, even a type-only one
+function moveImportOutOfTypeOnlyDeclaration(config: ProxifiedModule, from: string, local: string) {
+  const item = config.imports.$items.find((i) => i.from === from && i.local === local);
+  const declaration = item?.$declaration;
+  if (!item || declaration?.importKind !== 'type') {
+    return;
+  }
+
+  declaration.specifiers = declaration.specifiers.filter((specifier) => specifier !== item.$ast);
+  const valueDeclaration = {
+    type: 'ImportDeclaration',
+    importKind: 'value',
+    specifiers: [item.$ast],
+    source: { type: 'StringLiteral', value: from },
+  } as typeof declaration;
+  const body = (config.$ast as { body: unknown[] }).body;
+  body.splice(body.indexOf(declaration), 0, valueDeclaration);
+}
+
 /**
  * Adds unplugin-typegpu to the Vite config, unless the config already uses it.
  * @returns whether the config was modified
@@ -142,7 +161,9 @@ export function addTypegpuPlugin(config: ProxifiedModule) {
     throw new Error('Expected the default export to be a config object.');
   }
 
-  addVitePlugin(config, { from: `${PLUGIN_PACKAGE}/vite`, constructor: 'typegpuPlugin' });
+  const from = `${PLUGIN_PACKAGE}/vite`;
+  addVitePlugin(config, { from, constructor: 'typegpuPlugin' });
+  moveImportOutOfTypeOnlyDeclaration(config, from, 'typegpuPlugin');
   return true;
 }
 
