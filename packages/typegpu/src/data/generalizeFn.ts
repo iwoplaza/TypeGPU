@@ -1,7 +1,7 @@
-import { vec2b, vec3b, vec4b, vecTypeToConstructor } from './vector.ts';
-import { mat2x2f, mat3x3f, mat4x4f } from './matrix.ts';
+import { Vec2bImpl, Vec3bImpl, Vec4bImpl } from './vectorImpl.ts';
 import {
   isVecInstance,
+  WORKAROUND_getSchema,
   type AnyBooleanVecInstance,
   type AnyMatInstance,
   type AnyVec2Instance,
@@ -30,6 +30,10 @@ export type ToBool<T extends Algebraic> = T extends number | boolean
         ? v4b
         : never;
 
+const vec2b = (...args: boolean[]) => new Vec2bImpl(...args) as unknown as v2b;
+const vec3b = (...args: boolean[]) => new Vec3bImpl(...args) as unknown as v3b;
+const vec4b = (...args: boolean[]) => new Vec4bImpl(...args) as unknown as v4b;
+
 const booleanFor = {
   vec2f: vec2b,
   vec2h: vec2b,
@@ -48,17 +52,21 @@ const booleanFor = {
   'vec4<bool>': vec4b,
 } as const;
 
-const constructorFor = {
-  ...vecTypeToConstructor,
-  mat2x2f,
-  mat3x3f,
-  mat4x4f,
-} as const;
+/**
+ * The schema of a vector or matrix, which can be used to construct a value of the same type.
+ * Accessed through the value so that this module does not depend on `vector.ts` and `matrix.ts`.
+ */
+function constructorOf(value: Vec | Mat): (...args: (number | boolean)[]) => Vec | Mat {
+  return WORKAROUND_getSchema(value) as unknown as (...args: (number | boolean)[]) => Vec | Mat;
+}
 
-function getConstructorFor(mode: Mode, kind: Kind) {
-  const map = mode === 'boolean' ? booleanFor : constructorFor;
-  if (kind in map) {
-    return map[kind as keyof typeof map];
+function getConstructorFor(mode: Mode, value: Algebraic) {
+  const kind = kindOf(value);
+  if (mode === 'boolean' && kind in booleanFor) {
+    return booleanFor[kind as keyof typeof booleanFor];
+  }
+  if (mode === 'first' && typeof value === 'object') {
+    return constructorOf(value);
   }
   throw new Error(`No corresponding vector/matrix type for '${kind}' kind in '${mode}' mode.`);
 }
@@ -81,9 +89,8 @@ function applyArgs(
     return fn(...(args as never[]));
   }
 
-  const kind = kinds[0];
-  invariant(kind, `Expected kind of the first argument to be present.`);
-  const constructor = getConstructorFor(mode, kind);
+  invariant(kinds[0], `Expected kind of the first argument to be present.`);
+  const constructor = getConstructorFor(mode, args[0] as Algebraic);
 
   const iterableArgs = (args as (Vec | Mat)[]).map(makeIterable);
   const length = iterableArgs[0]?.length;
@@ -205,10 +212,10 @@ export function upCast<T extends number | Vec | Mat>(
 ): [Exclude<T, number>, Exclude<T, number>] {
   const [lhs, rhs] = args;
   if (typeof lhs === 'number' && isVecInstance(rhs)) {
-    const schema = constructorFor[rhs.kind];
+    const schema = constructorOf(rhs);
     return [schema(lhs), rhs] as [Exclude<T, number>, Exclude<T, number>];
   } else if (isVecInstance(lhs) && typeof rhs === 'number') {
-    const schema = constructorFor[lhs.kind];
+    const schema = constructorOf(lhs);
     return [lhs, schema(rhs)] as [Exclude<T, number>, Exclude<T, number>];
   }
   return [lhs, rhs] as [Exclude<T, number>, Exclude<T, number>];

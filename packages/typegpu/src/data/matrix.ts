@@ -5,6 +5,7 @@ import { stitch } from '../core/resolve/stitch.ts';
 import { $repr } from '../shared/symbols.ts';
 import { $internal, $resolve } from '../shared/symbols.ts';
 import { numericLiteralToSnippet } from '../tgsl/generationHelpers.ts';
+import { assignInfixOperators } from '../tgsl/infixDispatch.ts';
 import type { ResolutionCtx, SelfResolvable } from '../types.ts';
 import { f32 } from './numeric.ts';
 import { type ResolvedSnippet } from './snippet.ts';
@@ -48,6 +49,8 @@ export abstract class MatBase<TColumn> implements NumberArrayView {
   abstract [Symbol.iterator](): Iterator<number>;
   [n: number]: number;
 }
+
+assignInfixOperators(MatBase, ['add', 'sub', 'mul']);
 
 interface MatSchemaOptions<TType extends string, ColumnType> {
   type: TType;
