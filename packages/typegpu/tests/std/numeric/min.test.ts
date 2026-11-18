@@ -121,3 +121,67 @@ describe('min', () => {
     );
   });
 });
+
+describe('min in shaders', () => {
+  it('unifies abstract literals with concrete arguments', () => {
+    const main = (x: number, v: d.v3f) => {
+      'use gpu';
+      const a = std.min(x, 0);
+      const b = std.min(v, d.vec3f(0));
+    };
+
+    expect(tgpu.resolve([tgpu.fn([d.f32, d.vec3f])(main)])).toMatchInlineSnapshot(`
+      "fn main(x: f32, v: vec3f) {
+        let a = min(x, 0f);
+        let b = min(v, vec3f());
+      }"
+    `);
+  });
+
+  it('rejects arguments that WGSL does not accept', () => {
+    expect(() =>
+      tgpu.resolve([
+        tgpu.fn([d.vec3f, d.bool])((v: d.v3f, b: boolean) => {
+          'use gpu';
+          // @ts-expect-error
+          std.min(v, 0);
+        }),
+      ]),
+    ).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn:<unnamed>
+      - fn:min: Unsupported data types: vec3f, abstractInt. Supported types are: f32, f16, abstractFloat, vec2f, vec3f, vec4f, vec2h, vec3h, vec4h, i32, u32, vec2i, vec3i, vec4i, vec2u, vec3u, vec4u, abstractInt.]
+    `);
+  });
+
+  it('keeps mixed integers as integers', () => {
+    const mixed = tgpu.fn(
+      [d.u32, d.i32],
+      d.i32,
+    )((a, b) => {
+      'use gpu';
+      return std.min(a, b) + std.clamp(b, 0, a);
+    });
+
+    expect(tgpu.resolve([mixed])).toMatchInlineSnapshot(`
+      "fn mixed(a: u32, b: i32) -> i32 {
+        return (min(i32(a), b) + clamp(b, 0i, i32(a)));
+      }"
+    `);
+  });
+
+  it('converts booleans to a numeric type, like other numeric functions', () => {
+    const main = (b: boolean) => {
+      'use gpu';
+      // @ts-expect-error
+      const a = std.min(b, b);
+    };
+
+    expect(tgpu.resolve([tgpu.fn([d.bool])(main)])).toMatchInlineSnapshot(`
+      "fn main(b: bool) {
+        let a = min(f32(b), f32(b));
+      }"
+    `);
+  });
+});

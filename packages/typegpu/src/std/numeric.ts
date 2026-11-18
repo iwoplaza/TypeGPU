@@ -72,14 +72,6 @@ const unaryIdentitySignature = (arg: BaseData) => {
   };
 };
 
-const variadicUnifySignature = (...args: BaseData[]) => {
-  const uargs = unify(args) ?? args;
-  return {
-    argTypes: uargs,
-    returnType: uargs[0] as BaseData,
-  };
-};
-
 /*#__NO_SIDE_EFFECTS__*/
 export function unifyRestrictedSignature(restrict: BaseData[]) {
   return (...args: BaseData[]) => {
@@ -123,6 +115,23 @@ const anyFloat = [...anyFloatPrimitive, ...anyFloatVec];
 const anyConcreteIntegerPrimitive = [i32, u32];
 const anyConcreteIntegerVec = [vec2i, vec3i, vec4i, vec2u, vec3u, vec4u];
 const anyConcreteInteger = [...anyConcreteIntegerPrimitive, ...anyConcreteIntegerVec];
+const anyNumeric: BaseData[] = [...anyFloat, ...anyConcreteInteger, abstractInt];
+
+/**
+ * The arguments are first unified among their own types, so that e.g. mixed
+ * integers stay integers, and only then against all numeric types.
+ */
+const numericUnifySignature = (...args: BaseData[]) => {
+  const own = unify(args);
+  const uargs = own?.every((type) => anyNumeric.includes(type)) ? own : unify(args, anyNumeric);
+  if (!uargs) {
+    throw new SignatureNotSupportedError(args, anyNumeric);
+  }
+  return {
+    argTypes: uargs,
+    returnType: uargs[0] as BaseData,
+  };
+};
 
 // std
 
@@ -135,7 +144,7 @@ function cpuAbs<T extends NumVec | number>(value: T): T {
 
 export const abs = dualImpl({
   name: 'abs',
-  signature: unaryIdentitySignature,
+  signature: unifyRestrictedSignature(anyNumeric),
   normalImpl: cpuAbs,
   codegenImpl: (_ctx, [value]) => stitch`abs(${value})`,
   sideEffects: false,
@@ -272,7 +281,7 @@ function cpuClamp<T extends NumVec | number>(value: T, low: T, high: T): T {
 
 export const clamp = dualImpl({
   name: 'clamp',
-  signature: variadicUnifySignature,
+  signature: numericUnifySignature,
   normalImpl: cpuClamp,
   codegenImpl: (_ctx, [value, low, high]) => stitch`clamp(${value}, ${low}, ${high})`,
   sideEffects: false,
@@ -810,7 +819,7 @@ type VariadicOverload = {
 
 export const max = dualImpl({
   name: 'max',
-  signature: variadicUnifySignature,
+  signature: numericUnifySignature,
   normalImpl: variadicReduce(cpuMax) as VariadicOverload,
   codegenImpl: variadicStitch('max'),
   sideEffects: false,
@@ -826,7 +835,7 @@ function cpuMin<T extends NumVec | number>(a: T, b: T): T {
 
 export const min = dualImpl({
   name: 'min',
-  signature: variadicUnifySignature,
+  signature: numericUnifySignature,
   normalImpl: variadicReduce(cpuMin) as VariadicOverload,
   codegenImpl: variadicStitch('min'),
   sideEffects: false,
