@@ -157,4 +157,96 @@ describe('createOutputPathCompiler', () => {
       expected: 'output/examples/shader1.ts',
     });
   });
+
+  it('treats regex special characters in the input pattern as literal path characters', () => {
+    test({
+      inputPattern: 'shaders (old)/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'shaders (old)/nested/hello.wgsl',
+      expected: 'generated/nested/hello.ts',
+    });
+
+    test({
+      inputPattern: 'a+b/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'a+b/nested/hello.wgsl',
+      expected: 'generated/nested/hello.ts',
+    });
+
+    test({
+      inputPattern: 'a^b$c|d/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'a^b$c|d/nested/hello.wgsl',
+      expected: 'generated/nested/hello.ts',
+    });
+
+    test({
+      inputPattern: 'v1.0/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'v1.0/nested/hello.wgsl',
+      expected: 'generated/nested/hello.ts',
+    });
+  });
+
+  it('supports ?, character classes and multiple * in the input pattern', () => {
+    test({
+      inputPattern: 'shader?/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'shaderA/nested/hello.wgsl',
+      expected: 'generated/nested/hello.ts',
+    });
+
+    test({
+      inputPattern: 'shader[0-9]/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'shader1/nested/hello.wgsl',
+      expected: 'generated/nested/hello.ts',
+    });
+
+    test({
+      inputPattern: 'shader[!0-9]/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'shaderA/nested/hello.wgsl',
+      expected: 'generated/nested/hello.ts',
+    });
+
+    test({
+      inputPattern: 'src/**/*.*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/nested/hello.frag.wgsl',
+      expected: 'generated/nested/hello.frag.ts',
+    });
+  });
+
+  it('keeps every directory matched by ** when * comes before it', () => {
+    test({
+      inputPattern: '*/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/a/b/x.wgsl',
+      expected: 'generated/a/b/x.ts',
+    });
+
+    test({
+      inputPattern: 'src/*/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/a/b/c/x.wgsl',
+      expected: 'generated/b/c/x.ts',
+    });
+
+    test({
+      inputPattern: 'src/?/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/a/b/x.wgsl',
+      expected: 'generated/b/x.ts',
+    });
+  });
+
+  it('ignores a leading ./ in the input pattern', () => {
+    test({
+      inputPattern: './src/**/*.wgsl',
+      outputPattern: 'generated/**/*.ts',
+      fileName: 'src/a/x.wgsl',
+      expected: 'generated/a/x.ts',
+    });
+  });
 });
