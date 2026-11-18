@@ -13,6 +13,7 @@ import {
   type TgpuVertexFnShell,
 } from 'typegpu';
 import { restoreResource, snapshotResource } from 'typegpu/~internal';
+import type { LayoutToAllowedAttribs } from '../src/core/vertexLayout/vertexAttribute.ts';
 import { it } from 'typegpu-testing-utility';
 
 describe('render pipeline behavior', () => {
@@ -38,6 +39,118 @@ describe('render pipeline behavior', () => {
 
     // @ts-expect-error: Mismatched vertex output
     root.createRenderPipeline({ vertex: vert, fragment });
+  });
+
+  it('requires attribs when the vertex function has non-builtin inputs', ({ root }) => {
+    const vertex = tgpu.vertexFn({
+      in: { pos: d.vec3f, uv: d.vec2f, vid: d.builtin.vertexIndex },
+      out: { pos: d.builtin.position, uv: d.vec2f },
+    })`{ return Out(); }`;
+    const fragment = tgpu.fragmentFn({ in: { uv: d.vec2f }, out: d.vec4f })`{ return vec4f(); }`;
+    const layout = tgpu.vertexLayout(d.arrayOf(d.struct({ pos: d.vec3f, uv: d.vec2f })));
+
+    // @ts-expect-error: Missing attribs
+    root.createRenderPipeline({ vertex, fragment, targets: { format: 'rgba8unorm' } });
+    // @ts-expect-error: Missing attribs
+    root.createRenderPipeline({ vertex });
+    // @ts-expect-error: Missing attribs
+    root.createRenderPipeline({ vertex, fragment: undefined });
+
+    root.createRenderPipeline({
+      attribs: layout.attrib,
+      vertex,
+      fragment,
+      targets: { format: 'rgba8unorm' },
+    });
+    root.createRenderPipeline({ attribs: layout.attrib, vertex });
+  });
+
+  it('allows to omit attribs when the vertex function has only builtin inputs', ({ root }) => {
+    const vertex = tgpu.vertexFn({
+      in: { vid: d.builtin.vertexIndex, iid: d.builtin.instanceIndex },
+      out: { pos: d.builtin.position },
+    })`{ return Out(); }`;
+    const fragment = tgpu.fragmentFn({ out: d.vec4f })`{ return vec4f(); }`;
+
+    root.createRenderPipeline({ vertex, fragment, targets: { format: 'rgba8unorm' } });
+    root.createRenderPipeline({ vertex });
+
+    root.createRenderPipeline({
+      vertex: ({ $vertexIndex }) => {
+        'use gpu';
+        return { $position: d.vec4f(d.f32($vertexIndex), 0, 0, 1) };
+      },
+      fragment: () => {
+        'use gpu';
+        return d.vec4f();
+      },
+      targets: { format: 'rgba8unorm' },
+    });
+    root.createRenderPipeline({
+      vertex: () => {
+        'use gpu';
+        return { $position: d.vec4f() };
+      },
+    });
+  });
+
+  it('reports a mismatched attribute format on attribs', ({ root }) => {
+    const vertex = tgpu.vertexFn({
+      in: { pos: d.vec3f },
+      out: { pos: d.builtin.position },
+    })`{ return Out(); }`;
+    const layout = tgpu.vertexLayout(d.arrayOf(d.vec3u));
+
+    root.createRenderPipeline({
+      // @ts-expect-error: uint32x3 is not compatible with vec3f
+      attribs: { pos: layout.attrib },
+      vertex,
+    });
+  });
+
+  it('accepts vertex functions with widened input types', ({ root }) => {
+    const withInputs = tgpu.vertexFn({
+      in: { pos: d.vec3f },
+      out: { pos: d.builtin.position },
+    })`{ return Out(); }`;
+    const withoutInputs = tgpu.vertexFn({
+      in: { vid: d.builtin.vertexIndex },
+      out: { pos: d.builtin.position },
+    })`{ return Out(); }`;
+    const layout = tgpu.vertexLayout(d.arrayOf(d.vec3f));
+
+    const fromBare = (vertex: TgpuVertexFn) => root.createRenderPipeline({ vertex });
+    // oxlint-disable-next-line typescript/no-explicit-any -- the widest vertex function type a helper might accept
+    const fromAny = (vertex: TgpuVertexFn<any, any>) => {
+      root.createRenderPipeline({ vertex });
+      root.createRenderPipeline({ attribs: { pos: layout.attrib }, vertex });
+    };
+    const fromUnion = (vertex: typeof withInputs | typeof withoutInputs) =>
+      root.createRenderPipeline({ attribs: { pos: layout.attrib }, vertex });
+
+    fromBare(withoutInputs);
+    fromAny(withInputs);
+    fromUnion(withInputs);
+  });
+
+  it('accepts helpers that are generic over the vertex input type', ({ root }) => {
+    const fragment = tgpu.fragmentFn({ out: d.vec4f })`{ return vec4f(); }`;
+
+    function withoutAttribs<TIn extends TgpuVertexFn.In>(
+      vertex: TgpuVertexFn<TIn, { pos: d.BuiltinPosition }>,
+    ) {
+      root.createRenderPipeline({ vertex });
+      root.createRenderPipeline({ vertex, fragment: undefined });
+      root.createRenderPipeline({ vertex, fragment, targets: { format: 'rgba8unorm' } });
+    }
+
+    function withAttribs<TIn extends TgpuVertexFn.In>(
+      vertex: TgpuVertexFn<TIn, { pos: d.BuiltinPosition }>,
+      attribs: LayoutToAllowedAttribs<TIn>,
+    ) {
+      root.createRenderPipeline({ attribs, vertex });
+      root.createRenderPipeline({ attribs, vertex, fragment, targets: { format: 'rgba8unorm' } });
+    }
   });
 
   it('throws an error if bind groups are missing', ({ root }) => {
@@ -252,7 +365,9 @@ describe('render pipeline behavior', () => {
       });
 
       const fragmentMain = tgpu.fragmentFn({ out: d.vec4u })(() => d.vec4u(1));
+      const layout = tgpu.vertexLayout(d.arrayOf(d.u32));
       const pipeline = root.createRenderPipeline({
+        attribs: { index: layout.attrib },
         vertex: vertexMain,
         fragment: fragmentMain,
         targets: { format: 'rgba8uint' },
