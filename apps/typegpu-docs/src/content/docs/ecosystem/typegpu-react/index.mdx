@@ -435,7 +435,7 @@ Usage flags can be added to it with `.$usage(...)`, just like with buffers creat
 | Option | Description |
 |-|-|
 | initial | An initial value given to the buffer on component mount. Alternatively, a function can be passed in to imperatively write to the buffer while its still mapped to CPU memory. |
-| onInit | A function that will be called after the buffer is initialized. An example of where this is useful is populating the buffer with a compute shader. |
+| onInit | A function that will be called after the buffer is created, and again whenever it gets recreated. An example of where this is useful is populating the buffer with a compute shader. |
 
 ```tsx twoslash
 import { d } from 'typegpu';
@@ -449,6 +449,39 @@ const particles = useBuffer(d.arrayOf(d.vec2f, 100)).$usage('storage', 'vertex')
   return null;
 }
 ```
+
+:::caution
+The underlying `GPUBuffer` is created the first time the buffer is used (written to, bound, etc.), and usages added after that point have no effect on it.
+`onInit` runs inside the hook, before `.$usage(...)` on the returned value, so if `onInit` uses the buffer, add every usage the buffer will ever need inside `onInit`:
+
+```tsx twoslash
+import { d } from 'typegpu';
+import React from 'react';
+import { useBuffer, useRoot } from '@typegpu/react';
+
+function App() {
+// ---cut---
+const root = useRoot();
+const particles = useBuffer(d.arrayOf(d.vec2f, 100), {
+  onInit: (buffer) => {
+    // 'vertex' isn't needed by the compute shader, but it has to be added
+    // before the buffer is first used
+    const positions = buffer.$usage('storage', 'vertex').as('mutable');
+
+    root
+      .createGuardedComputePipeline((i) => {
+        'use gpu';
+        positions.$[i] = d.vec2f(d.f32(i) / 100, 0);
+      })
+      .dispatchThreads(100);
+  },
+  // Doesn't change the flags anymore, but gives `particles` the right type
+}).$usage('storage', 'vertex');
+// ---cut-after---
+  return null;
+}
+```
+:::
 
 ### useBindGroup
 
