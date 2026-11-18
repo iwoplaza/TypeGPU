@@ -11,7 +11,9 @@ import {
   type TgpuVar,
   type ResolvedDeclaration,
 } from 'typegpu';
+import { WgslGenerator } from 'typegpu/~internal';
 import { glOptions } from '@typegpu/gl';
+import { avoidThreeIdentifiers } from './reserved-identifiers.ts';
 
 /**
  * State held by the node, used during shader generation.
@@ -187,6 +189,12 @@ function isWebGL(builder: THREE.NodeBuilder): boolean {
   return (backend as { isWebGLBackend?: boolean } | undefined)?.isWebGLBackend === true;
 }
 
+function resolveOptionsFor(builder: THREE.NodeBuilder) {
+  const webgl = isWebGL(builder);
+  const generator = webgl ? glOptions().unstable_shaderGenerator : new WgslGenerator();
+  return { unstable_shaderGenerator: avoidThreeIdentifiers(generator, builder, webgl) };
+}
+
 class TgpuFnNode<T> extends THREE.Node {
   #impl: () => T;
 
@@ -229,7 +237,7 @@ class TgpuFnNode<T> extends THREE.Node {
       const resolved = withGeneratingFnNodeCtx(ctx, () => {
         const { code, declarations } = tgpu.resolveWithContext([this.#impl], {
           names: stageData.namespace,
-          ...(webgl ? glOptions() : {}),
+          ...resolveOptionsFor(builder),
         });
 
         // Resolving this.#impl as second time in the same
@@ -238,7 +246,7 @@ class TgpuFnNode<T> extends THREE.Node {
           names: stageData.namespace,
           template: 'impl',
           externals: { impl: this.#impl },
-          ...(webgl ? glOptions() : {}),
+          ...resolveOptionsFor(builder),
         });
 
         return {
@@ -278,7 +286,6 @@ class TgpuFnNode<T> extends THREE.Node {
   }
 
   #analyzeFunction(builder: THREE.NodeBuilder) {
-    const webgl = isWebGL(builder);
     let builderData = builderDataMap.get(builder);
 
     if (!builderData) {
@@ -299,7 +306,7 @@ class TgpuFnNode<T> extends THREE.Node {
         names: stageData.namespace,
         template: 'impl',
         externals: { impl: this.#impl },
-        ...(webgl ? glOptions() : {}),
+        ...resolveOptionsFor(builder),
       }),
     );
   }
@@ -317,7 +324,6 @@ class TgpuFnNode<T> extends THREE.Node {
     builder: THREE.NodeBuilder,
     output: string | null | undefined,
   ): string | null | undefined {
-    const webgl = isWebGL(builder);
     this.#getNodeFunction(builder); // making sure the node function exists
 
     const nodeData = builder.getDataFromNode(this) as TgpuFnNodeData;
@@ -344,7 +350,7 @@ class TgpuFnNode<T> extends THREE.Node {
         // oxlint-disable-next-line typescript/no-base-to-string
         template: `$var$ = ${varValue};\n`,
         externals: { $var$: bridgeVar },
-        ...(webgl ? glOptions() : {}),
+        ...resolveOptionsFor(builder),
       });
 
       // @ts-expect-error: it's there
