@@ -1,5 +1,6 @@
-import type { BuiltinClipDistances } from '../../builtin.ts';
+import type { BuiltinClipDistances, OmitBuiltins } from '../../builtin.ts';
 import type { AnyAttribute } from '../../data/attributes.ts';
+import type { Undecorate, UndecorateRecord } from '../../data/dataTypes.ts';
 import type {
   BaseData,
   Bool,
@@ -23,6 +24,7 @@ import type {
   Void,
 } from '../../data/wgslTypes.ts';
 import type { InferGPU } from '../../shared/repr.ts';
+import type { Prettify } from '../../shared/utilityTypes.ts';
 
 export type AnyFn = (...args: never[]) => unknown;
 
@@ -101,3 +103,14 @@ export interface SeparatedEntryArgs {
   dataSchema: BaseData | undefined;
   positionalArgs: PositionalArgInfo[];
 }
+
+/**
+ * The schema an entry function exposes for its input or output layout:
+ * builtins are dropped and decorations (locations, interpolation) are stripped.
+ */
+export type CleanIO<T> =
+  T extends Record<string, BaseData>
+    ? Prettify<UndecorateRecord<OmitBuiltins<T>>>
+    : [OmitBuiltins<T>] extends [never]
+      ? Record<string, never>
+      : Undecorate<T>;
