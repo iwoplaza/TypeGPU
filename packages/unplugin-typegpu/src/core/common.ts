@@ -98,6 +98,11 @@ export interface TransformMethods {
   replaceWithAssignmentOverload(path: NodePath<t.AssignmentExpression>, runtimeFn: string): void;
 
   replaceWithBinaryOverload(path: NodePath<t.BinaryExpression>, runtimeFn: string): void;
+
+  /**
+   * Prepends a `/*#__PURE__*\/` annotation to the call, so that bundlers can drop it when unused.
+   */
+  annotateAsPure(path: NodePath<t.CallExpression>): void;
 }
 
 export interface PluginState extends TransformMethods {
@@ -106,6 +111,14 @@ export interface PluginState extends TransformMethods {
    * need to catch that and act accordingly.
    */
   tgpuAliases: Set<string>;
+  /**
+   * How the `d` namespace (`typegpu/data`) is used in code, e.g. `d` or `data`.
+   */
+  dataAliases: Set<string>;
+  /**
+   * Functions imported directly from `typegpu/data`, local name -> imported name.
+   */
+  dataFunctionAliases: Map<string, string>;
   autoNamingEnabled: boolean;
 
   /**
@@ -136,6 +149,8 @@ export interface UnpluginPluginState extends PluginState {
 
 export function initPluginState(state: PluginState, methods: TransformMethods): void {
   state.tgpuAliases = new Set<string>(state.opts.forceTgpuAlias ? [state.opts.forceTgpuAlias] : []);
+  state.dataAliases = new Set<string>();
+  state.dataFunctionAliases = new Map<string, string>();
   state.autoNamingEnabled = state.opts.autoNamingEnabled ?? true;
   state.inUseGpuScope = false;
   Object.assign(state, methods);
@@ -186,10 +201,9 @@ export function getBlockScope(
 }
 
 /**
- * Checks if `node` is an alias for the 'tgpu' object, traditionally
- * available via `import { tgpu } from 'typegpu'`.
+ * Turns a chain of property accesses into a dot-separated path, e.g. `t.tgpu`.
  */
-function isTgpu(state: PluginState, node: t.Node): boolean {
+function toAliasPath(node: t.Node): string {
   let path = '';
 
   let tail = node;
@@ -216,15 +230,45 @@ function isTgpu(state: PluginState, node: t.Node): boolean {
     }
   }
 
-  return state.tgpuAliases.has(path);
+  return path;
+}
+
+/**
+ * Checks if `node` is an alias for the 'tgpu' object, traditionally
+ * available via `import { tgpu } from 'typegpu'`.
+ */
+function isTgpu(state: PluginState, node: t.Node): boolean {
+  return state.tgpuAliases.has(toAliasPath(node));
 }
 
 function gatherTgpuAliases(state: PluginState, node: t.ImportDeclaration) {
+  if (node.source.value === 'typegpu/data') {
+    for (const spec of node.specifiers) {
+      if (spec.type === 'ImportNamespaceSpecifier') {
+        // import * as d from 'typegpu/data';
+        state.dataAliases.add(spec.local.name);
+      } else if (spec.type === 'ImportSpecifier' && spec.imported.type === 'Identifier') {
+        // import { struct } from 'typegpu/data';
+        state.dataFunctionAliases.set(spec.local.name, spec.imported.name);
+      }
+    }
+    return;
+  }
+
   if (node.source.value !== 'typegpu') {
     return;
   }
 
   for (const spec of node.specifiers) {
+    if (
+      spec.type === 'ImportSpecifier' &&
+      spec.imported.type === 'Identifier' &&
+      spec.imported.name === 'd'
+    ) {
+      // import { d } from 'typegpu';
+      state.dataAliases.add(spec.local.name);
+    }
+
     if (
       // The default export of 'typegpu' is the `tgpu` object.
       spec.type === 'ImportDefaultSpecifier' ||
@@ -237,6 +281,7 @@ function gatherTgpuAliases(state: PluginState, node: t.ImportDeclaration) {
     } else if (spec.type === 'ImportNamespaceSpecifier') {
       // Importing everything, e.g. import * as t from 'typegpu';
       state.tgpuAliases.add(`${spec.local.name}.tgpu`);
+      state.dataAliases.add(`${spec.local.name}.d`);
     }
   }
 }
@@ -252,6 +297,132 @@ function isShellImplementationCall(node: t.CallExpression, state: PluginState) {
     node.arguments.length === 1 &&
     isTgpu(state, node.callee.callee.object)
   );
+}
+
+/**
+ * Calls that only construct a new object, without registering it anywhere or allocating
+ * GPU resources. Bundlers are free to drop them if their result is unused.
+ */
+const pureTgpuConstructors = [
+  ...fnShellFunctionNames,
+  'slot',
+  'const',
+  'accessor',
+  'mutableAccessor',
+  'comptime',
+  'bindGroupLayout',
+  'vertexLayout',
+  'privateVar',
+  'workgroupVar',
+];
+const pureDataConstructors = ['struct', 'unstruct', 'arrayOf', 'disarrayOf'];
+/**
+ * Methods that only modify the object they are called on, so they're pure
+ * as long as that object was just created by a pure call.
+ */
+const pureChainedMethods = ['$name', '$uses'];
+
+function getRootIdentifier(node: t.Node): t.Identifier | undefined {
+  let tail = node;
+  while (tail.type === 'MemberExpression') {
+    tail = tail.object;
+  }
+  return tail.type === 'Identifier' ? tail : undefined;
+}
+
+/**
+ * Checks that `node` refers to an import (or a global), and not to a local
+ * variable that happens to share the name, e.g. a parameter called `d`.
+ */
+function isNotShadowed(path: NodePath, node: t.Node): boolean {
+  const root = getRootIdentifier(node);
+  if (!root) {
+    return false;
+  }
+  const binding = path.scope.getBinding(root.name);
+  return !binding || binding.kind === 'module';
+}
+
+function isPureCall(node: t.Node, path: NodePath, state: PluginState): boolean {
+  if (node.type !== 'CallExpression') {
+    return false;
+  }
+
+  if (isShellImplementationCall(node, state)) {
+    // tgpu.fn(...)(...)
+    const shellArg = (node.callee as t.CallExpression).arguments[0];
+    if (shellArg?.type !== 'ArrayExpression' && shellArg?.type !== 'ObjectExpression') {
+      // Could be a generic function (`tgpu.fn(callback)`), calling which runs code on the CPU
+      return false;
+    }
+    return isPureCall(node.callee, path, state);
+  }
+
+  const callee = node.callee;
+  if (callee.type === 'Identifier') {
+    // struct({...}), imported from 'typegpu/data'
+    const imported = state.dataFunctionAliases.get(callee.name);
+    return (
+      imported !== undefined &&
+      pureDataConstructors.includes(imported) &&
+      isNotShadowed(path, callee)
+    );
+  }
+
+  if (callee.type !== 'MemberExpression' || callee.property.type !== 'Identifier') {
+    return false;
+  }
+
+  const name = callee.property.name;
+  if (pureChainedMethods.includes(name)) {
+    // tgpu.fn(...)(...).$name('foo')
+    return isPureCall(callee.object, path, state);
+  }
+  if (pureTgpuConstructors.includes(name) && isTgpu(state, callee.object)) {
+    // tgpu.slot()
+    return isNotShadowed(path, callee.object);
+  }
+  if (pureDataConstructors.includes(name) && state.dataAliases.has(toAliasPath(callee.object))) {
+    // d.struct({...})
+    return isNotShadowed(path, callee.object);
+  }
+  return false;
+}
+
+/**
+ * A `/*#__PURE__*\/` comment applies to the outermost call that follows it,
+ * so for `tgpu.fn(...)(...).with(slot, 1)` we cannot annotate just the inner part.
+ * Only calls that aren't continued by a member access or another call are annotated.
+ */
+function isChainContinued(path: NodePath): boolean {
+  let child: NodePath = path;
+  let parent = path.parentPath;
+  while (
+    parent &&
+    (parent.isTSAsExpression() ||
+      parent.isTSSatisfiesExpression() ||
+      parent.isTSNonNullExpression() ||
+      parent.isTSTypeAssertion() ||
+      parent.isParenthesizedExpression())
+  ) {
+    child = parent;
+    parent = parent.parentPath;
+  }
+  if (!parent) {
+    return false;
+  }
+  const node = child.node;
+  return (
+    ((parent.isMemberExpression() || parent.isOptionalMemberExpression()) &&
+      parent.node.object === node) ||
+    ((parent.isCallExpression() || parent.isOptionalCallExpression() || parent.isNewExpression()) &&
+      parent.node.callee === node) ||
+    (parent.isTaggedTemplateExpression() && parent.node.tag === node)
+  );
+}
+
+function hasPureAnnotation(node: t.Node): boolean {
+  return node.leadingComments?.some((comment) => /[@#]__PURE__/.test(comment.value)) ?? false;
 }
 
 /**
@@ -591,6 +762,15 @@ export const functionVisitor: TraverseOptions<PluginState> = {
   CallExpression: {
     exit(path, state) {
       const node = path.node;
+
+      if (
+        !state.inUseGpuScope &&
+        !hasPureAnnotation(node) &&
+        isPureCall(node, path, state) &&
+        !isChainContinued(path)
+      ) {
+        state.annotateAsPure(path);
+      }
 
       if (isShellImplementationCall(node, state)) {
         const implementation = node.arguments[0];

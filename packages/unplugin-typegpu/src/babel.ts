@@ -142,6 +142,10 @@ function wrapInAutoName(path: NodePath<t.Expression>, name: string): void {
   path.replaceWith(callExpr);
 }
 
+function annotateAsPure(path: NodePath<t.CallExpression>): void {
+  t.addComment(path.node, 'leading', '#__PURE__');
+}
+
 function replaceWithAssignmentOverload(
   path: NodePath<t.AssignmentExpression>,
   runtimeFn: string,
@@ -172,6 +176,7 @@ export default function TypeGPUPlugin() {
         wrapInAutoName,
         replaceWithAssignmentOverload,
         replaceWithBinaryOverload,
+        annotateAsPure,
       });
     },
     visitor: {
