@@ -1214,7 +1214,9 @@ export class GlslGenerator extends WgslGenerator {
       const propType =
         expectedReturnType && d.isWgslStruct(expectedReturnType)
           ? expectedReturnType.propTypes[key]
-          : autoStruct?.accessProp(key)?.type;
+          : (autoStruct?.accessProp(key)?.type ??
+            // An inferred output keeps the type its first return gave it
+            entryFnState.outVars.find((outVar) => outVar.propName === key)?.dataType);
       const rhsExpr = propType
         ? this._expressionWithTypeConversion(rhsNode, propType)
         : this._expression(rhsNode);

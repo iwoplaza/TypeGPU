@@ -1413,6 +1413,32 @@ describe('GlslGenerator - entry point generation with JS functions', () => {
     expect(vertexSource).toContain('vary_scale = 0.5;');
   });
 
+  it('converts later returns to the type the first one gave an inferred output', ({ gl }) => {
+    const root = initWithGL({ gl });
+    root.createRenderPipeline({
+      vertex: () => {
+        'use gpu';
+        const c = d.f32(1);
+        if (c > 0) {
+          return { $position: d.vec4f(), weight: 1, scale: 0.5 };
+        }
+        return { $position: d.vec4f(), weight: 2.5, scale: 2 };
+      },
+      fragment: ({ weight, scale }) => {
+        'use gpu';
+        return d.vec4f(d.f32(weight) * scale);
+      },
+    });
+
+    const [vertexSource] = vi.mocked(gl.shaderSource).mock.calls.map(([, source]) => source);
+    expect(vertexSource).toMatch(/\bint vary_weight;/);
+    expect(vertexSource).toMatch(/\bfloat vary_scale;/);
+    expect(vertexSource).toContain('vary_weight = 1;');
+    expect(vertexSource).toContain('vary_weight = 2;');
+    expect(vertexSource).toContain('vary_scale = 0.5;');
+    expect(vertexSource).toContain('vary_scale = 2.0;');
+  });
+
   it('makes number literals concrete in inferred fragment outputs', ({ gl }) => {
     const root = initWithGL({ gl });
     root.createRenderPipeline({
