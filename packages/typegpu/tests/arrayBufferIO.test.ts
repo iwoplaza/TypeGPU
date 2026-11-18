@@ -131,6 +131,117 @@ describe('arrayBufferIO', () => {
 
       expect(results).toStrictEqual(boids);
     });
+
+    it('handles non-finite values in f32 vectors', () => {
+      const buffer = new Float32Array([Infinity, -Infinity, NaN, 1]).buffer;
+
+      expect([...readFromArrayBuffer(buffer, d.vec2f)]).toStrictEqual([Infinity, -Infinity]);
+      expect([...readFromArrayBuffer(buffer, d.vec3f)]).toStrictEqual([Infinity, -Infinity, NaN]);
+      expect([...readFromArrayBuffer(buffer, d.vec4f)]).toStrictEqual([
+        Infinity,
+        -Infinity,
+        NaN,
+        1,
+      ]);
+      expect(readFromArrayBuffer(buffer, d.vec4f).kind).toBe('vec4f');
+    });
+
+    it('handles non-finite values in f16 vectors', () => {
+      // +Infinity, -Infinity, NaN, 1 as half-precision bits
+      const buffer = new Uint16Array([0x7c00, 0xfc00, 0x7e00, 0x3c00]).buffer;
+
+      expect([...readFromArrayBuffer(buffer, d.vec2h)]).toStrictEqual([Infinity, -Infinity]);
+      expect([...readFromArrayBuffer(buffer, d.vec3h)]).toStrictEqual([Infinity, -Infinity, NaN]);
+      expect([...readFromArrayBuffer(buffer, d.vec4h)]).toStrictEqual([
+        Infinity,
+        -Infinity,
+        NaN,
+        1,
+      ]);
+      expect(readFromArrayBuffer(buffer, d.vec4h).kind).toBe('vec4h');
+    });
+
+    it('handles non-finite values in matrices', () => {
+      const column = (last: number) => [Infinity, -Infinity, NaN, last];
+      const buffer = new Float32Array([...column(3), ...column(7), ...column(11), ...column(15)])
+        .buffer;
+
+      const m2 = readFromArrayBuffer(buffer, d.mat2x2f);
+      expect(m2.columns.map((c) => [...c])).toStrictEqual([
+        [Infinity, -Infinity],
+        [NaN, 3],
+      ]);
+
+      // mat3x3f columns are padded to 4 elements
+      const m3 = readFromArrayBuffer(buffer, d.mat3x3f);
+      expect(m3.columns.map((c) => [...c])).toStrictEqual([
+        [Infinity, -Infinity, NaN],
+        [Infinity, -Infinity, NaN],
+        [Infinity, -Infinity, NaN],
+      ]);
+
+      const m4 = readFromArrayBuffer(buffer, d.mat4x4f);
+      expect(m4.columns.map((c) => [...c])).toStrictEqual([
+        [Infinity, -Infinity, NaN, 3],
+        [Infinity, -Infinity, NaN, 7],
+        [Infinity, -Infinity, NaN, 11],
+        [Infinity, -Infinity, NaN, 15],
+      ]);
+      expect(m4.kind).toBe('mat4x4f');
+    });
+
+    it('handles non-finite values in vectors nested in structs and arrays', () => {
+      const Particle = d.struct({ pos: d.vec3f, mass: d.f32 });
+      const Particles = d.arrayOf(Particle, 2);
+      const buffer = new Float32Array([Infinity, 1, 2, NaN, 3, -Infinity, 4, 5]).buffer;
+
+      const result = readFromArrayBuffer(buffer, Particles);
+
+      expect(result.map((p) => [[...p.pos], p.mass])).toStrictEqual([
+        [[Infinity, 1, 2], NaN],
+        [[3, -Infinity, 4], 5],
+      ]);
+    });
+
+    it('handles non-finite values in loose float vertex formats', () => {
+      const buffer = new Float32Array([Infinity, -Infinity, NaN, 1]).buffer;
+      const halfBuffer = new Uint16Array([0x7c00, 0xfc00, 0x7e00, 0x3c00]).buffer;
+
+      expect([...readFromArrayBuffer(buffer, d.float32x2)]).toStrictEqual([Infinity, -Infinity]);
+      expect([...readFromArrayBuffer(buffer, d.float32x3)]).toStrictEqual([
+        Infinity,
+        -Infinity,
+        NaN,
+      ]);
+      expect([...readFromArrayBuffer(buffer, d.float32x4)]).toStrictEqual([
+        Infinity,
+        -Infinity,
+        NaN,
+        1,
+      ]);
+      expect([...readFromArrayBuffer(halfBuffer, d.float16x2)]).toStrictEqual([
+        Infinity,
+        -Infinity,
+      ]);
+      expect([...readFromArrayBuffer(halfBuffer, d.float16x4)]).toStrictEqual([
+        Infinity,
+        -Infinity,
+        NaN,
+        1,
+      ]);
+    });
+
+    it('keeps vectors read with non-finite values usable', () => {
+      const buffer = new Float32Array([Infinity, 1, 2, 0]).buffer;
+
+      const result = readFromArrayBuffer(buffer, d.vec3f);
+
+      expect([...result.yz]).toStrictEqual([1, 2]);
+      expect(() => {
+        result.y = Infinity;
+      }).toThrow();
+      expect(() => d.vec3f(Infinity)).toThrow();
+    });
   });
 
   describe('patch', () => {

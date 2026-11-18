@@ -513,6 +513,40 @@ export function writeData<TData extends wgsl.BaseData>(
   writer(output, schema, value);
 }
 
+type RawVec4 = { e0: number; e1: number; e2: number; e3: number };
+
+// Values read from memory need no casting, and going through the casting constructors
+// would reject non-finite values (e.g. a division by zero written by a shader).
+function fillVec2<T extends wgsl.v2f | wgsl.v2h>(vec: T, x: number, y: number): T {
+  const raw = vec as unknown as RawVec4;
+  raw.e0 = x;
+  raw.e1 = y;
+  return vec;
+}
+
+function fillVec3<T extends wgsl.v3f | wgsl.v3h>(vec: T, x: number, y: number, z: number): T {
+  const raw = vec as unknown as RawVec4;
+  raw.e0 = x;
+  raw.e1 = y;
+  raw.e2 = z;
+  return vec;
+}
+
+function fillVec4<T extends wgsl.v4f | wgsl.v4h>(
+  vec: T,
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+): T {
+  const raw = vec as unknown as RawVec4;
+  raw.e0 = x;
+  raw.e1 = y;
+  raw.e2 = z;
+  raw.e3 = w;
+  return vec;
+}
+
 const dataReaders = {
   bool(): boolean {
     throw new Error('Booleans are not host-shareable');
@@ -539,15 +573,16 @@ const dataReaders = {
   },
 
   vec2f(input: ISerialInput): wgsl.v2f {
-    return vec2f(input.readFloat32(), input.readFloat32());
+    return fillVec2(vec2f(), input.readFloat32(), input.readFloat32());
   },
 
   vec3f(input: ISerialInput): wgsl.v3f {
-    return vec3f(input.readFloat32(), input.readFloat32(), input.readFloat32());
+    return fillVec3(vec3f(), input.readFloat32(), input.readFloat32(), input.readFloat32());
   },
 
   vec4f(input: ISerialInput): wgsl.v4f {
-    return vec4f(
+    return fillVec4(
+      vec4f(),
       input.readFloat32(),
       input.readFloat32(),
       input.readFloat32(),
@@ -556,15 +591,21 @@ const dataReaders = {
   },
 
   vec2h(input): wgsl.v2h {
-    return vec2h(readFloat16(input), readFloat16(input));
+    return fillVec2(vec2h(), readFloat16(input), readFloat16(input));
   },
 
   vec3h(input: ISerialInput): wgsl.v3h {
-    return vec3h(readFloat16(input), readFloat16(input), readFloat16(input));
+    return fillVec3(vec3h(), readFloat16(input), readFloat16(input), readFloat16(input));
   },
 
   vec4h(input: ISerialInput): wgsl.v4h {
-    return vec4h(readFloat16(input), readFloat16(input), readFloat16(input), readFloat16(input));
+    return fillVec4(
+      vec4h(),
+      readFloat16(input),
+      readFloat16(input),
+      readFloat16(input),
+      readFloat16(input),
+    );
   },
 
   vec2i(input): wgsl.v2i {
@@ -604,58 +645,34 @@ const dataReaders = {
   },
 
   mat2x2f(input: ISerialInput): wgsl.m2x2f {
-    return mat2x2f(
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-    );
+    const mat = mat2x2f();
+    for (const column of mat.columns) {
+      fillVec2(column, input.readFloat32(), input.readFloat32());
+    }
+    return mat;
   },
 
   mat3x3f(input: ISerialInput): wgsl.m3x3f {
-    const skipOneAfter = () => {
-      const value = input.readFloat32();
-      input.readFloat32(); // skipping;
-      return value;
-    };
-
-    return mat3x3f(
-      input.readFloat32(),
-      input.readFloat32(),
-      skipOneAfter(),
-      //
-      input.readFloat32(),
-      input.readFloat32(),
-      skipOneAfter(),
-      //
-      input.readFloat32(),
-      input.readFloat32(),
-      skipOneAfter(),
-    );
+    const mat = mat3x3f();
+    for (const column of mat.columns) {
+      fillVec3(column, input.readFloat32(), input.readFloat32(), input.readFloat32());
+      input.readFloat32(); // skipping padding
+    }
+    return mat;
   },
 
   mat4x4f(input: ISerialInput): wgsl.m4x4f {
-    return mat4x4f(
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-      //
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-      //
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-      //
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-      input.readFloat32(),
-    );
+    const mat = mat4x4f();
+    for (const column of mat.columns) {
+      fillVec4(
+        column,
+        input.readFloat32(),
+        input.readFloat32(),
+        input.readFloat32(),
+        input.readFloat32(),
+      );
+    }
+    return mat;
   },
 
   struct: readStructLike,
@@ -722,12 +739,14 @@ const dataReaders = {
   float16(i) {
     return readFloat16(i);
   },
-  float16x2: (i) => vec2f(readFloat16(i), readFloat16(i)),
-  float16x4: (i) => vec4f(readFloat16(i), readFloat16(i), readFloat16(i), readFloat16(i)),
+  float16x2: (i) => fillVec2(vec2f(), readFloat16(i), readFloat16(i)),
+  float16x4: (i) =>
+    fillVec4(vec4f(), readFloat16(i), readFloat16(i), readFloat16(i), readFloat16(i)),
   float32: (i) => i.readFloat32(),
-  float32x2: (i) => vec2f(i.readFloat32(), i.readFloat32()),
-  float32x3: (i) => vec3f(i.readFloat32(), i.readFloat32(), i.readFloat32()),
-  float32x4: (i) => vec4f(i.readFloat32(), i.readFloat32(), i.readFloat32(), i.readFloat32()),
+  float32x2: (i) => fillVec2(vec2f(), i.readFloat32(), i.readFloat32()),
+  float32x3: (i) => fillVec3(vec3f(), i.readFloat32(), i.readFloat32(), i.readFloat32()),
+  float32x4: (i) =>
+    fillVec4(vec4f(), i.readFloat32(), i.readFloat32(), i.readFloat32(), i.readFloat32()),
   uint32: (i) => i.readUint32(),
   uint32x2: (i) => vec2u(i.readUint32(), i.readUint32()),
   uint32x3: (i) => vec3u(i.readUint32(), i.readUint32(), i.readUint32()),
