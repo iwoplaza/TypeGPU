@@ -161,13 +161,9 @@ const u32Mul = (a: number, b: number) => Math.imul(a, b) >>> 0;
 // Integer products wrap modulo 2^32, and a double-precision product loses
 // the low bits once it exceeds 2^53, so integer vectors need Math.imul.
 function componentMulFor(v: NumVec | Mat) {
-  if (isUint32VecInstance(v)) {
-    return u32Mul;
-  }
-  if (isInteger32VecInstance(v)) {
-    return i32Mul;
-  }
-  return floatMul;
+  // Vector and matrix kinds end with their component type: f, h, i or u
+  const component = v.kind[v.kind.length - 1];
+  return component === 'u' ? u32Mul : component === 'i' ? i32Mul : floatMul;
 }
 
 function cpuMul(lhs: number, rhs: number): number; // default multiplication
