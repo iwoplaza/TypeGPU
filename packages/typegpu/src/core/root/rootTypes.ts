@@ -798,31 +798,7 @@ export interface ExperimentalTgpuRoot
   readonly shaderGeneratorClass?: ShaderGeneratorClass | undefined;
 
   /** @deprecated Use `root.createTexture` instead. */
-  createTexture<
-    TWidth extends number,
-    THeight extends number,
-    TDepth extends number,
-    TSize extends
-      | readonly [TWidth]
-      | readonly [TWidth, THeight]
-      | readonly [TWidth, THeight, TDepth],
-    TFormat extends GPUTextureFormat,
-    TMipLevelCount extends number,
-    TSampleCount extends number,
-    TViewFormats extends GPUTextureFormat[],
-    TDimension extends GPUTextureDimension,
-  >(
-    props: CreateTextureOptions<
-      TSize,
-      TFormat,
-      TMipLevelCount,
-      TSampleCount,
-      TViewFormats,
-      TDimension
-    >,
-  ): TgpuTexture<
-    CreateTextureResult<TSize, TFormat, TMipLevelCount, TSampleCount, TViewFormats, TDimension>
-  >;
+  createTexture: TgpuRoot['createTexture'];
 
   /** @deprecated This feature is now stable, use {@link TgpuRoot.createCommandEncoder | root.createCommandEncoder}. */
   createCommandEncoder(descriptor?: GPUCommandEncoderDescriptor): TgpuCommandEncoder;

@@ -159,12 +159,12 @@ export function createFnCore(
           }
           const input = `(${parts.join(', ')})`;
 
-          const attributes = isWgslData(returnType) ? getAttributesString(returnType) : '';
+          const returnAttributes = isWgslData(returnType) ? getAttributesString(returnType) : '';
           const output =
             returnType !== Void
               ? isWgslStruct(returnType)
                 ? ` -> ${ctx.resolve(returnType).value} `
-                : ` -> ${attributes !== '' ? attributes : '@location(0)'} ${
+                : ` -> ${returnAttributes !== '' ? returnAttributes : '@location(0)'} ${
                     ctx.resolve(returnType).value
                   } `
               : ' ';

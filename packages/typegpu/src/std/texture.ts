@@ -895,7 +895,7 @@ function textureSampleCompareLevelCpu(
 export const textureSampleCompareLevel = dualImpl({
   name: 'textureSampleCompareLevel',
   normalImpl: textureSampleCompareLevelCpu,
-  codegenImpl: (ctx, args) => stitch`textureSampleCompareLevel(${args})`,
+  codegenImpl: (_ctx, args) => stitch`textureSampleCompareLevel(${args})`,
   signature: (...args) => ({
     argTypes: args,
     returnType: f32,
