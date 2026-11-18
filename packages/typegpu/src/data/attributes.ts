@@ -139,17 +139,15 @@ export type Decorate<TData extends BaseData, TAttrib extends AnyAttribute> =
         >
       : never;
 
-export type IsBuiltin<T> = ExtractAttributes<T>[number] extends []
+export type IsBuiltin<T> = [Extract<ExtractAttributes<T>[number], Builtin<BuiltinName>>] extends [
+  never,
+]
   ? false
-  : ExtractAttributes<T>[number] extends Builtin<BuiltinName>
-    ? true
-    : false;
+  : true;
 
-export type HasCustomLocation<T> = ExtractAttributes<T>[number] extends []
+export type HasCustomLocation<T> = [Extract<ExtractAttributes<T>[number], Location>] extends [never]
   ? false
-  : ExtractAttributes<T>[number] extends Location
-    ? true
-    : false;
+  : true;
 
 /**
  * WGSL allows one attribute of each kind, so a new decorator replaces an existing one of the same kind.

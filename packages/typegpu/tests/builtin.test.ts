@@ -31,6 +31,11 @@ describe('IsBuiltin', () => {
     expectTypeOf<d.IsBuiltin<d.BuiltinPosition>>().toEqualTypeOf<true>();
     expectTypeOf<d.IsBuiltin<d.BuiltinVertexIndex>>().toEqualTypeOf<true>();
   });
+
+  it('treats builtins with other attributes as builtin', () => {
+    const invariantPosition = d.invariant(d.builtin.position);
+    expectTypeOf<d.IsBuiltin<typeof invariantPosition>>().toEqualTypeOf<true>();
+  });
 });
 
 describe('isBuiltin', () => {

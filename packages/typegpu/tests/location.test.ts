@@ -34,4 +34,9 @@ describe('d.HasCustomLocation', () => {
     const builtin = d.builtin.clipDistances;
     expectTypeOf<d.HasCustomLocation<typeof builtin>>().toEqualTypeOf<false>();
   });
+
+  it('detects a location alongside other attributes', () => {
+    const flatWithLocation = d.interpolate('flat', d.location(3, d.u32));
+    expectTypeOf<d.HasCustomLocation<typeof flatWithLocation>>().toEqualTypeOf<true>();
+  });
 });
