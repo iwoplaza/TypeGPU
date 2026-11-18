@@ -46,7 +46,7 @@ function assignMetadata(
 ): void {
   const metadata = `{
     v: ${METADATA_FORMAT_VERSION},
-    name: ${name ? `"${name}"` : 'undefined'},
+    name: ${name ? JSON.stringify(name) : 'undefined'},
     ast: ${embedJSON({ params: ast.params, body: ast.body })},
     externals: ${externalsToString(ast.externalNames)}
   }`;
@@ -107,7 +107,7 @@ function wrapInAutoName(
       path.node.start ?? 0,
       '(/*#__PURE__*/(globalThis.__TYPEGPU_AUTONAME__ ?? (a => a))(',
     )
-    .prependRight(path.node.end ?? 0, `, "${name}"))`);
+    .prependRight(path.node.end ?? 0, `, ${JSON.stringify(name)}))`);
 }
 
 function replaceWithAssignmentOverload(

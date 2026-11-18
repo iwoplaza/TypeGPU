@@ -123,3 +123,27 @@ describe('[ROLLUP] auto naming edge cases', () => {
     );
   });
 });
+
+describe('names with special characters', () => {
+  const code = [
+    "import { tgpu } from 'typegpu';",
+    'const slots = {};',
+    "slots['x\"y'] = tgpu.slot();",
+    "const fns = { 'my\"fn': () => { 'use gpu'; return 1; } };",
+    'console.log(slots, fns);',
+  ].join('\n');
+
+  it('escapes them in the emitted code (rollup)', async () => {
+    const output = await rollupTransform(code, { autoNamingEnabled: true });
+
+    expect(output).toContain('tgpu.slot(), "x\\"y")');
+    expect(output).toContain('name: "my\\"fn"');
+  });
+
+  it('escapes them in the emitted code (babel)', () => {
+    const output = babelTransform(code, { autoNamingEnabled: true });
+
+    expect(output).toContain('tgpu.slot(), "x\\"y")');
+    expect(output).toContain('name: "my\\"fn"');
+  });
+});
