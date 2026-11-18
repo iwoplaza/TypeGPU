@@ -773,17 +773,19 @@ describe('transforms the ** operator', () => {
   test('babel', () => {
     const output = babelTransform(code);
     expect(output).toContain('let c = __tsover_pow(a, b);');
-    expect(output).toContain('c = __tsover_pow(c, 2);');
     expect(output).not.toContain('a ** b');
-    expect(output).not.toContain('c **= 2');
+    // `**=` is not supported by the shader generator, so it is left as is
+    expect(output).toContain('c **= 2;');
+    expect(output).not.toContain('__tsover_pow(c, 2)');
   });
 
   test('rollup', async () => {
     const output = await rollupTransform(code);
     expect(output).toContain('let c = __tsover_pow(a, b);');
-    expect(output).toContain('c = __tsover_pow(c, 2);');
     expect(output).not.toContain('a ** b');
-    expect(output).not.toContain('c **= 2');
+    // `**=` is not supported by the shader generator, so it is left as is
+    expect(output).toContain('c **= 2;');
+    expect(output).not.toContain('__tsover_pow(c, 2)');
   });
 });
 

@@ -116,6 +116,17 @@ describe('** operator on vectors', () => {
     );
   });
 
+  it('rejects integer vectors on the CPU, like on the GPU', () => {
+    const square = (v: d.v2i): d.v2i => {
+      'use gpu';
+      // @ts-expect-error: only float vectors support `**`
+      return v ** d.vec2i(2);
+    };
+
+    expect(() => square(d.vec2i(3, 4))).toThrow('Unsupported signature');
+    expect(() => tgpu.resolve([tgpu.fn([d.vec2i], d.vec2i)(square)])).toThrow();
+  });
+
   it('generates the same WGSL as before', () => {
     const square = (v: d.v2f) => {
       'use gpu';
