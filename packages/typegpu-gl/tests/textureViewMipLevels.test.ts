@@ -168,3 +168,83 @@ describe('TgpuRootWebGL - sampled texture view mip levels', () => {
     );
   });
 });
+
+describe('TgpuRootWebGL - texel fetches through a view with a base mip level', () => {
+  it('passes view-relative levels to texelFetch and textureSize, and sets the base level for the draw', ({
+    gl,
+  }) => {
+    const root = initWithGL({ gl });
+    const texture = root
+      .createTexture({ size: [8, 8], format: 'rgba8unorm', mipLevelCount: 4 })
+      .$usage('sampled');
+    const view = texture.createView(d.texture2d(), { baseMipLevel: 2 }).$name('view');
+
+    const pipeline = root.createRenderPipeline({
+      vertex: () => {
+        'use gpu';
+        return { $position: d.vec4f(0, 0, 0, 1) };
+      },
+      fragment: () => {
+        'use gpu';
+        const size = std.textureDimensions(view.$, 1);
+        return std.textureLoad(view.$, d.vec2u(size.x - 1, 0), 1);
+      },
+    });
+
+    vi.mocked(gl.texParameteri).mockClear();
+    pipeline.draw(3);
+
+    // GLES 3.0 adds `lod` to `TEXTURE_BASE_LEVEL` for both texelFetch (2.12.9.2) and
+    // textureSize (2.12.9.3), so with the base level set to the view's, level 1 of the
+    // view is level 3 of the texture, like in WGSL.
+    const fragmentSource = vi.mocked(gl.shaderSource).mock.calls.at(-1)?.[1];
+    expect(fragmentSource).toContain('textureSize(view, 1)');
+    expect(fragmentSource).toMatch(/texelFetch\(view, .*, 1\)/);
+    expect(levelParams(gl)).toEqual([
+      ['base', 2],
+      ['max', 3],
+    ]);
+  });
+});
+
+describe('TgpuRootWebGL - texture view mip level validation', () => {
+  it.for([
+    [{ baseMipLevel: 3 }, 'Base mip level 3 is out of range. Texture has 3 mip levels.'],
+    [{ baseMipLevel: -1 }, 'Base mip level -1 is out of range. Texture has 3 mip levels.'],
+    [
+      { baseMipLevel: 1, mipLevelCount: 3 },
+      'Mip level count 3 is out of range for base mip level 1. Texture has 3 mip levels.',
+    ],
+    [
+      { mipLevelCount: 0 },
+      'Mip level count 0 is out of range for base mip level 0. Texture has 3 mip levels.',
+    ],
+  ] as const)('throws for %o', ([descriptor, message], { gl }) => {
+    const root = initWithGL({ gl });
+    const texture = root
+      .createTexture({ size: [4, 4], format: 'rgba8unorm', mipLevelCount: 3 })
+      .$usage('sampled', 'render');
+
+    expect(() => texture.createView(d.texture2d(), descriptor)).toThrow(message);
+  });
+
+  it('throws for a render view with an out of range base mip level', ({ gl }) => {
+    const root = initWithGL({ gl });
+    const texture = root.createTexture({ size: [4, 4], format: 'rgba8unorm' }).$usage('render');
+
+    expect(() => texture.createView('render', { baseMipLevel: 1 })).toThrow(
+      'Base mip level 1 is out of range. Texture has 1 mip levels.',
+    );
+  });
+
+  it('accepts the last mip level', ({ gl }) => {
+    const root = initWithGL({ gl });
+    const texture = root
+      .createTexture({ size: [4, 4], format: 'rgba8unorm', mipLevelCount: 3 })
+      .$usage('sampled');
+
+    expect(() =>
+      texture.createView(d.texture2d(), { baseMipLevel: 2, mipLevelCount: 1 }),
+    ).not.toThrow();
+  });
+});

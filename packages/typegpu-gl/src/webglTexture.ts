@@ -306,6 +306,18 @@ export class WebGLTextureImpl {
     schema?: d.WgslTexture2d | 'render',
     descriptor: { baseMipLevel?: number; mipLevelCount?: number } = {},
   ): WebGLTextureView | WebGLTextureRenderView {
+    const levels = this.props.mipLevelCount ?? 1;
+    const base = descriptor.baseMipLevel ?? 0;
+    if (!Number.isInteger(base) || base < 0 || base >= levels) {
+      throw new Error(`Base mip level ${base} is out of range. Texture has ${levels} mip levels.`);
+    }
+    const count = descriptor.mipLevelCount;
+    if (count !== undefined && (!Number.isInteger(count) || count < 1 || base + count > levels)) {
+      throw new Error(
+        `Mip level count ${count} is out of range for base mip level ${base}. Texture has ${levels} mip levels.`,
+      );
+    }
+
     if (schema === 'render') {
       if (!this.usableAsRender) {
         throw new Error("Texture is not usable as a render target. Add .$usage('render').");
