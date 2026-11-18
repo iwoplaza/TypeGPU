@@ -86,7 +86,7 @@ function writePackedValue(
   const matrixDim = packedMatrixDimOf(packedSchema);
   if (matrixDim) {
     const packedColumnSize = matrixDim * 4;
-    const gpuColumnStride = roundUp(packedColumnSize, alignmentOf(schema));
+    const gpuColumnStride = roundUp(packedColumnSize, alignmentOf(packedSchema));
     for (let col = 0; col < matrixDim; col++) {
       target.set(
         srcBytes.subarray(

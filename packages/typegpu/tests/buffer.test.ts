@@ -1833,6 +1833,43 @@ describe('ValidateBufferSchema', () => {
     ]);
   });
 
+  describe.each([
+    { name: 'mat2x2f', schema: d.mat2x2f, dim: 2 },
+    { name: 'mat3x3f', schema: d.mat3x3f, dim: 3 },
+    { name: 'mat4x4f', schema: d.mat4x4f, dim: 4 },
+  ] as const)('with $name fields', ({ schema: matSchema, dim }) => {
+    it.for([
+      { field: matSchema },
+      { field: d.align(32, matSchema) },
+      { field: d.align(64, matSchema) },
+    ])('writes the same bytes as buffer.write (%#)', ({ field }, { root, device }) => {
+      const Entry = d.struct({ id: d.u32, m: field });
+      const schema = d.arrayOf(Entry, 3);
+      const buffer = root.createBuffer(schema);
+      root.unwrap(buffer);
+
+      const count = 3;
+      const packed = Array.from({ length: count * dim * dim }, (_, i) => i + 1);
+      const matrices = Array.from({ length: count }, (_, i) =>
+        (matSchema as (...values: number[]) => unknown)(
+          ...packed.slice(i * dim * dim, (i + 1) * dim * dim),
+        ),
+      );
+
+      common.writeSoA(buffer, {
+        id: new Uint32Array([10, 20, 30]),
+        m: new Float32Array(packed),
+      } as never);
+      buffer.write(matrices.map((m, i) => ({ id: (i + 1) * 10, m })) as never);
+
+      const soaBytes = device.mock.queue.writeBuffer.mock.calls[0]?.[2] as ArrayBuffer;
+      const writeBytes = device.mock.queue.writeBuffer.mock.calls[1]?.[2] as ArrayBuffer;
+
+      expect(soaBytes.byteLength).toBe(sizeOf(schema));
+      expect([...new Uint8Array(soaBytes)]).toStrictEqual([...new Uint8Array(writeBytes)]);
+    });
+  });
+
   it('should write SoA data only for the middle two elements when using startOffset and endOffset', ({
     root,
     device,
