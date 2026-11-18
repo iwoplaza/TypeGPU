@@ -60,3 +60,21 @@ node generateChart.ts \
 | `--output <path>` | no | write markdown to a file instead of stdout |
 
 Each `--input` dataset is plotted as a separate line on the same chart. Colors are assigned in order: red, blue, green.
+
+## Cold-start benchmark
+
+`procedural.ts` warms up before sampling, so it measures steady-state resolution. `coldStart.ts` measures what the first frame pays instead: each sample is a fresh Bun process that imports `typegpu`, then resolves the full-tree program from `procedural.ts` twice.
+
+```sh
+pnpm --filter resolution-time resolution-time:cold-start
+# or, from this directory
+bun coldStart.ts --runs 30 --depth 4
+```
+
+It prints the median, p10 and p90 (plus min and max) of:
+
+- `import typegpu`, the time to evaluate the library's modules. The benchmark runs against the package source, so this includes Bun transpiling TypeScript on the fly and is higher than for a bundled build.
+- `first resolve`, the first `tgpu.resolve` call in the process, with the engine still cold.
+- `second resolve`, the same resolution repeated in the same process, for reference.
+
+Raw samples are written to `results-cold-start.json`. This benchmark is not part of the CI comparison.

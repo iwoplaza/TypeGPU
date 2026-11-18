@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tgpu, d, std, type TgpuComptime } from 'typegpu';
 
-interface ProcGenConfig {
+export interface ProcGenConfig {
   mainBranching: number;
   branching: number;
   maxDepth: number;
@@ -255,6 +255,12 @@ function benchmarkResolve(): BenchmarkResult {
   return { maxDepth: config.maxDepth, timeMs, wgslLength: wgsl.length };
 }
 
+export function resolveOnce(input: ProcGenConfig): BenchmarkResult {
+  Object.assign(config, { samples: input.samples ?? SAMPLES }, input);
+  rand = splitmix32(config.seed);
+  return benchmarkResolve();
+}
+
 const outDir = resolve(import.meta.dirname ?? '.', '.');
 
 function runBenchmark(input: ProcGenConfig, output: BenchmarkResult[]) {
@@ -278,53 +284,56 @@ function runBenchmark(input: ProcGenConfig, output: BenchmarkResult[]) {
   }
 }
 
-const results: BenchmarkResult[] = [];
-const DEPTHS = Array.from({ length: 8 }, (_, i) => i + 1);
+// skipped when imported by coldStart.ts
+if (import.meta.main) {
+  const results: BenchmarkResult[] = [];
+  const DEPTHS = Array.from({ length: 8 }, (_, i) => i + 1);
 
-// resolution time vs max depth (full tree)
-for (const depth of DEPTHS) {
-  runBenchmark(
-    {
-      mainBranching: 2,
-      branching: 2,
-      maxDepth: depth,
-      recurseProb: 1,
-      seed: depth * 2 ** 24,
-    },
-    results,
-  );
-}
-writeFileSync(resolve(outDir, 'results-max-depth.json'), JSON.stringify(results, null, 2));
-results.length = 0;
+  // resolution time vs max depth (full tree)
+  for (const depth of DEPTHS) {
+    runBenchmark(
+      {
+        mainBranching: 2,
+        branching: 2,
+        maxDepth: depth,
+        recurseProb: 1,
+        seed: depth * 2 ** 24,
+      },
+      results,
+    );
+  }
+  writeFileSync(resolve(outDir, 'results-max-depth.json'), JSON.stringify(results, null, 2));
+  results.length = 0;
 
-// resolution time vs linear recursion (path)
-for (const depth of DEPTHS) {
-  runBenchmark(
-    {
-      mainBranching: 1,
-      branching: 1,
-      maxDepth: depth,
-      recurseProb: 1,
-      seed: depth * 2 ** 24,
-    },
-    results,
-  );
-}
-writeFileSync(resolve(outDir, 'results-linear-recursion.json'), JSON.stringify(results, null, 2));
-results.length = 0;
+  // resolution time vs linear recursion (path)
+  for (const depth of DEPTHS) {
+    runBenchmark(
+      {
+        mainBranching: 1,
+        branching: 1,
+        maxDepth: depth,
+        recurseProb: 1,
+        seed: depth * 2 ** 24,
+      },
+      results,
+    );
+  }
+  writeFileSync(resolve(outDir, 'results-linear-recursion.json'), JSON.stringify(results, null, 2));
+  results.length = 0;
 
-// resolution time vs random
-for (const depth of DEPTHS) {
-  runBenchmark(
-    {
-      mainBranching: 3,
-      branching: 3,
-      maxDepth: depth,
-      recurseProb: 0.5,
-      seed: depth * 2 ** 24,
-    },
-    results,
-  );
+  // resolution time vs random
+  for (const depth of DEPTHS) {
+    runBenchmark(
+      {
+        mainBranching: 3,
+        branching: 3,
+        maxDepth: depth,
+        recurseProb: 0.5,
+        seed: depth * 2 ** 24,
+      },
+      results,
+    );
+  }
+  writeFileSync(resolve(outDir, 'results-random.json'), JSON.stringify(results, null, 2));
+  results.length = 0;
 }
-writeFileSync(resolve(outDir, 'results-random.json'), JSON.stringify(results, null, 2));
-results.length = 0;
