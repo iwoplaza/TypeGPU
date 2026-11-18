@@ -34,6 +34,7 @@ export type {
   ShaderGenerator,
   ResolvedStatement,
   BinaryOperator,
+  UnaryOperator,
   ShaderGeneratorClass,
   FunctionDefinitionOptions,
   ConstantDefinitionOptions,

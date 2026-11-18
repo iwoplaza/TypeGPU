@@ -238,7 +238,7 @@ export const not = dualImpl({
     };
   },
   normalImpl: cpuNot,
-  codegenImpl: (_ctx, [arg]) => stitch`!(${arg})`,
+  codegenImpl: (ctx, [arg]) => ctx.gen.emitUnaryOp('!', arg),
   sideEffects: false,
 });
 
@@ -258,7 +258,7 @@ export const or = dualImpl({
   name: 'or',
   signature: (...argTypes) => ({ argTypes, returnType: argTypes[0] }),
   normalImpl: cpuOr,
-  codegenImpl: (_ctx, [lhs, rhs]) => stitch`(${lhs} | ${rhs})`,
+  codegenImpl: (ctx, [lhs, rhs]) => ctx.gen.emitBinaryOp(lhs, '|', rhs),
   sideEffects: false,
 });
 
@@ -275,7 +275,7 @@ export const and = dualImpl({
   name: 'and',
   signature: (...argTypes) => ({ argTypes, returnType: argTypes[0] }),
   normalImpl: cpuAnd,
-  codegenImpl: (_ctx, [lhs, rhs]) => stitch`(${lhs} & ${rhs})`,
+  codegenImpl: (ctx, [lhs, rhs]) => ctx.gen.emitBinaryOp(lhs, '&', rhs),
   sideEffects: false,
 });
 

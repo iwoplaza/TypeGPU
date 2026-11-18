@@ -57,6 +57,7 @@ import type {
   VariableDefinitionOptions,
   BinaryOperator,
   ResolvedStatement,
+  UnaryOperator,
 } from './shaderGenerator.ts';
 import { resolveData } from '../core/resolve/resolveData.ts';
 import { createPtrFromOrigin, implicitFrom, ptrFn } from '../data/ptr.ts';
@@ -1367,6 +1368,10 @@ The generated shader will evaluate them in declaration order.`,
     return parenthesizedOps.includes(op)
       ? `(${lhsStr} ${op} ${rhsStr})`
       : `${lhsStr} ${op} ${rhsStr}`;
+  }
+
+  public emitUnaryOp(op: UnaryOperator, arg: Snippet): string {
+    return `${op}(${this.ctx.resolveSnippet(arg).value})`;
   }
 
   protected _return(statement: tinyest.Return): string {
