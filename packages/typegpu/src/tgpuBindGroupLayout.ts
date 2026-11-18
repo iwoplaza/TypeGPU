@@ -122,14 +122,11 @@ export type TgpuLayoutEntry =
   | TgpuLayoutStorageTexture
   | TgpuLayoutExternalTexture;
 
-type UnwrapRuntimeConstructorInner<T extends BaseData | ((_: number) => BaseData)> = T extends (
+export type UnwrapRuntimeConstructor<T extends BaseData | ((_: number) => BaseData)> = T extends (
   _: number,
 ) => BaseData
   ? ReturnType<T>
   : T;
-
-export type UnwrapRuntimeConstructor<T extends BaseData | ((_: number) => BaseData)> =
-  T extends unknown ? UnwrapRuntimeConstructorInner<T> : never;
 
 export interface TgpuBindGroupLayoutSoul extends TgpuSoul<'bind-group-layout'> {
   readonly entries: Record<string, TgpuLayoutEntry | null>;

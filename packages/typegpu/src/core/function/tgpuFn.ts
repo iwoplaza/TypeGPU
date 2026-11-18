@@ -10,7 +10,6 @@ import { getName, setName } from '../../shared/meta.ts';
 import { isMarkedInternal } from '../../shared/symbols.ts';
 import type { InferGPU } from '../../shared/repr.ts';
 import { $getNameForward, $internal, $providing, $resolve } from '../../shared/symbols.ts';
-import type { Prettify } from '../../shared/utilityTypes.ts';
 import type { DualFn, ResolutionCtx, SelfResolvable } from '../../types.ts';
 import { addArgTypesToExternals, addReturnTypeToExternals } from '../resolve/externals.ts';
 import { stitch } from '../resolve/stitch.ts';
@@ -62,7 +61,7 @@ export type TgpuFnShell<Args extends BaseData[], Return extends BaseData> = Tgpu
 > &
   (<T extends (...args: InferArgs<Args>) => InferGPU<Return>>(
     implementation: T,
-  ) => TgpuFn<Prettify<InheritArgNames<(...args: Args) => Return, T>>['result']>) &
+  ) => TgpuFn<InheritArgNames<(...args: Args) => Return, T>['result']>) &
   ((implementation: string) => TgpuFn<(...args: Args) => Return>) &
   ((strings: TemplateStringsArray, ...values: unknown[]) => TgpuFn<(...args: Args) => Return>);
 

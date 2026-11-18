@@ -21,7 +21,7 @@ import type {
 } from '../../shared/repr.ts';
 import type { TgpuDeviceOwningSoul } from '../../shared/soul.ts';
 import { $internal, $soul } from '../../shared/symbols.ts';
-import type { Prettify, UnionToIntersection } from '../../shared/utilityTypes.ts';
+import type { UnionToIntersection } from '../../shared/utilityTypes.ts';
 import { isGPUBuffer } from '../../types.ts';
 import type { TgpuCommandEncoder } from '../commandEncoder/commandEncoder.ts';
 import type { ExperimentalTgpuRoot } from '../root/rootTypes.ts';
@@ -107,9 +107,6 @@ type UsageTypeToBufferBinding<TData extends BaseData> = {
 
 const usageToUsageConstructor = { uniform, mutable, readonly };
 
-/**
- * Done as an object to later Prettify it
- */
 type InnerValidUsagesFor<T> = {
   usage:
     | (IsValidStorageSchema<T> extends true ? 'storage' : never)
@@ -152,12 +149,7 @@ export interface TgpuBuffer<TData extends BaseData> extends TgpuNamable {
   usableAsIndex: boolean;
   usableAsIndirect: boolean;
 
-  $usage<
-    T extends [
-      Prettify<InnerValidUsagesFor<TData>>['usage'],
-      ...Prettify<InnerValidUsagesFor<TData>>['usage'][],
-    ],
-  >(
+  $usage<T extends [InnerValidUsagesFor<TData>['usage'], ...InnerValidUsagesFor<TData>['usage'][]]>(
     ...usages: T
   ): this & UnionToIntersection<LiteralToUsageType<T[number]>>;
   $addFlags(flags: GPUBufferUsageFlags): this;
