@@ -447,3 +447,15 @@ describe('TSL workgroup memory', () => {
     expect(capturedOrigins).toEqual(['workgroup', 'workgroup']);
   });
 });
+
+describe('fromTSL', () => {
+  it('explains what went wrong when given no node', () => {
+    // e.g. a TSL export that doesn't exist in the installed version of three.js
+    const missingNode = (TSL as Record<string, unknown>)
+      .someFutureNode as THREE.TSL.NodeObject<THREE.Node>;
+
+    expect(() => fromTSL(missingNode, d.f32)).toThrowErrorMatchingInlineSnapshot(
+      `[Error: fromTSL() expected a TSL node or a three.js texture, got 'undefined'. If this happened while importing '@typegpu/three', the installed version of three.js is missing a node it relies on (three.js r180 or newer is required).]`,
+    );
+  });
+});
