@@ -1012,6 +1012,213 @@ describe(`switch statement in 'use gpu' functions`, () => {
     `);
   });
 
+  /* oxlint-disable no-duplicate-case */
+  describe('duplicate cases', () => {
+    it('drops later duplicates of a case', () => {
+      const fn = tgpu.fn(
+        [d.i32],
+        d.i32,
+      )((x) => {
+        let a = 0;
+        switch (x) {
+          case 1:
+            a = 1;
+            break;
+          case 1:
+            a = 2;
+            break;
+          default:
+            a = 3;
+        }
+        return a;
+      });
+
+      expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+        "fn fn_1(x: i32) -> i32 {
+          var a = 0;
+          switch x {
+            case 1i: {
+              a = 1i;
+            }
+            case default: {
+              a = 3i;
+            }
+          }
+          return a;
+        }"
+      `);
+    });
+
+    it('drops cases that become duplicates after conversion', () => {
+      const fn = tgpu.fn(
+        [d.u32],
+        d.i32,
+      )((x) => {
+        switch (x) {
+          case d.u32(1):
+            return 1;
+          case 1:
+            return 2;
+          case d.i32(2):
+            return 3;
+          case 2:
+            return 4;
+        }
+        return 0;
+      });
+
+      expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+        "fn fn_1(x: u32) -> i32 {
+          switch x {
+            case 1u: {
+              return 1i;
+            }
+            case 2u: {
+              return 3i;
+            }
+            case default: {
+
+            }
+          }
+          return 0i;
+        }"
+      `);
+    });
+
+    it('keeps the rest of a group when only some of its cases are duplicates', () => {
+      const fn = tgpu.fn(
+        [d.i32],
+        d.i32,
+      )((x) => {
+        switch (x) {
+          case 1:
+          case 2:
+            return 1;
+          case 2:
+          case 3:
+            return 2;
+          case 1:
+          case 3:
+            return 3;
+        }
+        return 0;
+      });
+
+      expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+        "fn fn_1(x: i32) -> i32 {
+          switch x {
+            case 1i, 2i: {
+              return 1i;
+            }
+            case 3i: {
+              return 2i;
+            }
+            case default: {
+
+            }
+          }
+          return 0i;
+        }"
+      `);
+    });
+
+    it('keeps default when grouped with duplicates', () => {
+      const fn = tgpu.fn(
+        [d.i32],
+        d.i32,
+      )((x) => {
+        switch (x) {
+          case 1:
+            return 1;
+          case 1:
+          default:
+            return 2;
+        }
+      });
+
+      expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+        "fn fn_1(x: i32) -> i32 {
+          switch x {
+            case 1i: {
+              return 1i;
+            }
+            case default: {
+              return 2i;
+            }
+          }
+        }"
+      `);
+    });
+
+    it('drops duplicates of non-comptime constants', () => {
+      const limit = tgpu.const(d.i32, 4);
+      const fn = tgpu.fn(
+        [d.i32],
+        d.i32,
+      )((x) => {
+        switch (x) {
+          case limit.$:
+            return 1;
+          case limit.$:
+            return 2;
+        }
+        return 0;
+      });
+
+      expect(tgpu.resolve([fn])).toMatchInlineSnapshot(`
+        "const limit: i32 = 4i;
+
+        fn fn_1(x: i32) -> i32 {
+          switch x {
+            case limit: {
+              return 1i;
+            }
+            case default: {
+
+            }
+          }
+          return 0i;
+        }"
+      `);
+    });
+
+    it('does not drop a case because an unmatchable one converts to the same value', () => {
+      const truncated = tgpu.fn(
+        [d.i32],
+        d.i32,
+      )((x) => {
+        switch (x) {
+          case 1.5:
+            return 1;
+          case 1:
+            return 2;
+        }
+        return 0;
+      });
+
+      const wrapped = tgpu.fn(
+        [d.u32],
+        d.i32,
+      )((x) => {
+        switch (x) {
+          case -1:
+            return 1;
+          case 4294967295:
+            return 2;
+        }
+        return 0;
+      });
+
+      expect(() => tgpu.resolve([truncated])).toThrow(
+        "Case '1.5' can never match a switch selector of type 'i32'.",
+      );
+      expect(() => tgpu.resolve([wrapped])).toThrow(
+        "Case '-1' can never match a switch selector of type 'u32'.",
+      );
+    });
+  });
+  /* oxlint-enable no-duplicate-case */
+
   describe('comptime pruning', () => {
     it('leaves only matching branch as default', () => {
       const fn = () => {
