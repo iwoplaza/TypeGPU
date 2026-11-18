@@ -1,0 +1,2 @@
+# Used by the cold-start child processes in place of bunfig.toml, which preloads the
+# build plugin for every file. coldStart.ts registers the plugin itself, for its own files only.

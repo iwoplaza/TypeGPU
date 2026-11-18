@@ -5,7 +5,8 @@
   "description": "Resolution time benchmark app for TypeGPU",
   "type": "module",
   "scripts": {
-    "resolution-time": "bun procedural.ts"
+    "resolution-time": "bun procedural.ts",
+    "resolution-time:cold-start": "pnpm run --filter tinyest --filter typegpu build && bun coldStart.ts"
   },
   "dependencies": {
     "typegpu": "workspace:*"
