@@ -463,6 +463,20 @@ const fnNodeToTranspiledMap = new WeakMap<
   TranspilationResult
 >();
 
+function functionOnEnter(
+  this: PluginState,
+  path: NodePath<t.FunctionDeclaration | t.FunctionExpression | t.ArrowFunctionExpression>,
+  state: PluginState,
+) {
+  if (containsUseGpuDirective(path.node) && getEmbeddedTypegpuMetadata(path) === undefined) {
+    fnNodeToTranspiledMap.set(path.node, transpile(path.node, this.opts.unstable_obfuscate));
+    if (state.inUseGpuScope) {
+      throw new Error(`Nesting 'use gpu' functions is not allowed`);
+    }
+    state.inUseGpuScope = true;
+  }
+}
+
 function functionOnExit(
   path: NodePath<t.FunctionDeclaration | t.FunctionExpression | t.ArrowFunctionExpression>,
   state: PluginState,
@@ -550,41 +564,17 @@ export const functionVisitor: TraverseOptions<PluginState> = {
   },
 
   ArrowFunctionExpression: {
-    enter(path, state) {
-      if (containsUseGpuDirective(path.node) && getEmbeddedTypegpuMetadata(path) === undefined) {
-        fnNodeToTranspiledMap.set(path.node, transpile(path.node, this.opts.unstable_obfuscate));
-        if (state.inUseGpuScope) {
-          throw new Error(`Nesting 'use gpu' functions is not allowed`);
-        }
-        state.inUseGpuScope = true;
-      }
-    },
+    enter: functionOnEnter,
     exit: functionOnExit,
   },
 
   FunctionExpression: {
-    enter(path, state) {
-      if (containsUseGpuDirective(path.node) && getEmbeddedTypegpuMetadata(path) === undefined) {
-        fnNodeToTranspiledMap.set(path.node, transpile(path.node, this.opts.unstable_obfuscate));
-        if (state.inUseGpuScope) {
-          throw new Error(`Nesting 'use gpu' functions is not allowed`);
-        }
-        state.inUseGpuScope = true;
-      }
-    },
+    enter: functionOnEnter,
     exit: functionOnExit,
   },
 
   FunctionDeclaration: {
-    enter(path, state) {
-      if (containsUseGpuDirective(path.node) && getEmbeddedTypegpuMetadata(path) === undefined) {
-        fnNodeToTranspiledMap.set(path.node, transpile(path.node, this.opts.unstable_obfuscate));
-        if (state.inUseGpuScope) {
-          throw new Error(`Nesting 'use gpu' functions is not allowed`);
-        }
-        state.inUseGpuScope = true;
-      }
-    },
+    enter: functionOnEnter,
     exit: functionOnExit,
   },
 
