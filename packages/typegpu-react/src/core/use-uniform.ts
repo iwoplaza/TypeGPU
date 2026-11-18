@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import type { TgpuUniform, d, ValidateUniformSchema, TgpuBuffer } from 'typegpu';
 
-import { useRoot } from './root-context.tsx';
-import { useChangeDetection, useDeferredCleanup, useStableSchema } from './helper-hooks.ts';
+import { useRootResource } from './use-root-resource.ts';
 
 export interface UseUniformOptions<TSchema extends d.AnyWgslData> {
   initial?: ((buffer: TgpuBuffer<NoInfer<TSchema>>) => void) | d.InferInput<NoInfer<TSchema>>;
@@ -14,26 +12,16 @@ export function useUniform<TSchema extends d.AnyWgslData>(
   options?: UseUniformOptions<TSchema>,
 ): TgpuUniform<TSchema> {
   const { initial, onInit } = options ?? {};
-  const root = useRoot();
-  const [fakeState] = useState(() => {
-    const uniform = root.createUniform(_schema, initial);
-    onInit?.(uniform);
 
-    return { uniform };
-  });
+  const [uniform] = useRootResource(
+    _schema,
+    (root, schema) => {
+      const uniform = root.createUniform(schema, initial);
+      onInit?.(uniform);
+      return uniform;
+    },
+    (uniform) => uniform.buffer.destroy(),
+  );
 
-  const [schema, schemaChanged] = useStableSchema(_schema);
-  const rootChanged = useChangeDetection(root);
-
-  if (schemaChanged || rootChanged) {
-    fakeState.uniform.buffer.destroy();
-    fakeState.uniform = root.createUniform(schema, initial);
-    onInit?.(fakeState.uniform);
-  }
-
-  useDeferredCleanup(() => {
-    fakeState.uniform.buffer.destroy();
-  });
-
-  return fakeState.uniform;
+  return uniform;
 }

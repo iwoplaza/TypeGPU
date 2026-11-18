@@ -64,8 +64,9 @@ describe('useMirroredUniform', () => {
     rerender({ schema: d.vec2f, value: d.vec2f(1, 2) });
 
     expect(createUniformSpy).toHaveBeenCalledTimes(2);
-    expect(destroyUniformSpy).toHaveBeenCalledTimes(1);
     expect(createUniformSpy).toHaveBeenCalledWith(d.vec2f, d.vec2f(1, 2));
+    // Destroyed as soon as the new one has been committed
+    expect(destroyUniformSpy).toHaveBeenCalledTimes(1);
   });
 
   it('should not recreate the buffer for deeply equal schemas', ({ RootWrapper, root }) => {
@@ -153,16 +154,25 @@ describe('useMirroredUniform', () => {
       expect(createUniformSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle buffer creation in StrictMode', async ({ RootWrapper, root }) => {
+    it('should not leave buffers alive after unmounting in StrictMode', async ({
+      RootWrapper,
+      root,
+    }) => {
       using createUniformSpy = vi.spyOn(root, 'createUniform');
 
-      renderHook(() => useMirroredUniform(d.f32, 1.0), {
+      const { unmount } = renderHook(() => useMirroredUniform(d.f32, 1.0), {
         wrapper: RootWrapper,
         reactStrictMode: true,
       });
 
-      // Creates uniform twice, and discards one of them
-      expect(createUniformSpy).toHaveBeenCalledTimes(2);
+      unmount();
+      vi.runAllTimers();
+
+      const buffers = createUniformSpy.mock.results.map(
+        (r) => (r.value as TgpuUniform<d.F32>).buffer,
+      );
+      expect(buffers.length).toBeGreaterThan(0);
+      expect(buffers.filter((buffer) => !buffer.destroyed)).toHaveLength(0);
     });
 
     it('should handle value updates in StrictMode', async ({ RootWrapper, root }) => {
@@ -174,14 +184,13 @@ describe('useMirroredUniform', () => {
         initialProps: { value: 1 },
       });
 
-      // Creates uniform twice, and discards one of them
-      expect(createUniformSpy).toHaveBeenCalledTimes(2);
+      expect(createUniformSpy).toHaveBeenCalledTimes(1);
       expect(root.device.queue.writeBuffer).toHaveBeenCalledTimes(0);
 
       rerender({ value: 2 });
 
       // Doesn't recreate buffer on value update
-      expect(createUniformSpy).toHaveBeenCalledTimes(2);
+      expect(createUniformSpy).toHaveBeenCalledTimes(1);
       expect(root.device.queue.writeBuffer).toHaveBeenCalledTimes(1);
     });
 
@@ -193,7 +202,7 @@ describe('useMirroredUniform', () => {
         reactStrictMode: true,
       });
 
-      expect(createUniformSpy).toHaveBeenCalledTimes(2);
+      expect(createUniformSpy).toHaveBeenCalledTimes(1);
       const createdBuffer = result.current[$buffer];
       using destroyBufferSpy = vi.spyOn(createdBuffer, 'destroy');
 

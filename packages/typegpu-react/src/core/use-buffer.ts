@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import type { d, TgpuBuffer, ValidateBufferSchema } from 'typegpu';
 
-import { useChangeDetection, useDeferredCleanup, useStableSchema } from './helper-hooks.ts';
-import { useRoot } from './root-context.tsx';
+import { useRootResource } from './use-root-resource.ts';
 
 export interface UseBufferOptions<TSchema extends d.AnyData> {
   initial?: ((buffer: TgpuBuffer<TSchema>) => void) | d.InferInput<NoInfer<TSchema>>;
@@ -14,27 +12,16 @@ export function useBuffer<TSchema extends d.AnyData>(
   options?: UseBufferOptions<TSchema>,
 ): TgpuBuffer<TSchema> {
   const { initial, onInit } = options ?? {};
-  const root = useRoot();
 
-  const [fakeState] = useState(() => {
-    const buffer = root.createBuffer(_schema, initial);
-    onInit?.(buffer);
+  const [buffer] = useRootResource(
+    _schema,
+    (root, schema) => {
+      const buffer = root.createBuffer(schema, initial);
+      onInit?.(buffer);
+      return buffer;
+    },
+    (buffer) => buffer.destroy(),
+  );
 
-    return { buffer };
-  });
-
-  const [schema, schemaChanged] = useStableSchema(_schema);
-  const rootChanged = useChangeDetection(root);
-
-  if (schemaChanged || rootChanged) {
-    fakeState.buffer.destroy();
-    fakeState.buffer = root.createBuffer(schema, initial);
-    onInit?.(fakeState.buffer);
-  }
-
-  useDeferredCleanup(() => {
-    fakeState.buffer.destroy();
-  });
-
-  return fakeState.buffer;
+  return buffer;
 }

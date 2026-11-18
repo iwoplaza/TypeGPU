@@ -1,6 +1,8 @@
 import { act, render } from '@testing-library/react';
+import { Suspense, startTransition, use, useState } from 'react';
+import type { TgpuRoot } from 'typegpu';
 import { afterEach, beforeEach, describe, expect, vi } from 'vitest';
-import { useConfigureContext } from '@typegpu/react';
+import { Root, useConfigureContext } from '@typegpu/react';
 import {
   type CanvasRef,
   createUseConfigureContextHook,
@@ -121,6 +123,66 @@ describe('useConfigureContext', () => {
     expect(first).toHaveBeenCalledTimes(1);
     expect(second).toHaveBeenCalledTimes(1);
     expect(second).toHaveBeenLastCalledWith(640, 480);
+  });
+
+  describe('when the root changes', () => {
+    const otherRoot = { device: { label: 'other device' } } as unknown as TgpuRoot;
+    const neverResolves = new Promise<never>(() => {});
+
+    function setup(root: TgpuRoot) {
+      let configure: ReturnType<typeof vi.fn> | undefined;
+      let setState: (state: { root: TgpuRoot; suspend: boolean }) => void = () => {};
+
+      function SuspendingCanvas({ suspend }: { suspend: boolean }) {
+        const { ref, ctxRef } = useConfigureContext();
+        configure ??= ctxRef.current?.configure as ReturnType<typeof vi.fn> | undefined;
+        if (suspend) {
+          use(neverResolves);
+        }
+        return <canvas ref={ref} />;
+      }
+
+      function App() {
+        const [state, _setState] = useState({ root, suspend: false });
+        setState = _setState;
+        return (
+          <Root root={state.root}>
+            <Suspense fallback={null}>
+              <SuspendingCanvas suspend={state.suspend} />
+            </Suspense>
+          </Root>
+        );
+      }
+
+      render(<App />);
+      // Re-rendering once so that the context gets captured
+      act(() => setState({ root, suspend: false }));
+      expect(configure).toBeDefined();
+      configure?.mockClear();
+
+      return { configure: configure as ReturnType<typeof vi.fn>, setState };
+    }
+
+    it('reconfigures the context once the change commits', ({ root }) => {
+      const { configure, setState } = setup(root);
+
+      act(() => setState({ root: otherRoot, suspend: false }));
+
+      expect(configure).toHaveBeenCalledTimes(1);
+      expect(configure).toHaveBeenLastCalledWith(
+        expect.objectContaining({ device: otherRoot.device }),
+      );
+    });
+
+    it('does not reconfigure the context from a render that never commits', ({ root }) => {
+      const { configure, setState } = setup(root);
+
+      act(() => {
+        startTransition(() => setState({ root: otherRoot, suspend: true }));
+      });
+
+      expect(configure).not.toHaveBeenCalled();
+    });
   });
 
   it('does not reconfigure the context or the resizing on re-render', ({ RootWrapper, root }) => {
