@@ -7,7 +7,7 @@ import { $internal, $resolve } from '../shared/symbols.ts';
 import { numericLiteralToSnippet } from '../tgsl/generationHelpers.ts';
 import type { ResolutionCtx, SelfResolvable } from '../types.ts';
 import { f32 } from './numeric.ts';
-import { type ResolvedSnippet } from './snippet.ts';
+import { type ResolvedSnippet, snip } from './snippet.ts';
 import { vec2f, vec3f, vec4f } from './vector.ts';
 import {
   type BaseData,
@@ -570,6 +570,17 @@ export const identity4 = comptime(() =>
   mat4x4f(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1),
 ).$name('identity4');
 
+function mat4x4fInstantiation(ctx: ResolutionCtx, elements: (number | string)[]): string {
+  return ctx.gen.typeInstantiation(
+    mat4x4f,
+    elements.map((element) =>
+      typeof element === 'number'
+        ? numericLiteralToSnippet(element)
+        : snip(element, f32, /* origin */ 'runtime', /* possibleSideEffects */ false),
+    ),
+  ).value;
+}
+
 const identityFunctions = {
   2: identity2,
   3: identity3,
@@ -594,8 +605,14 @@ export const translation4 = dualImpl({
   get signature() {
     return { argTypes: [vec3f], returnType: mat4x4f };
   },
-  codegenImpl: (_ctx, [v]) =>
-    stitch`mat4x4f(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, ${v}.x, ${v}.y, ${v}.z, 1)`,
+  codegenImpl: (ctx, [v]) =>
+    // oxfmt-ignore
+    mat4x4fInstantiation(ctx, [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      stitch`${v}.x`, stitch`${v}.y`, stitch`${v}.z`, 1,
+    ]),
   sideEffects: false,
 });
 
@@ -617,8 +634,14 @@ export const scaling4 = dualImpl({
   get signature() {
     return { argTypes: [vec3f], returnType: mat4x4f };
   },
-  codegenImpl: (_ctx, [v]) =>
-    stitch`mat4x4f(${v}.x, 0, 0, 0, 0, ${v}.y, 0, 0, 0, 0, ${v}.z, 0, 0, 0, 0, 1)`,
+  codegenImpl: (ctx, [v]) =>
+    // oxfmt-ignore
+    mat4x4fInstantiation(ctx, [
+      stitch`${v}.x`, 0, 0, 0,
+      0, stitch`${v}.y`, 0, 0,
+      0, 0, stitch`${v}.z`, 0,
+      0, 0, 0, 1,
+    ]),
   sideEffects: false,
 });
 
@@ -640,8 +663,14 @@ export const rotationX4 = dualImpl({
   get signature() {
     return { argTypes: [f32], returnType: mat4x4f };
   },
-  codegenImpl: (_ctx, [a]) =>
-    stitch`mat4x4f(1, 0, 0, 0, 0, cos(${a}), sin(${a}), 0, 0, -sin(${a}), cos(${a}), 0, 0, 0, 0, 1)`,
+  codegenImpl: (ctx, [a]) =>
+    // oxfmt-ignore
+    mat4x4fInstantiation(ctx, [
+      1, 0, 0, 0,
+      0, stitch`cos(${a})`, stitch`sin(${a})`, 0,
+      0, stitch`-sin(${a})`, stitch`cos(${a})`, 0,
+      0, 0, 0, 1,
+    ]),
   sideEffects: false,
 });
 
@@ -663,8 +692,14 @@ export const rotationY4 = dualImpl({
   get signature() {
     return { argTypes: [f32], returnType: mat4x4f };
   },
-  codegenImpl: (_ctx, [a]) =>
-    stitch`mat4x4f(cos(${a}), 0, -sin(${a}), 0, 0, 1, 0, 0, sin(${a}), 0, cos(${a}), 0, 0, 0, 0, 1)`,
+  codegenImpl: (ctx, [a]) =>
+    // oxfmt-ignore
+    mat4x4fInstantiation(ctx, [
+      stitch`cos(${a})`, 0, stitch`-sin(${a})`, 0,
+      0, 1, 0, 0,
+      stitch`sin(${a})`, 0, stitch`cos(${a})`, 0,
+      0, 0, 0, 1,
+    ]),
   sideEffects: false,
 });
 
@@ -686,8 +721,14 @@ export const rotationZ4 = dualImpl({
   get signature() {
     return { argTypes: [f32], returnType: mat4x4f };
   },
-  codegenImpl: (_ctx, [a]) =>
-    stitch`mat4x4f(cos(${a}), sin(${a}), 0, 0, -sin(${a}), cos(${a}), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)`,
+  codegenImpl: (ctx, [a]) =>
+    // oxfmt-ignore
+    mat4x4fInstantiation(ctx, [
+      stitch`cos(${a})`, stitch`sin(${a})`, 0, 0,
+      stitch`-sin(${a})`, stitch`cos(${a})`, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ]),
   sideEffects: false,
 });
 
