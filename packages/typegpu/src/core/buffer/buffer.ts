@@ -472,10 +472,15 @@ class TgpuBufferImpl<TData extends BaseData> implements TgpuBuffer<TData> {
   }
 
   #assertCopyDst(operation: string): void {
-    if (!(this.buffer.usage & GPUBufferUsage.COPY_DST)) {
+    // The flags of buffers we did not create are only known to the GPUBuffer itself
+    const usage = this.#ownBuffer ? this.flags : this.buffer.usage;
+    if (!(usage & GPUBufferUsage.COPY_DST)) {
       throw new Error(
-        `Cannot ${operation} buffer '${getName(this) ?? '<unnamed>'}', as it does not have the COPY_DST usage. ` +
-          'Buffers with the MAP_WRITE flag can only be written to while mapped.',
+        `Cannot ${operation} buffer '${getName(this) ?? '<unnamed>'}', as it does not have the COPY_DST usage.${
+          usage & GPUBufferUsage.MAP_WRITE
+            ? ' Buffers with the MAP_WRITE flag can only be written to while mapped.'
+            : ''
+        }`,
       );
     }
   }
