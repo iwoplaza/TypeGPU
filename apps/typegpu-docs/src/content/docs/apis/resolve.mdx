@@ -38,17 +38,17 @@ const resolved = tgpu.resolve([createSmallBoid, createBigBoid]);
 Resolved WGSL shader code is as follows:
 
 ```wgsl
-struct Boid_1 {
+struct Boid {
   size: f32,
   color: vec4f,
 }
 
-fn createSmallBoid_0() -> Boid_1 {
-  return Boid_1(1f, vec4f(0, 1, 0, 1));
+fn createSmallBoid() -> Boid {
+  return Boid(1f, vec4f(0, 1, 0, 1));
 }
 
-fn createBigBoid_2() -> Boid_1 {
-  return Boid_1(10f, vec4f(1, 0, 0, 1));
+fn createBigBoid() -> Boid {
+  return Boid(10f, vec4f(1, 0, 0, 1));
 }
 ```
 
@@ -80,15 +80,11 @@ const resolved = tgpu.resolve([multiplyPipeline]);
 Resolved WGSL shader code is as follows:
 
 ```wgsl
-@group(0) @binding(0) var<storage, read_write> dataMutable_1: array<u32, 8>;
+@group(0) @binding(0) var<storage, read_write> dataMutable: array<u32, 8>;
 
-struct computeMain_Input_2 {
-  @builtin(global_invocation_id) gid: vec3u,
-}
-
-@compute @workgroup_size(1) fn computeMain_0(input: computeMain_Input_2) {
-  var index = input.gid.x;
-  dataMutable_1[index] *= 2u;
+@compute @workgroup_size(1) fn computeMain(@builtin(global_invocation_id) gid: vec3u) {
+  let index = gid.x;
+  dataMutable[index] *= 2u;
 }
 ```
 
@@ -142,12 +138,13 @@ fn calculateEffectStrength() -> f32 {
 Resolved WGSL shader code is as follows:
 
 ```wgsl
-const offsetConst_0: f32 = 7f;
-@group(0) @binding(0) var<uniform> timeUniform_1: u32;
-@group(0) @binding(1) var<uniform> rangeUniform_2: f32;
+@group(0) @binding(0) var<uniform> timeUniform: u32;
 
+@group(0) @binding(1) var<uniform> rangeUniform: f32;
+
+const offsetConst: f32 = 7f;
 fn calculateEffectStrength() -> f32 {
-  return sin(timeUniform_1) * rangeUniform_2 + offsetConst_0;
+  return sin(timeUniform) * rangeUniform + offsetConst;
 }
 ```
 
@@ -201,23 +198,24 @@ const resolved = tgpu.resolve({
 Resolved WGSL shader code is as follows:
 
 ```wgsl
-struct Source_0 {
+@group(1) @binding(2) var bgTexture: texture_external;
+
+@group(1) @binding(1) var sampling: sampler;
+
+struct Source {
   ambientColor: vec3f,
   intensity: f32,
 }
 
-@group(1) @binding(2) var bgTexture_1: texture_external;
-@group(1) @binding(1) var sampling_2: sampler;
-@group(1) @binding(0) var<uniform> lightSource_3: Source_0;
-
+@group(1) @binding(0) var<uniform> lightSource: Source;
 <existing code>
 
 @fragment
 fn main(@location(0) uv: vec2f) -> @location(0) vec4f {
-  var bgColor = textureSampleBaseClampToEdge(bgTexture_1, sampling_2, uv).rgb;
+  var bgColor = textureSampleBaseClampToEdge(bgTexture, sampling, uv).rgb;
 
-  var newSource: Source_0;
-  newSource.ambientColor = (bgColor + lightSource_3.ambientColor) * vec3f(0.4000000059604645, 0.6000000238418579, 1);
+  var newSource: Source;
+  newSource.ambientColor = (bgColor + lightSource.ambientColor) * vec3f(0.4000000059604645, 0.6000000238418579, 1);
   newSource.intensity = 0.6;
 
   return vec4f(newSource.ambientColor, newSource.intensity);

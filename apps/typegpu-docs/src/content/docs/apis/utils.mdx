@@ -518,11 +518,11 @@ Generates:
 fn processNeighbors(cell: vec2i) {
   // unrolled iteration #0
   // unrolled iteration #0 / #0
-  processNeighbor(cell + vec2i(-1, -1));
+  processNeighbor((cell + vec2i(-1)));
   // unrolled iteration #0 / #1
-  processNeighbor(cell + vec2i(0, -1));
+  processNeighbor((cell + vec2i(0, -1)));
   // unrolled iteration #0 / #2
-  processNeighbor(cell + vec2i(1, -1));
+  processNeighbor((cell + vec2i(1, -1)));
   // ---
   // (and so on...)
 }
@@ -621,7 +621,7 @@ result += 3u;
 const b1 = Boid({ pos: d.vec2i(1), vel: d.vec2f(1) });
 const b2 = Boid({ pos: d.vec2i(2), vel: d.vec2f(2) });
 
-let res = d.vec3f();
+let res = d.vec2f();
 for (const foo of tgpu.unroll([b1, b2])) {
   const boo = foo;
   res = res.add(foo.vel);
@@ -666,11 +666,11 @@ for (const foo of tgpu.unroll(d.vec3f(v))) {
 Generates:
 ```wgsl
 // unrolled iteration #0
-res = res + v[0u];
+res += v.x;
 // unrolled iteration #1
-res = res + v[1u];
+res += v.y;
 // unrolled iteration #2
-res = res + v[2u];
+res += v.z;
 // ---
 ```
 

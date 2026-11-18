@@ -7,21 +7,25 @@
 A set of noise/pseudo-random functions for use in WebGPU/TypeGPU apps.
 
 ```ts
+import { tgpu, d } from 'typegpu';
 import { randf } from '@typegpu/noise';
 
-const time = root.createUniform(f32);
+const root = await tgpu.init();
+const time = root.createUniform(d.f32);
 
-const mainFrag = tgpu
-  .fragmentFn({
-    in: { pos: builtin.position },
-    out: vec4f,
-  })((input) => {
-    randf.seed2(add(input.pos.xy, vec2f(time.$)));
+const mainFrag = tgpu.fragmentFn({
+  in: { pos: d.builtin.position },
+  out: d.vec4f,
+})((input) => {
+  'use gpu';
+  randf.seed2(input.pos.xy + time.$);
 
-    const val = randf.sample(); // => number
-    const normal = randf.onUnitSphere(); // => v3f
-    const dir = randf.inUnitCircle(); // => v2f
-  });
+  const val = randf.sample(); // => number
+  const normal = randf.onUnitSphere(); // => v3f
+  const dir = randf.inUnitCircle(); // => v2f
+
+  return d.vec4f(dir, val, 1);
+});
 ```
 
 ## TypeGPU is created by Software Mansion

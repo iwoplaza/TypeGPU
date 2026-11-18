@@ -595,10 +595,10 @@ struct MyStruct {
   n: u32,
 }
 
-fn myFn(){
-  var s1 = MyStruct(0);
-  let s2 = &s1;
-  (*s2).n = 1; // s1 is modified
+fn myFn() {
+  var s1 = MyStruct(0u);
+  let s2 = (&s1);
+  (*s2).n = 1u; // s1 is modified
 }
 ```
 
