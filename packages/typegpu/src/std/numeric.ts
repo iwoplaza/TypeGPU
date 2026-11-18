@@ -637,21 +637,24 @@ const FrexpResults = {
   vec4h: abstruct({ fract: vec4h, exp: vec4i }),
 } as const;
 
+const frexpView = new DataView(new ArrayBuffer(8));
+
+/**
+ * Reads the exponent straight from the bits of the double, so that it's exact for the
+ * whole range, including subnormals (`2 ** exp` would overflow or underflow there).
+ */
 const frexpScalar = (value: number): { fract: number; exp: number } => {
   if (value === 0 || !Number.isFinite(value)) {
     return { fract: value, exp: 0 };
   }
-  let exp = Math.floor(Math.log2(Math.abs(value))) + 1;
-  let fract = value / 2 ** exp;
-  // Correcting for imprecision of `Math.log2`
-  if (Math.abs(fract) >= 1) {
-    fract /= 2;
-    exp += 1;
-  } else if (Math.abs(fract) < 0.5) {
-    fract *= 2;
-    exp -= 1;
-  }
-  return { fract, exp };
+  // Subnormals have no implicit leading 1, scaling them up makes them normal
+  const scale = Math.abs(value) < 2 ** -1022 ? 64 : 0;
+  frexpView.setFloat64(0, value * 2 ** scale);
+  const high = frexpView.getUint16(0);
+  const exp = ((high >>> 4) & 0x7ff) - 1022 - scale;
+  // Setting the biased exponent to 1022 puts the magnitude in [0.5, 1)
+  frexpView.setUint16(0, (high & 0x800f) | (1022 << 4));
+  return { fract: frexpView.getFloat64(0), exp };
 };
 
 const intVecByLength = { 2: vec2i, 3: vec3i, 4: vec4i } as const;

@@ -43,6 +43,14 @@ describe('frexp', () => {
     }
   });
 
+  it('handles the whole double range, including subnormals', () => {
+    expect(frexp(1e308)).toStrictEqual({ fract: 1e308 / 2 ** 1023 / 2, exp: 1024 });
+    expect(frexp(-Number.MAX_VALUE)).toStrictEqual({ fract: -(1 - 2 ** -53), exp: 1024 });
+    expect(frexp(Number.MIN_VALUE)).toStrictEqual({ fract: 0.5, exp: -1073 });
+    expect(frexp(-3 * 2 ** -1070)).toStrictEqual({ fract: -0.75, exp: -1068 });
+    expect(frexp(2 ** -1022)).toStrictEqual({ fract: 0.5, exp: -1021 });
+  });
+
   it('works component-wise on vectors', () => {
     expect(frexp(vec2f(1.5, 0))).toStrictEqual({ fract: vec2f(0.75, 0), exp: vec2i(1, 0) });
     expect(frexp(vec3h(-6, 1, 0.25))).toStrictEqual({
