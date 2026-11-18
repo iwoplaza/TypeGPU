@@ -3,10 +3,13 @@ import { it } from 'typegpu-testing-utility';
 import { tgpu } from 'typegpu';
 
 // What a tree-shaken bundle looks like when no function in it carries the logging support
-vi.mock('../../src/tgsl/consoleLog/registry.ts', () => ({
+const noRegistry = vi.hoisted(() => () => ({
   registerLogSupport: <T>(support: T) => support,
   getLogSupport: () => undefined,
 }));
+vi.mock('../../src/tgsl/consoleLog/registry.ts', noRegistry);
+// When testing the built package
+vi.mock('../../dist/tgsl/consoleLog/registry.js', noRegistry);
 
 describe('console.log in a program without logging support', () => {
   it('falls back to a comment and warns', ({ root }) => {
