@@ -227,13 +227,15 @@ const I32_MIN = -(2 ** 31);
 
 /**
  * When a shader is being generated and all operands are known, the result gets baked into the shader.
- * WGSL treats a const-expression that divides an integer by zero as a shader-creation error,
- * so it should not silently turn into a value.
+ * WGSL treats a const-expression that divides an integer by zero (or the most negative i32 by -1)
+ * as a shader-creation error, so it should not silently turn into a value.
  */
-function assertNotFoldingIntoShader(a: number, op: '/' | '%'): void {
+function assertNotFoldingIntoShader(a: number, op: '/' | '%', b: number): void {
   if (getResolutionCtx() && getExecMode().type === 'normal') {
     throw new Error(
-      `Cannot evaluate '${a} ${op} 0' while generating a shader. Integer division by zero is only well-defined at runtime.`,
+      `Cannot evaluate '${a} ${op} ${b}' while generating a shader. ${
+        b === 0 ? 'Integer division by zero' : 'Dividing the most negative i32 by -1'
+      } is only well-defined at runtime.`,
     );
   }
 }
@@ -242,11 +244,8 @@ function assertNotFoldingIntoShader(a: number, op: '/' | '%'): void {
  * Integer division with WGSL's runtime semantics: `e1 / 0` and `I32_MIN / -1` evaluate to `e1`.
  */
 export function intDivComponent(a: number, b: number): number {
-  if (b === 0) {
-    assertNotFoldingIntoShader(a, '/');
-    return a;
-  }
-  if (a === I32_MIN && b === -1) {
+  if (b === 0 || (a === I32_MIN && b === -1)) {
+    assertNotFoldingIntoShader(a, '/', b);
     return a;
   }
   return Math.trunc(a / b);
@@ -256,11 +255,8 @@ export function intDivComponent(a: number, b: number): number {
  * Integer remainder with WGSL's runtime semantics: `e1 % 0` and `I32_MIN % -1` evaluate to `0`.
  */
 function intModComponent(a: number, b: number): number {
-  if (b === 0) {
-    assertNotFoldingIntoShader(a, '%');
-    return 0;
-  }
-  if (a === I32_MIN && b === -1) {
+  if (b === 0 || (a === I32_MIN && b === -1)) {
+    assertNotFoldingIntoShader(a, '%', b);
     return 0;
   }
   return a % b;

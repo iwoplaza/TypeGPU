@@ -84,6 +84,21 @@ describe('div', () => {
     expect(tgpu.resolve([runtime])).toContain('(vec2u(7) / rhs)');
   });
 
+  it('throws when I32_MIN / -1 would be folded into a shader', () => {
+    const constant = () => {
+      'use gpu';
+      return div(d.vec2i(-2147483648, 4), d.vec2i(-1, 2));
+    };
+
+    expect(() => tgpu.resolve([constant])).toThrowErrorMatchingInlineSnapshot(`
+      [Error: Resolution of the following tree failed:
+      - <root>
+      - fn*:constant
+      - fn*:constant()
+      - fn:div: Cannot evaluate '-2147483648 / -1' while generating a shader. Dividing the most negative i32 by -1 is only well-defined at runtime.]
+    `);
+  });
+
   it('truncates integer division toward zero', () => {
     expect(div(d.vec2i(7, -7), d.vec2i(2, 2))).toStrictEqual(d.vec2i(3, -3));
     expect(div(d.vec2i(7, -7), d.vec2i(-2, -2))).toStrictEqual(d.vec2i(-3, 3));
