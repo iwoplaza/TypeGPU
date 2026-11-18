@@ -894,7 +894,14 @@ export class WgslGenerator implements ShaderGenerator {
           rhsExpr.origin === 'constant-immutable-def' ||
           this.#localConstants.has(rhsExpr)
         ) {
-          const mask = wgsl.isVec(rhsTarget) ? `${rhsTarget.type}(31)` : '31u';
+          const mask = snip(
+            wgsl.isVec(rhsTarget)
+              ? (rhsTarget as typeof vec2u | typeof vec3u | typeof vec4u)(31)
+              : 31,
+            rhsTarget,
+            /* origin */ 'constant',
+            /* possibleSideEffects */ false,
+          );
           convRhs = snip(
             stitch`(${convRhs} & ${mask})`,
             rhsTarget,
