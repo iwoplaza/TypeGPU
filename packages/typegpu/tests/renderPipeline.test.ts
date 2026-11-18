@@ -93,6 +93,45 @@ describe('render pipeline behavior', () => {
     });
   });
 
+  it('reports a mismatched attribute format on attribs', ({ root }) => {
+    const vertex = tgpu.vertexFn({
+      in: { pos: d.vec3f },
+      out: { pos: d.builtin.position },
+    })`{ return Out(); }`;
+    const layout = tgpu.vertexLayout(d.arrayOf(d.vec3u));
+
+    root.createRenderPipeline({
+      // @ts-expect-error: uint32x3 is not compatible with vec3f
+      attribs: { pos: layout.attrib },
+      vertex,
+    });
+  });
+
+  it('accepts vertex functions with widened input types', ({ root }) => {
+    const withInputs = tgpu.vertexFn({
+      in: { pos: d.vec3f },
+      out: { pos: d.builtin.position },
+    })`{ return Out(); }`;
+    const withoutInputs = tgpu.vertexFn({
+      in: { vid: d.builtin.vertexIndex },
+      out: { pos: d.builtin.position },
+    })`{ return Out(); }`;
+    const layout = tgpu.vertexLayout(d.arrayOf(d.vec3f));
+
+    const fromBare = (vertex: TgpuVertexFn) => root.createRenderPipeline({ vertex });
+    // oxlint-disable-next-line typescript/no-explicit-any -- the widest vertex function type a helper might accept
+    const fromAny = (vertex: TgpuVertexFn<any, any>) => {
+      root.createRenderPipeline({ vertex });
+      root.createRenderPipeline({ attribs: { pos: layout.attrib }, vertex });
+    };
+    const fromUnion = (vertex: typeof withInputs | typeof withoutInputs) =>
+      root.createRenderPipeline({ attribs: { pos: layout.attrib }, vertex });
+
+    fromBare(withoutInputs);
+    fromAny(withInputs);
+    fromUnion(withInputs);
+  });
+
   it('throws an error if bind groups are missing', ({ root }) => {
     const layout = tgpu.bindGroupLayout({ alpha: { uniform: d.f32 } });
 
