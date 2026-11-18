@@ -111,24 +111,13 @@ describe('tgpu.vertexLayout', () => {
     );
   });
 
-  it('throws when an attribute offset is misaligned for its format', () => {
-    expect(() =>
-      tgpu.vertexLayout(d.disarrayOf(d.unstruct({ a: d.unorm8, b: d.float32 }))),
-    ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Vertex attribute 'b' (float32) is at byte offset 1, but WebGPU requires attributes of this format to be placed at a multiple of 4 bytes. Use d.align() or d.size() to adjust the layout.]`,
+  it('accepts misaligned attributes, as long as they are not connected to a shader', () => {
+    const layout = tgpu.vertexLayout(
+      d.disarrayOf(d.unstruct({ pos: d.float32x3, tag: d.uint8, extra: d.unorm16, tail: d.uint8 })),
     );
-    expect(() =>
-      tgpu.vertexLayout(d.disarrayOf(d.unstruct({ a: d.uint8, b: d.unorm8x2, c: d.uint8 }))),
-    ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Vertex attribute 'b' (unorm8x2) is at byte offset 1, but WebGPU requires attributes of this format to be placed at a multiple of 2 bytes. Use d.align() or d.size() to adjust the layout.]`,
-    );
-    expect(() =>
-      tgpu.vertexLayout(
-        d.disarrayOf(d.unstruct({ a: d.location(0, d.unorm8), b: d.location(1, d.f32) })),
-      ),
-    ).toThrowErrorMatchingInlineSnapshot(
-      `[Error: Vertex attribute 'b' (float32) is at byte offset 1, but WebGPU requires attributes of this format to be placed at a multiple of 4 bytes. Use d.align() or d.size() to adjust the layout.]`,
-    );
+
+    expect(layout.stride).toBe(16);
+    expect(layout.attrib.extra).toMatchObject({ format: 'unorm16', offset: 13 });
   });
 
   it('accepts packed formats placed at valid offsets', () => {

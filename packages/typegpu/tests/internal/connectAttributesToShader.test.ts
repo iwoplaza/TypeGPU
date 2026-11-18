@@ -246,4 +246,41 @@ describe('connectAttributesToShader', () => {
       usedVertexLayouts: [layout],
     });
   });
+
+  it('throws when a connected attribute is at a misaligned offset', () => {
+    const layout = tgpu.vertexLayout(
+      d.disarrayOf(d.unstruct({ a: d.unorm8, b: d.float32, c: d.unorm8x2, pad: d.uint8 })),
+    );
+
+    expect(() =>
+      connectAttributesToShader({ b: d.f32 }, { b: layout.attrib.b }),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex attribute 'b' (float32) is at byte offset 1, but WebGPU requires attributes of this format to be placed at a multiple of 4 bytes. Use d.align() or d.size() to adjust the layout.]`,
+    );
+    expect(() =>
+      connectAttributesToShader({ c: d.vec2f }, { c: layout.attrib.c }),
+    ).toThrowErrorMatchingInlineSnapshot(
+      `[Error: Vertex attribute 'c' (unorm8x2) is at byte offset 5, but WebGPU requires attributes of this format to be placed at a multiple of 2 bytes. Use d.align() or d.size() to adjust the layout.]`,
+    );
+    expect(() => connectAttributesToShader(d.f32, layout.attrib.b)).toThrow(
+      "Vertex attribute 'b' (float32) is at byte offset 1",
+    );
+  });
+
+  it('ignores misaligned attributes that the shader does not use', () => {
+    const layout = tgpu.vertexLayout(
+      d.disarrayOf(d.unstruct({ pos: d.float32x3, tag: d.uint8, extra: d.unorm16, tail: d.uint8 })),
+    );
+
+    expect(connectAttributesToShader({ pos: d.vec3f }, layout.attrib)).toStrictEqual({
+      bufferDefinitions: [
+        {
+          arrayStride: 16,
+          stepMode: 'vertex',
+          attributes: [{ format: 'float32x3', offset: 0, shaderLocation: 0 }],
+        },
+      ],
+      usedVertexLayouts: [layout],
+    });
+  });
 });

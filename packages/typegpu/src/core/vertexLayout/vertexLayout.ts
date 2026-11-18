@@ -41,6 +41,24 @@ export interface TgpuVertexLayout<
 
 export interface INTERNAL_TgpuVertexAttrib {
   readonly _layout: TgpuVertexLayout;
+  /** The name of the field this attribute comes from, if it's part of a struct */
+  readonly _key: string | undefined;
+  /** WebGPU requires the offset to be a multiple of `min(4, byteSize(format))` */
+  readonly _offsetAlignment: number;
+}
+
+/**
+ * WebGPU validates the offsets of only those attributes that end up in a pipeline,
+ * so this is called when an attribute gets connected to a shader, not when the layout is created.
+ */
+export function assertValidAttribOffset(attrib: TgpuVertexAttrib & INTERNAL_TgpuVertexAttrib) {
+  if (attrib.offset % attrib._offsetAlignment !== 0) {
+    const name =
+      attrib._key !== undefined ? `'${attrib._key}' (${attrib.format})` : `(${attrib.format})`;
+    throw new Error(
+      `Vertex attribute ${name} is at byte offset ${attrib.offset}, but WebGPU requires attributes of this format to be placed at a multiple of ${attrib._offsetAlignment} bytes. Use d.align() or d.size() to adjust the layout.`,
+    );
+  }
 }
 
 export function vertexLayout<TData extends WgslArray | Disarray>(
@@ -59,21 +77,6 @@ export function isVertexLayout(value: unknown): value is TgpuVertexLayout {
 // --------------
 
 const defaultAttribEntry = Symbol('defaultAttribEntry');
-
-function validateAttribOffset(
-  data: BaseData,
-  format: VertexFormat,
-  offset: number,
-  key: string | undefined,
-) {
-  const requiredAlignment = Math.min(4, sizeOf(data));
-  if (offset % requiredAlignment !== 0) {
-    const name = key !== undefined ? `'${key}' (${format})` : `(${format})`;
-    throw new Error(
-      `Vertex attribute ${name} is at byte offset ${offset}, but WebGPU requires attributes of this format to be placed at a multiple of ${requiredAlignment} bytes. Use d.align() or d.size() to adjust the layout.`,
-    );
-  }
-}
 
 function dataToContainedAttribs<TLayoutData extends WgslArray | Disarray, TData extends BaseData>(
   layout: TgpuVertexLayout<TLayoutData>,
@@ -110,9 +113,10 @@ function dataToContainedAttribs<TLayoutData extends WgslArray | Disarray, TData 
 
   if ('type' in data && typeof data.type === 'string') {
     if (vertexFormats.includes(data.type as VertexFormat)) {
-      validateAttribOffset(data, data.type as VertexFormat, offset, key);
       return {
         _layout: layout, // hidden property, used to determine which buffers to apply when executing the pipeline
+        _key: key,
+        _offsetAlignment: Math.min(4, sizeOf(data)),
         format: data.type as VertexFormat,
         offset,
         // oxlint-disable-next-line typescript/no-explicit-any -- too many type shenanigans
@@ -122,9 +126,10 @@ function dataToContainedAttribs<TLayoutData extends WgslArray | Disarray, TData 
     const format = (kindToDefaultFormatMap as Record<string, VertexFormat>)[data.type];
 
     if (format) {
-      validateAttribOffset(data, format, offset, key);
       return {
         _layout: layout, // hidden property, used to determine which buffers to apply when executing the pipeline
+        _key: key,
+        _offsetAlignment: Math.min(4, sizeOf(data)),
         format,
         offset,
         // oxlint-disable-next-line typescript/no-explicit-any -- too many type shenanigans
