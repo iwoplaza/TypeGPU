@@ -1181,6 +1181,41 @@ describe(`switch statement in 'use gpu' functions`, () => {
         }"
       `);
     });
+
+    it('does not drop a case because an unmatchable one converts to the same value', () => {
+      const truncated = tgpu.fn(
+        [d.i32],
+        d.i32,
+      )((x) => {
+        switch (x) {
+          case 1.5:
+            return 1;
+          case 1:
+            return 2;
+        }
+        return 0;
+      });
+
+      const wrapped = tgpu.fn(
+        [d.u32],
+        d.i32,
+      )((x) => {
+        switch (x) {
+          case -1:
+            return 1;
+          case 4294967295:
+            return 2;
+        }
+        return 0;
+      });
+
+      expect(() => tgpu.resolve([truncated])).toThrow(
+        "Case '1.5' can never match a switch selector of type 'i32'.",
+      );
+      expect(() => tgpu.resolve([wrapped])).toThrow(
+        "Case '-1' can never match a switch selector of type 'u32'.",
+      );
+    });
   });
   /* oxlint-enable no-duplicate-case */
 
