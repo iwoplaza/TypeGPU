@@ -291,6 +291,9 @@ export function onCleanup() {
     }
   }
 
+  if (isIOS) {
+    window.removeEventListener('orientationchange', setUVTransformForIOS);
+  }
   autoResizer.detach();
   root.destroy();
 }

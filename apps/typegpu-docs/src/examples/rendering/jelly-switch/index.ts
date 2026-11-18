@@ -587,9 +587,10 @@ canvas.addEventListener('mouseup', (event) => {
   event.stopPropagation();
 });
 
-window.addEventListener('mouseup', () => {
+const handleWindowMouseUp = () => {
   switchBehavior.pressed = false;
-});
+};
+window.addEventListener('mouseup', handleWindowMouseUp);
 
 async function autoSetQuaility() {
   if (!hasTimestampQuery) {
@@ -696,6 +697,7 @@ export const controls = defineControls({
 
 export function onCleanup() {
   cancelAnimationFrame(animationFrameHandle);
+  window.removeEventListener('mouseup', handleWindowMouseUp);
   autoResizer.detach();
   root.destroy();
 }
