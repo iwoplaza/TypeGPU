@@ -50,6 +50,7 @@ type TextureProps = {
   dimension?: GPUTextureDimension | undefined;
   mipLevelCount?: number | undefined;
   sampleCount?: number | undefined;
+  textureBindingViewDimension?: GPUTextureViewDimension | undefined;
 };
 ```
 
@@ -65,6 +66,8 @@ const texture = root.createTexture({
   dimension: '3d',
 })
 ```
+
+On devices without the `core-features-and-limits` feature (compatibility mode), a texture can only be bound as one view dimension, which you can pick with `textureBindingViewDimension`, e.g. `'cube'` for a 6-layer cubemap. Only dimensions that fit the texture's `dimension` and layer count are accepted.
 
 ### Usage flags
 
@@ -387,6 +390,8 @@ const sampledView = texture.createView(d.texture2d(d.f32));
 // - texture.createView(d.texture2d()); (defaults to f32)
 // - texture.createView();              (defaults to texture2d<f32>)
 ```
+
+The optional second argument accepts the usual view properties (`format`, `aspect`, `baseMipLevel`, `mipLevelCount`, `baseArrayLayer`, `arrayLayerCount`, `usage`), as well as `swizzle` when the `texture-component-swizzle` feature is enabled.
 
 :::tip
 If type information is available the view schema will be statically checked against the texture properties.

@@ -132,6 +132,18 @@ type TgpuTextureViewDescriptor = {
    * texture or one of the {@link GPUTextureDescriptor#viewFormats} specified during its creation.
    */
   format?: GPUTextureFormat;
+  /**
+   * The allowed {@link GPUTextureUsage | usage(s)} for the texture view. Must be a subset of the
+   * usage flags of the texture. If 0 or omitted, defaults to the full set of usage flags of the texture.
+   */
+  usage?: GPUTextureUsageFlags;
+  /**
+   * A string of length four, with each character (`r`, `g`, `b`, `a`, `0` or `1`) mapping to the
+   * texture view's red/green/blue/alpha channels, respectively.
+   * Requires the `texture-component-swizzle` feature to be enabled.
+   * @default 'rgba'
+   */
+  swizzle?: string;
 };
 
 type DefaultViewSchema<T extends Partial<TextureProps>> = TextureSchemaForDescriptor<{
@@ -350,6 +362,9 @@ class TgpuTextureImpl<TProps extends TextureProps> implements TgpuTexture<TProps
             viewFormats: props.viewFormats ?? [],
             mipLevelCount: props.mipLevelCount ?? 1,
             sampleCount: props.sampleCount ?? 1,
+            ...(props.textureBindingViewDimension && {
+              textureBindingViewDimension: props.textureBindingViewDimension,
+            }),
           });
         }
 
