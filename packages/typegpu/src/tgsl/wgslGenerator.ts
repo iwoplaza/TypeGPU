@@ -283,8 +283,10 @@ function tryFoldBitwiseOp(lhs: Snippet, op: string, rhs: Snippet): Snippet | und
 
   if (resultType === u32) {
     value >>>= 0;
-  } else if (value === -(2 ** 31)) {
-    // `-2147483648i` is not a valid WGSL literal, so we leave the expression to WGSL.
+  }
+  if (value === (resultType === u32 ? 2 ** 31 : -(2 ** 31))) {
+    // `-2147483648i` is not a valid WGSL literal, and it is also what 2147483648u
+    // becomes when converted to an i32, so we leave the expression to WGSL.
     return undefined;
   }
 
