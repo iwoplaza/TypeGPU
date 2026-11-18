@@ -12,9 +12,6 @@ const fixedThreeIdentifiers = {
     'OutputStruct',
     'varyings',
     'VaryingsStruct',
-    'instanceIndex',
-    'globalId',
-    'numWorkgroups',
     'render',
     'renderStruct',
     'frame',
@@ -50,11 +47,78 @@ const fixedThreeIdentifiers = {
 };
 
 /**
+ * Parameters of the WGSL `main` function, named after the `property` that `WGSLNodeBuilder` passes to `getBuiltin`.
+ * They're only registered once the node that needs them is generated, which is often after TypeGPU code has
+ * already been resolved, so they're listed upfront.
+ */
+const wgslBuiltinParameters = [
+  'vertexIndex',
+  'instanceIndex',
+  'invocationLocalIndex',
+  'subgroupSize',
+  'invocationSubgroupIndex',
+  'subgroupIndex',
+  'isFront',
+  'fragCoord',
+  'globalId',
+  'workgroupId',
+  'localId',
+  'numWorkgroups',
+];
+
+/**
  * Names that three.js numbers as it goes (`nodeVar3`, `nodeUniform0`, `f_nodeUniform2`, ...),
  * so they cannot be listed upfront.
  */
 const generatedThreeIdentifier =
   /^(?:[vf]_)?(?:nodeUniform|nodeVar|nodeConst|nodeVarying|nodeAttribute|nodeCode|NodeBuffer_|StructType|buffer)\d+$/;
+
+interface NodeBuilderState {
+  declarations?: Record<string, Record<string, unknown> | undefined>;
+  builtins?: Record<string, unknown>;
+  varyings?: { name: string }[];
+  geometry?: { attributes?: Record<string, unknown> } | null;
+  getAttributesArray?(): { name: string }[];
+}
+
+/**
+ * Names that the builder already knows will end up in the shader stage being built.
+ */
+function namesKnownToBuilder(builder: THREE.NodeBuilder): string[] {
+  const stage = builder.shaderStage ?? '';
+  const state = builder as unknown as NodeBuilderState;
+  const names: string[] = [];
+
+  // Declared so far (e.g. `DiffuseColor`, `positionLocal`, `object.nodeUniform0`)
+  for (const property of Object.keys(state.declarations?.[stage] ?? {})) {
+    names.push(property.split('.')[0] as string);
+  }
+
+  // Builtins registered so far, `attribute` ones are parameters of the vertex and compute `main`
+  for (const builtins of [state.builtins?.[stage], state.builtins?.attribute]) {
+    if (builtins instanceof Map) {
+      for (const { property } of (builtins as Map<string, { property: string }>).values()) {
+        names.push(property);
+      }
+    }
+  }
+
+  // Varyings are set up before code is generated, in GLSL they're globals, in WGSL fragment `main` parameters
+  for (const varying of state.varyings ?? []) {
+    names.push(varying.name);
+  }
+
+  // Vertex attributes are parameters of the WGSL `main`, and globals in GLSL. Only the ones used so far are
+  // registered, so the attributes of the geometry are included as well.
+  if (stage !== 'fragment') {
+    for (const attribute of state.getAttributesArray?.() ?? []) {
+      names.push(attribute.name);
+    }
+    names.push(...Object.keys(state.geometry?.attributes ?? {}));
+  }
+
+  return names;
+}
 
 /**
  * Makes the generator avoid identifiers that three.js uses in the shader being built.
@@ -65,26 +129,23 @@ export function avoidThreeIdentifiers<T extends ShaderGenerator>(
   webgl: boolean,
 ): T {
   const initGenerator = generator.initGenerator.bind(generator);
+  const isIdentifierReserved = generator.isIdentifierReserved?.bind(generator);
 
   generator.initGenerator = (ctx) => {
     initGenerator(ctx);
 
-    for (const id of fixedThreeIdentifiers[webgl ? 'glsl' : 'wgsl']) {
+    const reserved = [
+      ...fixedThreeIdentifiers[webgl ? 'glsl' : 'wgsl'],
+      ...(webgl ? [] : wgslBuiltinParameters),
+      ...namesKnownToBuilder(builder),
+    ];
+    for (const id of reserved) {
       ctx.reserveIdentifier(id, 'global');
     }
-
-    // Names declared by the builder so far (e.g. `DiffuseColor`, `positionLocal`, `object.nodeUniform0`)
-    const { declarations } = builder as {
-      declarations?: Record<string, Record<string, unknown> | undefined>;
-    };
-    for (const property of Object.keys(declarations?.[builder.shaderStage ?? ''] ?? {})) {
-      ctx.reserveIdentifier(property.split('.')[0] as string, 'global');
-    }
-
-    const isIdentifierTaken = ctx.isIdentifierTaken.bind(ctx);
-    ctx.isIdentifierTaken = (name, scope) =>
-      isIdentifierTaken(name, scope) || generatedThreeIdentifier.test(name);
   };
+
+  generator.isIdentifierReserved = (name) =>
+    isIdentifierReserved?.(name) === true || generatedThreeIdentifier.test(name);
 
   return generator;
 }

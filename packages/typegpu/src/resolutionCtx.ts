@@ -512,6 +512,7 @@ export class ResolutionCtxImpl implements ResolutionCtx {
       bannedTokens.has(name) ||
       builtins.has(name) ||
       templateEnumerants.has(name) ||
+      this.gen.isIdentifierReserved?.(name) === true ||
       this.#namespaceInternal.takenGlobalIdentifiers.has(name) ||
       (scope === 'block'
         ? this._itemStateStack.isIdentifierTakenLocally(name)

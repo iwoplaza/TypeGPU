@@ -117,6 +117,13 @@ export interface ShaderGenerator {
 
   initGenerator(ctx: ResolutionCtx): void;
 
+  /**
+   * Identifiers that generated code must not declare, in any scope, on top of the
+   * ones that are always reserved. Useful when the code ends up next to code generated
+   * by another system.
+   */
+  isIdentifierReserved?(name: string): boolean;
+
   declareGlobalConst(options: ConstantDefinitionOptions): ResolvedSnippet;
   declareGlobalVar(options: VariableDefinitionOptions): ResolvedSnippet;
   functionDefinition(options: FunctionDefinitionOptions): string;

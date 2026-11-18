@@ -1,5 +1,6 @@
 import { describe, expect } from 'vitest';
 import { tgpu, d } from 'typegpu';
+import { WgslGenerator } from 'typegpu/~internal';
 import { it } from 'typegpu-testing-utility';
 
 describe('tgpu.namespace', () => {
@@ -163,6 +164,36 @@ describe('tgpu.namespace', () => {
 
       fn createBoid_1() -> Boid_1 {
         return Boid_1();
+      }"
+    `);
+  });
+
+  it('does not name declarations after identifiers reserved by the shader generator', () => {
+    class ReservingGenerator extends WgslGenerator {
+      isIdentifierReserved(name: string) {
+        return /^(?:taken|outer)\d*$/.test(name);
+      }
+    }
+
+    const taken = tgpu.privateVar(d.f32).$name('taken');
+    const fn = tgpu.fn(
+      [],
+      d.f32,
+    )(() => {
+      const outer = taken.$;
+      const taken2 = outer;
+      return taken2;
+    });
+
+    expect(
+      tgpu.resolve([fn.$name('outer')], { unstable_shaderGenerator: new ReservingGenerator() }),
+    ).toMatchInlineSnapshot(`
+      "var<private> taken_1: f32;
+
+      fn outer_1() -> f32 {
+        let outer_2 = taken_1;
+        let taken2_1 = outer_2;
+        return taken2_1;
       }"
     `);
   });
